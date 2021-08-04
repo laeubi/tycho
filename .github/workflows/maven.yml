@@ -1,7 +1,7 @@
 # This workflow will build a Java project with Maven
 # For more information see: https://help.github.com/actions/language-and-framework-guides/building-and-testing-java-with-maven
 
-name: Java CI with Maven
+name: Build Tycho
 
 on:
   push:
@@ -21,5 +21,12 @@ jobs:
       with:
         java-version: '11'
         distribution: 'adopt'
+    - name: Cache local Maven repository
+      uses: actions/cache@v2
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
     - name: Build with Maven
-      run: mvn -B package --file pom.xml
+      run: mvn -B package -Pits --file pom.xml
