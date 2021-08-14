@@ -41,7 +41,7 @@ Step by step instructions:
 4. If you are behind a proxy, at this point you might want to double check your network settings by clicking in the _Network Proxy Settings_ at the bottom.
 5. Select _Eclipse IDE for Eclipse Committers_ . Click _Next_ .
 6. Under _Eclipse.org_ , double-click on _Tycho_ (single click is not enough!). Make sure that _Tycho_ is shown in the table on the bottom. Click _Next_.
-7. You can edit the _Installation Folder_ , but you do not have to select the _Target Platform_ here, this will be set later automatically. By choosing _Show all variables_ at the bottom of the page, you are able to change other values as well but you do not have to. Click _Next_ .
+7. You can edit the _Installation Folder_ , but you do not have to select the _Target Platform_ here, this will be set later automatically. By choosing _Show all variables_ at the bottom of the page, you are able to change other values as well but you do not have to. (Unless you have write access to the GitHub repository, make sure you select "HTTPS read-only" in the dropdown "Tycho Github repository"). Click _Next_.
 8. Press _Finished_ on the _Confirmation_ page will start the installation process. 
 9. The installer will download the selected Eclipse version, starts Eclipse and will perform all the additional steps (cloning the git repos, etc...). When the downloaded Eclipse started, the progress bar in the status bar shows the progress of the overall setup.
 10. Once the _Executing startup task_ job is finished you should have all the Tycho and Tycho Extras projects imported into 2 working sets called _Tycho_ and _Tycho Extras_ .
@@ -122,9 +122,9 @@ To use a different Tycho snapshot repository use the system property `tycho-snap
 
 Tycho makes heavy use of p2 functionality. Therefore it may be useful to try out patches to p2 without waiting for a new p2 release, or even just the next nightly build. With the following steps it is possible to build Tycho against a locally built version of p2.
 
-1. Get the p2 sources (see [http://projects.eclipse.org/projects/rt.equinox.p2/developer p2 project information])
-2. Make changes in the p2 sources
-3. Build the changed p2 bundles individually with <tt>mvn clean install -Pbuild-individual-bundles</tt> (see [[Equinox/p2/Build]] for more information)
+1. Get the p2 sources (see [p2 project information](http://projects.eclipse.org/projects/rt.equinox.p2/developer))
+2. Make changes in the p2 sources, **(!) don't forget to increase the version of that bundle otherwhise your changes will be overwritten with the current release version (!)**
+3. Build the changed p2 bundles individually with <tt>mvn clean install -Pbuild-individual-bundles</tt> (see [Equinox/p2/Build](https://wiki.eclipse.org/Equinox/p2/Build) for more information)
 4. Build at least the Tycho module tycho-bundles-external with <tt>mvn clean install</tt> - you should see a warning that the locally built p2 bundles have been used.
 Then the locally built Tycho SNAPSHOT includes the patched p2 version.
 
