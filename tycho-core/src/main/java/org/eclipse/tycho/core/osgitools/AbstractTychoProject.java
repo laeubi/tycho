@@ -73,9 +73,9 @@ public abstract class AbstractTychoProject extends AbstractLogEnabled implements
     public void checkForMissingDependencies(ReactorProject project) {
     }
 
-    public void resolveClassPath(MavenSession session, MavenProject project) {
-        // do nothing by default
-    }
+//    public void resolveClassPath(MavenSession session, MavenProject project) {
+//        // do nothing by default
+//    }
 
     protected TargetEnvironment[] getEnvironments(ReactorProject project, TargetEnvironment environment) {
         if (environment != null) {

@@ -170,7 +170,7 @@ public class DefaultTychoResolver implements TychoResolver {
         }
 
         logger.info("Resolving class path of " + project);
-        dr.resolveClassPath(session, project);
+//        dr.resolveClassPath(session, project);
 
         resolver.injectDependenciesIntoMavenModel(project, dr, dependencyArtifacts, testDependencyArtifacts, logger);
 

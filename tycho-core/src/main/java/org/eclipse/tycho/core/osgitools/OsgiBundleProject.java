@@ -89,6 +89,10 @@ import org.osgi.framework.InvalidSyntaxException;
 @Component(role = TychoProject.class, hint = PackagingType.TYPE_ECLIPSE_PLUGIN)
 public class OsgiBundleProject extends AbstractTychoProject implements BundleProject {
 
+    private static final String CTX_MAVEN_SESSION = "tycho.MavenSession";
+
+    private static final String CTX_MAVEN_PROJECT = "tycho.MavenProject";
+
     private static final String CTX_ARTIFACT_KEY = TychoConstants.CTX_BASENAME + "/osgiBundle/artifactKey";
 
     @Requirement
@@ -171,7 +175,10 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
     @Override
     public void setupProject(MavenSession session, MavenProject project) {
         ArtifactKey key = readArtifactKey(project.getBasedir());
-        DefaultReactorProject.adapt(project).setContextValue(CTX_ARTIFACT_KEY, key);
+        ReactorProject reactorProject = DefaultReactorProject.adapt(project);
+        reactorProject.setContextValue(CTX_ARTIFACT_KEY, key);
+        reactorProject.setContextValue(CTX_MAVEN_PROJECT, project);
+        reactorProject.setContextValue(CTX_MAVEN_SESSION, session);
     }
 
     public ArtifactKey readArtifactKey(File location) {
@@ -188,8 +195,7 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
         return bundleReader.loadManifest(project.getBasedir());
     }
 
-    @Override
-    public void resolveClassPath(MavenSession session, MavenProject project) {
+    public List<ClasspathEntry> resolveClassPath(MavenSession session, MavenProject project) {
         ReactorProject reactorProject = DefaultReactorProject.adapt(project);
         DependencyArtifacts artifacts = getDependencyArtifacts(reactorProject);
 
@@ -254,6 +260,8 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
                 dependencyComputer.computeBootClasspathExtraAccessRules(state));
 
         addPDESourceRoots(project);
+        return classpath;
+
     }
 
     private Collection<ClasspathEntry> computeExtraTestClasspath(ReactorProject reactorProject) {
@@ -369,7 +377,8 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
         List<ClasspathEntry> classpath = (List<ClasspathEntry>) project
                 .getContextValue(TychoConstants.CTX_ECLIPSE_PLUGIN_CLASSPATH);
         if (classpath == null) {
-            throw new IllegalStateException();
+            return resolveClassPath((MavenSession) project.getContextValue(CTX_MAVEN_SESSION),
+                    (MavenProject) project.getContextValue(CTX_MAVEN_PROJECT));
         }
         return classpath;
     }
@@ -485,7 +494,8 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
             if (entry instanceof LibraryClasspathEntry) {
                 LibraryClasspathEntry libraryClasspathEntry = (LibraryClasspathEntry) entry;
                 ArtifactKey projectKey = getArtifactKey(project);
-                classpath.add(new DefaultClasspathEntry(project, projectKey, Collections.singletonList(libraryClasspathEntry.getLibraryPath()), null));
+                classpath.add(new DefaultClasspathEntry(project, projectKey,
+                        Collections.singletonList(libraryClasspathEntry.getLibraryPath()), null));
             }
         }
     }

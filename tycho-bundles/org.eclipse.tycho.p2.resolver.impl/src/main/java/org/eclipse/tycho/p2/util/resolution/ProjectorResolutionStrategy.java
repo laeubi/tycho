@@ -27,6 +27,7 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.MultiStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.equinox.internal.p2.director.Explanation;
+import org.eclipse.equinox.internal.p2.director.Explanation.MissingIU;
 import org.eclipse.equinox.internal.p2.director.Projector;
 import org.eclipse.equinox.internal.p2.director.QueryableArray;
 import org.eclipse.equinox.internal.p2.director.SimplePlanner;
@@ -64,9 +65,15 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
     public Collection<IInstallableUnit> resolve(Map<String, String> properties, IProgressMonitor monitor)
             throws ResolverException {
 
+        List<IInstallableUnit> additionalUnits = new ArrayList<>();
+        return resolveInternal(properties, additionalUnits, monitor);
+    }
+
+    protected Collection<IInstallableUnit> resolveInternal(Map<String, String> properties,
+            Collection<IInstallableUnit> additionalUnits, IProgressMonitor monitor) throws ResolverException {
         Map<String, String> newSelectionContext = SimplePlanner.createSelectionContext(properties);
 
-        IQueryable<IInstallableUnit> slice = slice(properties, monitor);
+        IQueryable<IInstallableUnit> slice = slice(properties, additionalUnits, monitor);
 
         Set<IInstallableUnit> seedUnits = new LinkedHashSet<>(data.getRootIUs());
         List<IRequirement> seedRequires = new ArrayList<>();
@@ -77,17 +84,36 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
         // force profile UIs to be used during resolution
         seedUnits.addAll(data.getEEResolutionHints().getMandatoryUnits());
         seedRequires.addAll(data.getEEResolutionHints().getMandatoryRequires());
-
         Projector projector = new Projector(slice, newSelectionContext, new HashSet<IInstallableUnit>(), false);
         projector.encode(createUnitRequiring("tycho", seedUnits, seedRequires),
-                EMPTY_IU_ARRAY /* alreadyExistingRoots */, new QueryableArray(EMPTY_IU_ARRAY) /* installedIUs */,
-                seedUnits /* newRoots */, monitor);
+                EMPTY_IU_ARRAY /* alreadyExistingRoots */,
+                new QueryableArray(EMPTY_IU_ARRAY) /* installedIUs */, seedUnits /* newRoots */, monitor);
         IStatus s = projector.invokeSolver(monitor);
         if (s.getSeverity() == IStatus.ERROR) {
             // log all transitive requirements which cannot be satisfied; this doesn't print the dependency chain from the seed to the units with missing requirements, so this is less useful than the "explanation" 
             logger.debug(StatusTool.collectProblems(s));
 
             Set<Explanation> explanation = projector.getExplanation(new NullProgressMonitor()); // suppress "Cannot complete the request.  Generating details."
+
+            List<IRequirement> requirements = explanation.stream().filter(MissingIU.class::isInstance)
+                    .map(MissingIU.class::cast).map(miu -> miu.req).collect(Collectors.toList());
+            if (requirements.size() > 0) {
+                IInstallableUnit providing = createUnitProviding("tycho.unresolved.requirements", requirements);
+                if (providing.getProvidedCapabilities().size() > 0) {
+                    System.out.println("created a unit for missing requirements:" + providing);
+                    additionalUnits.add(providing);
+                    return resolveInternal(properties, additionalUnits, monitor);
+                }
+            }
+            for (Explanation exp : explanation) {
+                if (exp instanceof MissingIU) {
+                    MissingIU missingIU = (MissingIU) exp;
+                    System.out.println("MissingIU: " + missingIU.iu);
+                    System.out.println("           " + missingIU.req);
+                } else {
+                    System.out.println(exp.getClass() + ": " + exp);
+                }
+            }
             throw new ResolverException(explanation.stream().map(Object::toString).collect(Collectors.joining("\n")),
                     newSelectionContext.toString(), StatusTool.findException(s));
         }
@@ -136,13 +162,14 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
 
         IInstallableUnit swtFragment = null;
 
-        all_ius: for (Iterator<IInstallableUnit> iter = new QueryableCollection(availableIUs).query(
-                QueryUtil.ALL_UNITS, monitor).iterator(); iter.hasNext();) {
+        all_ius: for (Iterator<IInstallableUnit> iter = new QueryableCollection(availableIUs)
+                .query(QueryUtil.ALL_UNITS, monitor).iterator(); iter.hasNext();) {
             IInstallableUnit iu = iter.next();
             if (iu.getId().startsWith("org.eclipse.swt") && isApplicable(newSelectionContext, iu.getFilter())
                     && providesJavaPackages(iu)) {
                 for (IProvidedCapability provided : iu.getProvidedCapabilities()) {
-                    if ("osgi.fragment".equals(provided.getNamespace()) && "org.eclipse.swt".equals(provided.getName())) {
+                    if ("osgi.fragment".equals(provided.getNamespace())
+                            && "org.eclipse.swt".equals(provided.getName())) {
                         if (swtFragment == null || swtFragment.getVersion().compareTo(iu.getVersion()) < 0) {
                             swtFragment = iu;
                         }
@@ -153,8 +180,8 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
         }
 
         if (swtFragment == null) {
-            throw new RuntimeException("Could not determine SWT implementation fragment bundle for environment "
-                    + newSelectionContext);
+            throw new RuntimeException(
+                    "Could not determine SWT implementation fragment bundle for environment " + newSelectionContext);
         }
 
         resolutionResult.add(swtFragment);
