@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2012 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2021 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -62,7 +62,7 @@ public class DependencyCollectorTest {
         DependencyCollector dc = new DependencyCollector(logVerifier.getLogger());
         dc.setData(data);
         try {
-            dc.resolve(Collections.<String, String> emptyMap(), new NullProgressMonitor());
+            dc.resolve(Collections.<String, String> emptyMap(), false, new NullProgressMonitor());
             Assert.fail();
         } catch (RuntimeException e) {
             Throwable cause = e.getCause();

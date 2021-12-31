@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2011, 2020 SAP SE and others.
+ * Copyright (c) 2011, 2021 SAP SE and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -141,8 +141,8 @@ public class InstallableUnitResolver {
                 ResolutionDataImpl data = new ResolutionDataImpl(executionEnvironment);
                 data.setRootIUs(allRoots);
                 data.setAvailableIUsAndFilter(allUnits);
-                Collection<IInstallableUnit> resolve = getPlannerResolutionStrategy(data)
-                        .multiPlatformResolve(environments, new DuplicateFilteringLoggingProgressMonitor(logger));
+                Collection<IInstallableUnit> resolve = getPlannerResolutionStrategy(data).multiPlatformResolve(
+                        environments, false, new DuplicateFilteringLoggingProgressMonitor(logger));
                 if (!resolve.isEmpty()) {
                     collector.addAll(resolve);
                     if (includeSource) {
@@ -157,7 +157,7 @@ public class InstallableUnitResolver {
                     data.setRootIUs(root.rootIUs);
                     data.setAvailableIUsAndFilter(root.localUnits);
                     SlicerResolutionStrategy strategy = getSlicerResolutionStrategy(data);
-                    Collection<IInstallableUnit> resolve = strategy.multiPlatformResolve(environments,
+                    Collection<IInstallableUnit> resolve = strategy.multiPlatformResolve(environments, false,
                             new DuplicateFilteringLoggingProgressMonitor(logger));
                     if (!resolve.isEmpty()) {
                         collector.addAll(resolve);
@@ -251,7 +251,7 @@ public class InstallableUnitResolver {
             data.setRootIUs(Collections.singleton(sourceIU));
             final TargetEnvironment nonFilteringEnvironment = new TargetEnvironment();
             Collection<IInstallableUnit> sourceUnits = strategySupplier.apply(data).resolve(nonFilteringEnvironment,
-                    progressMonitor);
+                    false, progressMonitor);
             sourceUnits.remove(sourceIU); // nobody wants to see our artificial IU
             return sourceUnits; // TODO: remove duplicates?
         } finally {

@@ -12,6 +12,7 @@
  *    Christoph Läubrich    - Bug 551739, Bug 538144, Bug 533747
  *                          - [Bug 567098] pomDependencies=consider should wrap non-osgi jars
  *                          - [Bug 572481] Tycho does not understand "additional.bundles" directive in build.properties
+ *                          - [Issue #462] Delay Pom considered items to the final Target Platform calculation 
  *******************************************************************************/
 package org.eclipse.tycho.p2.resolver;
 
@@ -22,6 +23,7 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -76,6 +78,7 @@ import org.eclipse.tycho.core.osgitools.AbstractTychoProject;
 import org.eclipse.tycho.core.osgitools.BundleReader;
 import org.eclipse.tycho.core.osgitools.DebugUtils;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
+import org.eclipse.tycho.core.osgitools.targetplatform.ArtifactCollection;
 import org.eclipse.tycho.core.osgitools.targetplatform.DefaultDependencyArtifacts;
 import org.eclipse.tycho.core.osgitools.targetplatform.MultiEnvironmentDependencyArtifacts;
 import org.eclipse.tycho.core.p2.P2ArtifactRepositoryLayout;
@@ -89,6 +92,7 @@ import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.osgi.adapters.MavenLoggerAdapter;
 import org.eclipse.tycho.p2.facade.internal.AttachedArtifact;
 import org.eclipse.tycho.p2.metadata.DependencyMetadataGenerator;
+import org.eclipse.tycho.p2.metadata.IArtifactFacade;
 import org.eclipse.tycho.p2.metadata.PublisherOptions;
 import org.eclipse.tycho.p2.repository.LocalRepositoryP2Indices;
 import org.eclipse.tycho.p2.resolver.facade.P2ResolutionResult;
@@ -116,9 +120,6 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
     @Requirement
     private BuildPropertiesParser buildPropertiesParser;
 
-    @Requirement
-    private ProjectDependenciesResolver projectDependenciesResolver;
-
     @Requirement(role = TychoProject.class)
     private Map<String, TychoProject> projectTypes;
 
@@ -133,6 +134,10 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
     private DependencyMetadataGenerator generator;
 
     private ReactorRepositoryManagerFacade reactorRepositoryManager;
+
+    @SuppressWarnings("deprecation")
+    @Requirement
+    private ProjectDependenciesResolver projectDependenciesResolver;
 
     @Override
     public void setupProjects(final MavenSession session, final MavenProject project,
@@ -208,9 +213,6 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
 
         TargetPlatformConfigurationStub tpConfiguration = new TargetPlatformConfigurationStub();
         tpConfiguration.setIncludePackedArtifacts(configuration.isIncludePackedArtifacts());
-
-        PomDependencyCollector pomDependencies = collectPomDependencies(project, reactorProjects, session,
-                configuration.getPomDependencies());
         for (ArtifactRepository repository : project.getRemoteArtifactRepositories()) {
             addEntireP2RepositoryToTargetPlatform(repository, tpConfiguration);
         }
@@ -224,7 +226,7 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
         tpConfiguration.setIncludeSourceMode(configuration.getTargetDefinitionIncludeSourceMode());
 
         return reactorRepositoryManager.computePreliminaryTargetPlatform(reactorProject, tpConfiguration, ee,
-                reactorProjects, pomDependencies);
+                reactorProjects);
     }
 
     private ReactorProject getThisReactorProject(MavenSession session, MavenProject project,
@@ -266,16 +268,25 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
         return reactorProjet;
     }
 
-    private PomDependencyCollector collectPomDependencies(MavenProject project, List<ReactorProject> reactorProjects,
-            MavenSession session, PomDependencies pomDependencies) {
+    @SuppressWarnings("deprecation")
+    @Override
+    public PomDependencyCollector resolvePomDependencies(MavenSession session, MavenProject project) {
+
+        ReactorProject reactorProject = DefaultReactorProject.adapt(project);
+        TargetPlatformConfiguration configuration = TychoProjectUtils.getTargetPlatformConfiguration(reactorProject);
+        PomDependencies pomDependencies = configuration.getPomDependencies();
         if (pomDependencies == PomDependencies.ignore) {
-            return resolverFactory.newPomDependencyCollector(DefaultReactorProject.adapt(project));
+            return resolverFactory.newPomDependencyCollector(reactorProject);
         }
+
+        List<ReactorProject> reactorProjects = DefaultReactorProject.adapt(session);
 
         Set<String> projectIds = new HashSet<>();
         for (ReactorProject p : reactorProjects) {
-            String key = ArtifactUtils.key(p.getGroupId(), p.getArtifactId(), p.getVersion());
-            projectIds.add(key);
+            if (PackagingType.TYPE_ECLIPSE_PLUGIN.equals(p.getPackaging())) {
+                String key = ArtifactUtils.key(p.getGroupId(), p.getArtifactId(), p.getVersion());
+                projectIds.add(key);
+            }
         }
 
         ArrayList<String> scopes = new ArrayList<>();
@@ -314,8 +325,22 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
         }
         PomDependencyProcessor pomDependencyProcessor = new PomDependencyProcessor(session, repositorySystem,
                 resolverFactory, equinox.getService(LocalRepositoryP2Indices.class), getLogger());
-        return pomDependencyProcessor.collectPomDependencies(project, externalArtifacts,
-                pomDependencies == PomDependencies.wrapAsBundle);
+        PomDependencyCollector dependencyCollector = pomDependencyProcessor.collectPomDependencies(project,
+                externalArtifacts, pomDependencies == PomDependencies.wrapAsBundle);
+        DependencyArtifacts dependencyArtifacts = TychoProjectUtils.getDependencyArtifacts(reactorProject);
+        if (dependencyArtifacts instanceof ArtifactCollection) {
+            //enhance the dependency set
+            ArtifactCollection collection = (ArtifactCollection) dependencyArtifacts;
+            Map<?, IArtifactFacade> mavenInstallableUnits = dependencyCollector.getMavenInstallableUnits();
+            for (var entry : mavenInstallableUnits.entrySet()) {
+                Object key = entry.getKey();
+                IArtifactFacade val = entry.getValue();
+                ArtifactKey artifactKey = dependencyCollector.getArtifactKey(val);
+                File location = val.getLocation();
+                collection.addArtifactFile(artifactKey, location, Collections.singleton(key));
+            }
+        }
+        return dependencyCollector;
     }
 
     private void addEntireP2RepositoryToTargetPlatform(ArtifactRepository repository,

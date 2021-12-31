@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2012 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2021 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -71,22 +71,22 @@ public class SlicerResolutionStrategy extends AbstractSlicerResolutionStrategy {
 
     @Override
     public Collection<IInstallableUnit> multiPlatformResolve(List<TargetEnvironment> environments,
-            IProgressMonitor monitor) throws ResolverException {
+            boolean allowIncomplete, IProgressMonitor monitor) throws ResolverException {
         if (ignoreFilters) {
             // short cut: properties would ignored for each single resolution, so resolve just once 
-            return resolve(Collections.<String, String> emptyMap(), monitor);
+            return resolve(Collections.<String, String> emptyMap(), allowIncomplete, monitor);
         }
-        return super.multiPlatformResolve(environments, monitor);
+        return super.multiPlatformResolve(environments, allowIncomplete, monitor);
     }
 
     @Override
-    public Collection<IInstallableUnit> resolve(Map<String, String> properties, IProgressMonitor monitor)
-            throws ResolverException {
+    public Collection<IInstallableUnit> resolve(Map<String, String> properties, boolean allowIncomplete,
+            IProgressMonitor monitor) throws ResolverException {
 
         IQueryable<IInstallableUnit> slice = slice(properties, monitor);
 
-        Set<IInstallableUnit> result = new LinkedHashSet<>(slice.query(QueryUtil.ALL_UNITS, monitor)
-                .toUnmodifiableSet());
+        Set<IInstallableUnit> result = new LinkedHashSet<>(
+                slice.query(QueryUtil.ALL_UNITS, monitor).toUnmodifiableSet());
         result.removeAll(data.getEEResolutionHints().getTemporaryAdditions());
 
         if (logger.isExtendedDebugEnabled()) {

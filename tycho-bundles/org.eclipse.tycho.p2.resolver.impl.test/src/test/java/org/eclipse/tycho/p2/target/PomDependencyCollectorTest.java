@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2011, 2020 Sonatype Inc. and others.
+ * Copyright (c) 2011, 2021 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -103,7 +103,7 @@ public class PomDependencyCollectorTest {
     private Collection<IInstallableUnit> getTargetPlatformUnits() {
         TestResolverFactory resolverFactory = new TestResolverFactory(logVerifier.getLogger());
         P2TargetPlatform platform = resolverFactory.getTargetPlatformFactoryImpl()
-                .createTargetPlatform(new TargetPlatformConfigurationStub(), NOOP_EE_RESOLUTION_HANDLER, null, subject);
+                .createTargetPlatform(new TargetPlatformConfigurationStub(), NOOP_EE_RESOLUTION_HANDLER, null);
         return platform.getInstallableUnits();
     }
 }

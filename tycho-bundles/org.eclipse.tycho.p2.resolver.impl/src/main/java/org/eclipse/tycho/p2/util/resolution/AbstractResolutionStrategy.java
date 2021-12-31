@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2014 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2021 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -39,24 +39,24 @@ public abstract class AbstractResolutionStrategy {
         this.data = data;
     }
 
-    public final Collection<IInstallableUnit> resolve(TargetEnvironment environment, IProgressMonitor monitor)
-            throws ResolverException {
-        return resolve(getEffectiveFilterProperties(environment), monitor);
+    public final Collection<IInstallableUnit> resolve(TargetEnvironment environment, boolean allowIncompleteState,
+            IProgressMonitor monitor) throws ResolverException {
+        return resolve(getEffectiveFilterProperties(environment), allowIncompleteState, monitor);
     }
 
     public Collection<IInstallableUnit> multiPlatformResolve(List<TargetEnvironment> environments,
-            IProgressMonitor monitor) throws ResolverException {
+            boolean allowIncompleteState, IProgressMonitor monitor) throws ResolverException {
         Set<IInstallableUnit> result = new LinkedHashSet<>();
 
         for (TargetEnvironment environment : environments) {
-            result.addAll(resolve(getEffectiveFilterProperties(environment), monitor));
+            result.addAll(resolve(getEffectiveFilterProperties(environment), allowIncompleteState, monitor));
         }
 
         return result;
     }
 
-    protected abstract Collection<IInstallableUnit> resolve(Map<String, String> properties, IProgressMonitor monitor)
-            throws ResolverException;
+    protected abstract Collection<IInstallableUnit> resolve(Map<String, String> properties,
+            boolean allowIncompleteState, IProgressMonitor monitor) throws ResolverException;
 
     private Map<String, String> getEffectiveFilterProperties(TargetEnvironment environment) {
         Map<String, String> result = environment.toFilterProperties();

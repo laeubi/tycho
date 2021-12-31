@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2020 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2021 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -506,11 +506,11 @@ public class P2ResolverTest extends P2ResolverTestBase {
     }
 
     private P2TargetPlatform getTargetPlatform() {
-        return tpFactory.createTargetPlatform(tpConfig, NOOP_EE_RESOLUTION_HANDLER, reactorProjects, pomDependencies);
+        return tpFactory.createTargetPlatform(tpConfig, NOOP_EE_RESOLUTION_HANDLER, reactorProjects);
     }
 
     private P2TargetPlatform getTargetPlatform(ExecutionEnvironmentResolutionHandler eeResolutionHandler) {
-        return tpFactory.createTargetPlatform(tpConfig, eeResolutionHandler, reactorProjects, pomDependencies);
+        return tpFactory.createTargetPlatform(tpConfig, eeResolutionHandler, reactorProjects);
     }
 
     private static P2ResolutionResult singleEnv(Map<TargetEnvironment, P2ResolutionResult> map) {

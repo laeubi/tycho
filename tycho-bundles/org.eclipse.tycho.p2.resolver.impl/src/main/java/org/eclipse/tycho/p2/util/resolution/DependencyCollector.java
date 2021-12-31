@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2012 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2021 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -41,7 +41,8 @@ public class DependencyCollector extends AbstractResolutionStrategy {
     }
 
     @Override
-    public Collection<IInstallableUnit> resolve(Map<String, String> properties, IProgressMonitor monitor) {
+    public Collection<IInstallableUnit> resolve(Map<String, String> properties, boolean allowIncompleteState,
+            IProgressMonitor monitor) {
         Set<IInstallableUnit> result = new LinkedHashSet<>();
 
         LinkedHashSet<IStatus> errors = new LinkedHashSet<>();

@@ -167,8 +167,7 @@ public class P2ResolverImpl implements P2Resolver {
     @Override
     public P2ResolutionResult resolveMetadata(TargetPlatformConfigurationStub tpConfiguration,
             ExecutionEnvironmentConfiguration eeConfig) {
-        P2TargetPlatform contextImpl = targetPlatformFactory.createTargetPlatform(tpConfiguration, eeConfig, null,
-                null);
+        P2TargetPlatform contextImpl = targetPlatformFactory.createTargetPlatform(tpConfiguration, eeConfig, null);
 
         ResolutionDataImpl data = new ResolutionDataImpl(contextImpl.getEEResolutionHints());
         data.setAvailableIUs(contextImpl.getInstallableUnits());
@@ -180,7 +179,7 @@ public class P2ResolverImpl implements P2Resolver {
 
         MetadataOnlyP2ResolutionResult result = new MetadataOnlyP2ResolutionResult();
         try {
-            for (IInstallableUnit iu : strategy.multiPlatformResolve(environments, monitor)) {
+            for (IInstallableUnit iu : strategy.multiPlatformResolve(environments, false, monitor)) {
                 result.addArtifact(ArtifactType.TYPE_INSTALLABLE_UNIT, iu.getId(), iu.getVersion().toString(), iu);
             }
         } catch (ResolverException e) {
@@ -196,7 +195,7 @@ public class P2ResolverImpl implements P2Resolver {
     public P2ResolutionResult getTargetPlatformAsResolutionResult(TargetPlatformConfigurationStub tpConfiguration,
             String eeName) {
         P2TargetPlatform targetPlatform = targetPlatformFactory.createTargetPlatform(tpConfiguration,
-                new ExecutionEnvironmentConfigurationStub(eeName), null, null);
+                new ExecutionEnvironmentConfigurationStub(eeName), null);
 
         MetadataOnlyP2ResolutionResult result = new MetadataOnlyP2ResolutionResult();
         for (IInstallableUnit iu : targetPlatform.getInstallableUnits()) {
@@ -229,7 +228,8 @@ public class P2ResolverImpl implements P2Resolver {
         strategy.setData(data);
         Collection<IInstallableUnit> newState;
         try {
-            newState = strategy.resolve(environment, monitor);
+            //FIXME must be determined according to the pomDependecies=considered!
+            newState = strategy.resolve(environment, true, monitor);
         } catch (ResolverException e) {
             logger.info(e.getSelectionContext());
             logger.error("Cannot resolve project dependencies:");
