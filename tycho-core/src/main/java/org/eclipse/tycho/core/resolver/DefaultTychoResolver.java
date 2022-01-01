@@ -35,6 +35,7 @@ import org.eclipse.tycho.artifacts.TargetPlatform;
 import org.eclipse.tycho.core.BundleProject;
 import org.eclipse.tycho.core.DependencyResolver;
 import org.eclipse.tycho.core.DependencyResolverConfiguration;
+import org.eclipse.tycho.core.PomDependencies;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
 import org.eclipse.tycho.core.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
@@ -161,6 +162,11 @@ public class DefaultTychoResolver implements TychoResolver {
                         ArrayList<ArtifactKey> res = new ArrayList<>(resolverConfiguration.getExtraRequirements());
                         res.addAll(testDependencies);
                         return res;
+                    }
+
+                    @Override
+                    public PomDependencies getPomDependencies() {
+                        return resolverConfiguration.getPomDependencies();
                     }
                 };
                 testDependencyArtifacts = resolver.resolveDependencies(session, project, preliminaryTargetPlatform,

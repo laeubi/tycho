@@ -77,6 +77,7 @@ import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.core.BundleProject;
 import org.eclipse.tycho.core.DependencyResolver;
 import org.eclipse.tycho.core.DependencyResolverConfiguration;
+import org.eclipse.tycho.core.PomDependencies;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
 import org.eclipse.tycho.core.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
@@ -798,6 +799,11 @@ public abstract class AbstractTestMojo extends AbstractMojo {
             @Override
             public List<ArtifactKey> getExtraRequirements() {
                 return extraDependencies;
+            }
+
+            @Override
+            public PomDependencies getPomDependencies() {
+                return PomDependencies.ignore;
             }
         };
 

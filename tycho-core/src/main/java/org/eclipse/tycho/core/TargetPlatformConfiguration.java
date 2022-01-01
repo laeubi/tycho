@@ -34,23 +34,6 @@ public class TargetPlatformConfiguration implements DependencyResolverConfigurat
         first, minimal
     }
 
-    public enum PomDependencies {
-        /**
-         * pom dependencies are ignored
-         */
-        ignore,
-        /**
-         * pom dependencies are considered if the are already valid osgi artifacts. p2 metadata may
-         * be generated if missing
-         */
-        consider,
-        /**
-         * pom dependencies are used and wrapped into OSGi bundles if necessary. p2 metadata may be
-         * generated if missing.
-         */
-        wrapAsBundle;
-    }
-
     private String resolver;
 
     private List<TargetEnvironment> environments = new ArrayList<>();
@@ -125,6 +108,7 @@ public class TargetPlatformConfiguration implements DependencyResolverConfigurat
         this.pomDependencies = pomDependencies;
     }
 
+    @Override
     public PomDependencies getPomDependencies() {
         return pomDependencies;
     }
