@@ -199,7 +199,7 @@ public class StandardExecutionEnvironment implements Comparable<StandardExecutio
     }
 
     @Override
-    public Collection<SystemPackageEntry> getSystemPackages() {
+    public synchronized Collection<SystemPackageEntry> getSystemPackages() {
         if (systemPackages == null) {
             // EE definitions in Tycho for JVMs 11+ will no longer contain system packages as with modular JVMs it's not sure
             // all packages will be available at runtime
@@ -252,8 +252,7 @@ public class StandardExecutionEnvironment implements Comparable<StandardExecutio
 
     @Override
     public int hashCode() {
-        return Objects.hash(compilerSourceLevel, compilerTargetLevel, eeVersion, profileName, profileProperties,
-                systemPackages);
+        return Objects.hash(compilerSourceLevel, compilerTargetLevel, eeVersion, profileName, profileProperties);
     }
 
     @Override
@@ -272,8 +271,7 @@ public class StandardExecutionEnvironment implements Comparable<StandardExecutio
                 && Objects.equals(this.compilerTargetLevel, other.compilerTargetLevel)
                 && Objects.equals(this.eeVersion, other.eeVersion)
                 && Objects.equals(this.profileName, other.profileName)
-                && Objects.equals(this.profileProperties, other.profileProperties)
-                && Objects.equals(this.systemPackages, other.systemPackages);
+                && Objects.equals(this.profileProperties, other.profileProperties);
     }
 
     @Override

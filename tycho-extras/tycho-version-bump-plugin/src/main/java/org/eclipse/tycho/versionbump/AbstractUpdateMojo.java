@@ -13,8 +13,6 @@
 package org.eclipse.tycho.versionbump;
 
 import java.io.File;
-import java.io.IOException;
-import java.net.URISyntaxException;
 
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -54,7 +52,7 @@ public abstract class AbstractUpdateMojo extends AbstractMojo {
 
     protected abstract File getFileToBeUpdated();
 
-    protected abstract void doUpdate() throws IOException, URISyntaxException;
+    protected abstract void doUpdate() throws Exception;
 
     private void createResolver() {
         P2ResolverFactory factory = equinox.getService(P2ResolverFactory.class);

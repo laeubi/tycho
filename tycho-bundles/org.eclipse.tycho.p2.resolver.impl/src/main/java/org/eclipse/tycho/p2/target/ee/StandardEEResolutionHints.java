@@ -180,4 +180,13 @@ public final class StandardEEResolutionHints implements ExecutionEnvironmentReso
         return Stream.empty();
     }
 
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("StandardEEResolutionHints [executionEnvironment=");
+        builder.append(executionEnvironment);
+        builder.append("]");
+        return builder.toString();
+    }
+
 }

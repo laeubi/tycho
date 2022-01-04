@@ -17,9 +17,9 @@ package org.eclipse.tycho.p2.target;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -40,11 +40,9 @@ public class TargetDefinitionResolverService {
 
     private static final String CACHE_MISS_MESSAGE = "Target definition content cache miss: ";
 
-    private Map<ResolutionArguments, CompletableFuture<TargetDefinitionContent>> resolutionCache = new ConcurrentHashMap<>();
+    private ConcurrentMap<ResolutionArguments, CompletableFuture<TargetDefinitionContent>> resolutionCache = new ConcurrentHashMap<>();
 
     private MavenContext mavenContext;
-
-    private IProvisioningAgent provisioningAgent;
 
     private final AtomicReference<MavenDependenciesResolver> dependenciesResolver = new AtomicReference<>();
 
@@ -55,10 +53,22 @@ public class TargetDefinitionResolverService {
     public TargetDefinitionContent getTargetDefinitionContent(TargetDefinition definition,
             List<TargetEnvironment> environments, ExecutionEnvironmentResolutionHints jreIUs,
             IncludeSourceMode includeSourceMode, IProvisioningAgent agent) {
-        this.provisioningAgent = agent;
         ResolutionArguments arguments = new ResolutionArguments(definition, environments, jreIUs, includeSourceMode,
                 agent);
-
+//        synchronized (this) {
+//            System.out.println("---------------");
+//            System.out.println(arguments + " = " + arguments.hashCode());
+//            System.out.println("#arguments.agent             =" + arguments.agent.hashCode() + " ("
+//                    + arguments.agent.getClass().getName() + ")");
+//            System.out.println("#arguments.definition        =" + arguments.definition.hashCode() + " ("
+//                    + arguments.definition.getClass().getName() + ")");
+//            System.out.println("#arguments.environments      =" + arguments.environments.hashCode() + " ("
+//                    + arguments.environments.getClass().getName() + ")");
+//            System.out.println("#arguments.includeSourceMode =" + arguments.includeSourceMode.hashCode() + " ("
+//                    + arguments.includeSourceMode.getClass().getName() + ")");
+//            System.out.println("#arguments.jreIUs            =" + arguments.jreIUs.hashCode() + " ("
+//                    + arguments.jreIUs.getClass().getName() + ")");
+//        }
         CompletableFuture<TargetDefinitionContent> future = resolutionCache.computeIfAbsent(arguments,
                 this::resolveFromArguments);
 
@@ -78,15 +88,16 @@ public class TargetDefinitionResolverService {
 
     // this method must only have the cache key as parameter (to make sure that the key is complete)
     private CompletableFuture<TargetDefinitionContent> resolveFromArguments(ResolutionArguments arguments) {
-        if (mavenContext.getLogger().isDebugEnabled()) {
-            debugCacheMiss(arguments);
-            mavenContext.getLogger().debug("Resolving target definition content...");
-        }
+        mavenContext.getLogger().info("Resolving " + arguments + "...");
+//        if (mavenContext.getLogger().isDebugEnabled()) {
+        debugCacheMiss(arguments);
+//    }
 
         TargetDefinitionResolver resolver = new TargetDefinitionResolver(arguments.environments, arguments.jreIUs,
                 arguments.includeSourceMode, mavenContext, dependenciesResolver.get());
+        CompletableFuture<TargetDefinitionContent> future = new CompletableFuture<>();
         try {
-            return CompletableFuture.completedFuture(resolver.resolveContent(arguments.definition, provisioningAgent));
+            return CompletableFuture.completedFuture(resolver.resolveContent(arguments.definition, arguments.agent));
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -94,13 +105,16 @@ public class TargetDefinitionResolverService {
 
     private void debugCacheMiss(ResolutionArguments arguments) {
         if (resolutionCache.isEmpty()) {
+            System.out.println("cache is empty!");
             return;
         }
 
         // find cache entries which differ only in one of the arguments
         List<String> fieldsInWhichDistanceOneEntriesDiffer = new ArrayList<>();
         for (ResolutionArguments existingKey : resolutionCache.keySet()) {
+            System.out.println("existing: " + existingKey);
             List<String> differingFields = arguments.getNonEqualFields(existingKey);
+            System.out.println(differingFields);
             if (differingFields.size() == 1) {
                 fieldsInWhichDistanceOneEntriesDiffer.add(differingFields.get(0));
             }
@@ -183,6 +197,13 @@ public class TargetDefinitionResolverService {
             addIfNonEqual(result, "remote p2 repository options", agent, other.agent);
             addIfNonEqual(result, "include source mode", includeSourceMode, other.includeSourceMode);
             return result;
+        }
+
+        @Override
+        public String toString() {
+            return "target definition " + definition.getOrigin() + " for environments=" + environments
+                    + ", include source mode=" + includeSourceMode + ", execution environment=" + jreIUs
+                    + ", remote p2 repository options=" + agent;
         }
 
     }
