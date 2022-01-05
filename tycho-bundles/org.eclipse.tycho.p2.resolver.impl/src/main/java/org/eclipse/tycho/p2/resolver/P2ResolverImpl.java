@@ -92,8 +92,6 @@ public class P2ResolverImpl implements P2Resolver {
 
     private TargetPlatformFactoryImpl targetPlatformFactory;
 
-    private Set<IInstallableUnit> usedTargetPlatformUnits;
-
     public P2ResolverImpl(TargetPlatformFactoryImpl targetPlatformFactory, MavenLogger logger) {
         this.targetPlatformFactory = targetPlatformFactory;
         this.logger = logger;
@@ -114,13 +112,13 @@ public class P2ResolverImpl implements P2Resolver {
 
         // we need a linked hashmap to maintain iteration-order, some of the code relies on it!
         Map<TargetEnvironment, P2ResolutionResult> results = new LinkedHashMap<>();
-        usedTargetPlatformUnits = new LinkedHashSet<>();
+        Set<IInstallableUnit> usedTargetPlatformUnits = new LinkedHashSet<>();
         Set<?> metadata = project != null ? project.getDependencyMetadata(DependencyMetadataType.SEED)
                 : Collections.emptySet();
         for (TargetEnvironment environment : environments) {
             if (isMatchingEnv(metadata, environment, logger::debug)) {
                 results.put(environment, resolveDependencies(Collections.<IInstallableUnit> emptySet(), project,
-                        new ProjectorResolutionStrategy(logger), environment, targetPlatform));
+                        new ProjectorResolutionStrategy(logger), environment, targetPlatform, usedTargetPlatformUnits));
             } else {
                 logger.info(MessageFormat.format(
                         "Project {0}:{1}:{2} does not match environment {3} skipp dependecy resolution",
@@ -130,8 +128,6 @@ public class P2ResolverImpl implements P2Resolver {
         }
 
         targetPlatform.reportUsedLocalIUs(usedTargetPlatformUnits);
-        usedTargetPlatformUnits = null;
-
         return results;
     }
 
@@ -153,7 +149,7 @@ public class P2ResolverImpl implements P2Resolver {
         Map<TargetEnvironment, P2ResolutionResult> results = new LinkedHashMap<>();
         for (TargetEnvironment environment : environments) {
             results.put(environment, resolveDependencies(roots, null, new ProjectorResolutionStrategy(logger),
-                    environment, targetPlatform));
+                    environment, targetPlatform, null));
         }
         return results;
     }
@@ -161,7 +157,7 @@ public class P2ResolverImpl implements P2Resolver {
     @Override
     public P2ResolutionResult collectProjectDependencies(TargetPlatform context, ReactorProject project) {
         return resolveDependencies(Collections.<IInstallableUnit> emptySet(), project, new DependencyCollector(logger),
-                new TargetEnvironment(null, null, null), getTargetFromContext(context));
+                new TargetEnvironment(null, null, null), getTargetFromContext(context), null);
     }
 
     @Override
@@ -207,7 +203,8 @@ public class P2ResolverImpl implements P2Resolver {
 
     @SuppressWarnings("unchecked")
     protected P2ResolutionResult resolveDependencies(Collection<IInstallableUnit> rootUIs, ReactorProject project,
-            AbstractResolutionStrategy strategy, TargetEnvironment environment, P2TargetPlatform targetPlatform) {
+            AbstractResolutionStrategy strategy, TargetEnvironment environment, P2TargetPlatform targetPlatform,
+            Set<IInstallableUnit> usedTargetPlatformUnits) {
         ResolutionDataImpl data = new ResolutionDataImpl(targetPlatform.getEEResolutionHints());
 
         Set<IInstallableUnit> availableUnits = targetPlatform.getInstallableUnits();
