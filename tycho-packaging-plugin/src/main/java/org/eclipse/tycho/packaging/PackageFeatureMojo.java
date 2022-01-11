@@ -252,8 +252,6 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
 
         TargetPlatform targetPlatform = TychoProjectUtils.getTargetPlatformIfAvailable(reactorProject);
         if (targetPlatform == null) {
-            getLog().warn(
-                    "Skipping version reference expansion in eclipse-feature project using the deprecated -Dtycho.targetPlatform configuration");
             return;
         }
         featureXmlTransformer.expandReferences(feature, targetPlatform);

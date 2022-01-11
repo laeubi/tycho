@@ -32,7 +32,7 @@ import org.eclipse.tycho.core.FeatureDescription;
 import org.eclipse.tycho.core.PluginDescription;
 import org.eclipse.tycho.core.osgitools.AbstractArtifactDependencyWalker;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
-import org.eclipse.tycho.core.osgitools.targetplatform.LocalDependencyResolver;
+import org.eclipse.tycho.core.testcomponents.LocalDependencyResolver;
 import org.eclipse.tycho.model.ProductConfiguration;
 import org.eclipse.tycho.testing.AbstractTychoMojoTestCase;
 

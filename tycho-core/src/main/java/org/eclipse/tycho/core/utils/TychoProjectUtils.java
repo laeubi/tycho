@@ -76,8 +76,6 @@ public class TychoProjectUtils {
      * Returns the final target platform of the given project, or <code>null</code> if the target
      * platform is not available.
      * 
-     * Projects with -Dtycho.targetPlatform use the legacy LocalDependencyResolver, which doesn't
-     * provide the {@link TargetPlatform} interface.
      */
     public static TargetPlatform getTargetPlatformIfAvailable(ReactorProject project) {
         return (TargetPlatform) project.getContextValue(TargetPlatform.FINAL_TARGET_PLATFORM_KEY);

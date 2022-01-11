@@ -9,12 +9,11 @@
  *    Sonatype Inc. - initial API and implementation
  *    Christoph Läubrich - Bug 567098 - pomDependencies=consider should wrap non-osgi jars
  *******************************************************************************/
-package org.eclipse.tycho.core.osgitools.targetplatform;
+package org.eclipse.tycho.core.testcomponents;
 
 import static java.util.Optional.ofNullable;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -40,6 +39,7 @@ import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.artifacts.TargetPlatform;
+import org.eclipse.tycho.core.ArtifactDependencyVisitor;
 import org.eclipse.tycho.core.DependencyResolver;
 import org.eclipse.tycho.core.DependencyResolverConfiguration;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
@@ -51,7 +51,9 @@ import org.eclipse.tycho.core.osgitools.BundleReader;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
 import org.eclipse.tycho.core.osgitools.OsgiManifest;
 import org.eclipse.tycho.core.osgitools.OsgiManifestParserException;
+import org.eclipse.tycho.core.osgitools.targetplatform.DefaultDependencyArtifacts;
 import org.eclipse.tycho.core.resolver.shared.PomDependencies;
+import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.model.Feature;
 import org.eclipse.tycho.p2.target.facade.PomDependencyCollector;
 
@@ -240,7 +242,7 @@ public class LocalDependencyResolver extends AbstractLogEnabled implements Depen
         return key;
     }
 
-    public void setLocation(File location) throws IOException {
+    public void setLocation(File location) {
         layout.setLocation(location.getAbsoluteFile());
     }
 
@@ -250,7 +252,11 @@ public class LocalDependencyResolver extends AbstractLogEnabled implements Depen
         // TODO testTargetPlatform is ignored for this local resolved. Is this OK?
         ReactorProject reactorProject = DefaultReactorProject.adapt(project);
         // walk depencencies for consistency
-        projectType.checkForMissingDependencies(reactorProject);
+        TargetPlatformConfiguration configuration = TychoProjectUtils.getTargetPlatformConfiguration(reactorProject);
+
+        // this throws exceptions when dependencies are missing
+        projectType.getDependencyWalker(reactorProject).walk(new ArtifactDependencyVisitor() {
+        });
 
         MavenDependencyCollector dependencyCollector = new MavenDependencyCollector(project, bundleReader, logger);
         projectType.getDependencyWalker(reactorProject).walk(dependencyCollector);

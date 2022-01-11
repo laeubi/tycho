@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.codehaus.plexus.PlexusTestCase;
-import org.eclipse.tycho.core.osgitools.targetplatform.EclipseInstallationLayout;
+import org.eclipse.tycho.core.testcomponents.EclipseInstallationLayout;
 
 public class EclipseInstallationLayoutTest extends PlexusTestCase {
 

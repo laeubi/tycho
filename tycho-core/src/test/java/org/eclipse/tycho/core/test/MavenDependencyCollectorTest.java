@@ -24,7 +24,9 @@ import org.apache.maven.project.MavenProject;
 import org.eclipse.tycho.testing.AbstractTychoMojoTestCase;
 import org.eclipse.tycho.testing.CompoundRuntimeException;
 import org.junit.Assert;
+import org.junit.Ignore;
 
+@Ignore("MavenDependencyCollector is only used for legacy reasons inside tests now")
 public class MavenDependencyCollectorTest extends AbstractTychoMojoTestCase {
 
     @Override
@@ -76,8 +78,8 @@ public class MavenDependencyCollectorTest extends AbstractTychoMojoTestCase {
             assertDependenciesContains(mavenDependencies, expectedGroupId, expectedArtifactId, expectedVersion, null,
                     "eclipse-plugin", Artifact.SCOPE_PROVIDED, null);
             assertDependenciesContains(mavenDependencies, expectedGroupId, expectedArtifactId, expectedVersion,
-                    "lib/lib.jar", "jar", Artifact.SCOPE_SYSTEM, new File(getBasedir("projects/mavendeps"),
-                            "p002/lib/lib.jar"));
+                    "lib/lib.jar", "jar", Artifact.SCOPE_SYSTEM,
+                    new File(getBasedir("projects/mavendeps"), "p002/lib/lib.jar"));
         }
     }
 

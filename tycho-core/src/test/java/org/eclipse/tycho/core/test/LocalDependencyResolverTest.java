@@ -30,7 +30,7 @@ import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.core.DependencyResolver;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
-import org.eclipse.tycho.core.osgitools.targetplatform.LocalDependencyResolver;
+import org.eclipse.tycho.core.testcomponents.LocalDependencyResolver;
 import org.eclipse.tycho.testing.AbstractTychoMojoTestCase;
 
 public class LocalDependencyResolverTest extends AbstractTychoMojoTestCase {
