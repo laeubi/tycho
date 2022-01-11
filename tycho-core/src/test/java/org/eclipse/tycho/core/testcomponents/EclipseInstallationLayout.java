@@ -8,7 +8,7 @@
  * Contributors:
  *    Sonatype Inc. - initial API and implementation
  *******************************************************************************/
-package org.eclipse.tycho.core.osgitools.targetplatform;
+package org.eclipse.tycho.core.testcomponents;
 
 import java.io.BufferedReader;
 import java.io.File;

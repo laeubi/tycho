@@ -19,6 +19,7 @@ import org.eclipse.tycho.ArtifactDescriptor;
 import org.eclipse.tycho.core.ArtifactDependencyVisitor;
 import org.eclipse.tycho.core.FeatureDescription;
 import org.eclipse.tycho.core.PluginDescription;
+import org.eclipse.tycho.core.maven.MavenDependencyInjector;
 import org.eclipse.tycho.core.osgitools.BundleReader;
 import org.eclipse.tycho.model.PluginRef;
 

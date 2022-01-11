@@ -65,6 +65,7 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -243,6 +244,7 @@ public class P2ResolverTest extends P2ResolverTestBase {
     }
 
     @Test
+    @Ignore("Uses outdated eclipse release")
     public void testBundleUsesSWT() throws Exception {
         tpConfig.addP2Repository(resourceFile("repositories/e361").toURI());
 
