@@ -18,16 +18,19 @@ import static org.eclipse.tycho.p2.util.resolution.ResolverDebugUtils.toDebugStr
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.MultiStatus;
 import org.eclipse.equinox.internal.p2.director.Slicer;
 import org.eclipse.equinox.internal.p2.metadata.IRequiredCapability;
 import org.eclipse.equinox.internal.p2.metadata.RequiredCapability;
+import org.eclipse.equinox.internal.p2.metadata.RequiredPropertiesMatch;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.metadata.IProvidedCapability;
 import org.eclipse.equinox.p2.metadata.IRequirement;
@@ -35,7 +38,10 @@ import org.eclipse.equinox.p2.metadata.MetadataFactory;
 import org.eclipse.equinox.p2.metadata.MetadataFactory.InstallableUnitDescription;
 import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.equinox.p2.metadata.VersionRange;
+import org.eclipse.equinox.p2.metadata.expression.ExpressionUtil;
+import org.eclipse.equinox.p2.metadata.expression.IExpression;
 import org.eclipse.equinox.p2.metadata.expression.IMatchExpression;
+import org.eclipse.equinox.p2.publisher.actions.JREAction;
 import org.eclipse.equinox.p2.query.IQueryable;
 import org.eclipse.tycho.core.shared.MavenLogger;
 import org.eclipse.tycho.repository.p2base.metadata.QueryableCollection;
@@ -132,7 +138,7 @@ abstract class AbstractSlicerResolutionStrategy extends AbstractResolutionStrate
 
         InstallableUnitDescription result = new MetadataFactory.InstallableUnitDescription();
         String time = Long.toString(System.currentTimeMillis());
-        result.setId(name + "-" + time);
+        result.setId(name + "-" + UUID.randomUUID());
         result.setVersion(Version.createOSGi(0, 0, 0, time));
         for (IRequirement requirement : requirements) {
             if (requirement instanceof IRequiredCapability) {
@@ -148,9 +154,48 @@ abstract class AbstractSlicerResolutionStrategy extends AbstractResolutionStrate
                 } catch (RuntimeException e) {
                     logger.debug("can't convert requirement " + requirement + " to capability: " + e.toString(), e);
                 }
+            } else if (requirement instanceof RequiredPropertiesMatch) {
+                try {
+                    if (isEERequirement(requirement)) {
+                        RequiredPropertiesMatch propertiesMatch = (RequiredPropertiesMatch) requirement;
+                        IMatchExpression<IInstallableUnit> matches = propertiesMatch.getMatches();
+                        Map<String, Object> properties = new HashMap<>();
+                        Object p = matches.getParameters()[1];
+                        if (p instanceof IExpression) {
+                            IExpression expression = (IExpression) p;
+                            IExpression operand = ExpressionUtil.getOperand(expression);
+                            IExpression[] operands = ExpressionUtil.getOperands(operand);
+                            for (IExpression eq : operands) {
+                                IExpression lhs = ExpressionUtil.getLHS(eq);
+                                IExpression rhs = ExpressionUtil.getRHS(eq);
+                                Object value = ExpressionUtil.getValue(rhs);
+                                String key = ExpressionUtil.getName(lhs);
+                                if (IProvidedCapability.PROPERTY_VERSION.equals(key)) {
+                                    properties.put(key, Version.create(value.toString()));
+                                } else {
+                                    properties.put(key, value.toString());
+                                }
+                            }
+                        }
+                        IProvidedCapability providedCapability = MetadataFactory.createProvidedCapability(
+                                RequiredPropertiesMatch.extractNamespace(matches), properties);
+                        result.addProvidedCapabilities(Collections.singleton(providedCapability));
+                    }
+                } catch (RuntimeException e) {
+                    logger.debug("can't convert requirement " + requirement + " to capability: " + e.toString(), e);
+                }
             }
         }
         return MetadataFactory.createInstallableUnit(result);
+    }
+
+    protected static boolean isEERequirement(IRequirement requirement) {
+        if (requirement instanceof RequiredPropertiesMatch) {
+            RequiredPropertiesMatch propertiesMatch = (RequiredPropertiesMatch) requirement;
+            String namespace = RequiredPropertiesMatch.extractNamespace(propertiesMatch.getMatches());
+            return JREAction.NAMESPACE_OSGI_EE.equals(namespace);
+        }
+        return false;
     }
 
     private static IRequirement createStrictRequirementTo(IInstallableUnit unit) {

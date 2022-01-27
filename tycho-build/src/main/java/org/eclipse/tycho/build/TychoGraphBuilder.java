@@ -39,6 +39,7 @@ import org.apache.maven.toolchain.ToolchainManager;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
+import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationException;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.MultiStatus;
@@ -76,7 +77,12 @@ import org.eclipse.equinox.p2.publisher.eclipse.FeaturesAction;
 import org.eclipse.equinox.p2.query.IQueryable;
 import org.eclipse.equinox.p2.query.QueryUtil;
 import org.eclipse.osgi.service.resolver.BundleDescription;
+import org.eclipse.tycho.p2.PlexusProvisioningAgent;
 import org.eclipse.tycho.p2.QueryableCollection;
+import org.eclipse.tycho.p2.target.ee.NoExecutionEnvironmentResolutionHints;
+import org.eclipse.tycho.p2.util.resolution.ProjectorResolutionStrategy;
+import org.eclipse.tycho.p2.util.resolution.ResolutionDataImpl;
+import org.eclipse.tycho.p2.util.resolution.ResolverException;
 import org.osgi.framework.BundleException;
 
 @Component(role = GraphBuilder.class, hint = GraphBuilder.HINT)
@@ -94,11 +100,16 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 	@Requirement
 	private Logger log;
 
-	@Requirement
+	@Requirement(hint = "plexus")
 	private IProvisioningAgent agent;
 
 	@Override
 	public Result<ProjectDependencyGraph> build(MavenSession session) {
+		try {
+			((PlexusProvisioningAgent) agent).initialize();
+		} catch (InitializationException e1) {
+			e1.printStackTrace();
+		}
 		session.getUserProperties().put("tycho.mode", "extension");
 		System.out.println("TychoGraphBuilder.build()");
 		MavenExecutionRequest request = session.getRequest();
@@ -117,25 +128,22 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 
 		List<MavenProject> projects = build.get().getAllProjects();
 		Map<MavenProject, Collection<IInstallableUnit>> rootIus = new ConcurrentHashMap<>();
-		FeatureParser parser = new FeatureParser();
+
 		PublisherInfo publisherInfo = new PublisherInfo();
 		publisherInfo.setArtifactOptions(IPublisherInfo.A_INDEX);
-		for (MavenProject project : projects) {
+		projects.stream().parallel().unordered().forEach(project -> {
 			if (TYPE_ECLIPSE_PLUGIN.equals(project.getPackaging())
 					|| TYPE_ECLIPSE_TEST_PLUGIN.equals(project.getPackaging())) {
 
 				File basedir = project.getBasedir();
-				System.out.print(basedir);
 				File mf = new File(basedir, JarFile.MANIFEST_NAME);
 				if (mf.exists()) {
-					System.out.println(" --> Bundle");
 					try {
 						BundleDescription bundleDescription = BundlesAction.createBundleDescription(basedir);
 						IArtifactKey descriptor = BundlesAction.createBundleArtifactKey(
 								bundleDescription.getSymbolicName(), bundleDescription.getVersion().toString());
 						IInstallableUnit iu = BundlesAction.createBundleIU(bundleDescription, descriptor,
 								publisherInfo);
-						System.out.println("   iu = " + iu);
 						rootIus.put(project, Collections.singletonList(iu));
 					} catch (IOException | BundleException e) {
 						// TODO Auto-generated catch block
@@ -145,9 +153,8 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 					System.out.println("---> ?");
 				}
 			} else if (TYPE_ECLIPSE_FEATURE.equals(project.getPackaging())) {
+				FeatureParser parser = new FeatureParser();
 				File basedir = project.getBasedir();
-				System.out.print(basedir);
-				System.out.println(" --> Feature");
 				Feature feature = parser.parse(basedir);
 				Map<IInstallableUnit, Feature> featureMap = new HashMap<>();
 				FeaturesAction action = new FeaturesAction(new Feature[] { feature }) {
@@ -169,51 +176,41 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 				PublisherResult results = new PublisherResult();
 				action.perform(publisherInfo, results, null);
 				Set<IInstallableUnit> result = results.query(QueryUtil.ALL_UNITS, null).toSet();
-				for (IInstallableUnit unit : result) {
-					System.out.println("   iu = " + unit);
-				}
 				rootIus.put(project, result);
 
 			}
-		}
-		Map<String, String> properties = new HashMap<String, String>();
+		});
 
-		Map<MavenProject, Collection<IInstallableUnit>> projectDependecies = new HashMap<MavenProject, Collection<IInstallableUnit>>();
+		Map<MavenProject, Collection<IInstallableUnit>> projectDependecies = new ConcurrentHashMap<MavenProject, Collection<IInstallableUnit>>();
 		Collection<IInstallableUnit> availableIUs = rootIus.values().stream().flatMap(Collection::stream)
-				/* .filter(u -> !seedUnits.contains(u)) */.collect(Collectors.toSet());
-		for (Entry<MavenProject, Collection<IInstallableUnit>> entry : rootIus.entrySet()) {
+				.collect(Collectors.toSet());
+
+		rootIus.entrySet().parallelStream().unordered().forEach(entry -> {
 			List<IInstallableUnit> additionalUnits = new ArrayList<>();
 			Set<IRequirement> missingReq = new HashSet<IRequirement>();
 			Collection<IInstallableUnit> missingUnits = new HashSet<IInstallableUnit>();
+			Map<String, String> properties = new HashMap<String, String>();
 			System.out.println("#### ---- resolving [" + entry.getKey() + "] ---- ####");
 			try {
 				Collection<IInstallableUnit> seedUnits = entry.getValue();
-				Collection<IInstallableUnit> resolve = resolveInternal(properties, additionalUnits, missingReq,
-						missingUnits, seedUnits, availableIUs);
-				resolve.removeAll(seedUnits);
-				resolve.removeAll(additionalUnits);
-//				for (IInstallableUnit resolved : resolve) {
-//					if (additionalUnits.contains(resolved)) {
-//						continue;
-//					}
-//					System.out.println("\t require " + resolved);
-//
-//				}
-//				System.out.println("");
+//				Collection<IInstallableUnit> resolve = resolveInternal(properties, additionalUnits, missingReq,
+//						missingUnits, seedUnits, availableIUs);
+//				resolve.removeAll(seedUnits);
+//				resolve.removeAll(additionalUnits);
+				Collection<IInstallableUnit> resolve = resolveProject(seedUnits, availableIUs);
 				projectDependecies.put(entry.getKey(), resolve);
-				System.out.println("::: the following requirements are missing (" + missingReq.size() + ") ::::");
-				for (IRequirement requirement : missingReq) {
-					System.out.println(requirement);
-				}
-			} catch (CoreException e) {
+//				System.out.println("::: the following requirements are missing (" + missingReq.size() + ") ::::");
+//				for (IRequirement requirement : missingReq) {
+//					System.out.println(requirement);
+//				}
+			} catch (ResolverException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+		});
+		for (Entry<MavenProject, Collection<IInstallableUnit>> entry : rootIus.entrySet()) {
+
 		}
-//		System.out.println("::: the following units are missing (" + missingUnits.size() + ") ::::");
-//		for (IInstallableUnit missing : missingUnits) {
-//			System.out.println(missing);
-//		}
 		for (Entry<MavenProject, Collection<IInstallableUnit>> dependecies : projectDependecies.entrySet()) {
 			System.out.println("#### ---- [" + dependecies.getKey().getName() + "] ---- ####");
 			for (IInstallableUnit ius : dependecies.getValue()) {
@@ -221,9 +218,6 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 			}
 		}
 
-		// projects
-
-//			resolveProjects(session, projects);
 		ProjectDependencyGraph graph = new ProjectDependencyGraph() {
 
 			@Override
@@ -257,8 +251,24 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 				return projects;
 			}
 		};
+
 		// TODO add problems here!
 		return Result.newResult(graph, build.getProblems());
+	}
+
+	protected Collection<IInstallableUnit> resolveProject(Collection<IInstallableUnit> availableIUs,
+			Collection<IInstallableUnit> rootIUs)
+			throws ResolverException {
+		ProjectorResolutionStrategy resolutionStrategy = new ProjectorResolutionStrategy(
+				new MavenLoggerAdapter(log, true));
+		ResolutionDataImpl data = new ResolutionDataImpl(NoExecutionEnvironmentResolutionHints.INSTANCE);
+		data.setFailOnMissing(false);
+		data.setAvailableIUs(availableIUs);
+		data.setRootIUs(rootIUs);
+		data.setIInstallableUnitAcceptor(always -> true);
+		resolutionStrategy.setData(data);
+
+		return resolutionStrategy.resolve(new HashMap<String, String>(), new NullProgressMonitor());
 	}
 
 	protected Collection<IInstallableUnit> resolveInternal(Map<String, String> properties,
@@ -346,10 +356,11 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 	protected final IQueryable<IInstallableUnit> slice(Map<String, String> properties,
 			List<IInstallableUnit> additionalUnits, Collection<IInstallableUnit> availableIUs,
 			Collection<IInstallableUnit> seedIUs) throws CoreException {
+		ArrayList<IInstallableUnit> arrayList = new ArrayList<>();
+		arrayList.addAll(additionalUnits);
+		arrayList.addAll(availableIUs);
 
-		availableIUs.addAll(additionalUnits);
-
-		Slicer slicer = newSlicer(new QueryableCollection(availableIUs), properties);
+		Slicer slicer = newSlicer(new QueryableCollection(arrayList), properties);
 		IQueryable<IInstallableUnit> slice = slicer.slice(seedIUs.toArray(new IInstallableUnit[0]),
 				new NullProgressMonitor());
 		MultiStatus slicerStatus = slicer.getStatus();

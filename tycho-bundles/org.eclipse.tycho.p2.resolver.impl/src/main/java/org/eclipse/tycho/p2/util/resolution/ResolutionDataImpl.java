@@ -20,6 +20,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
@@ -38,6 +39,9 @@ public class ResolutionDataImpl implements ResolutionData {
     private Map<String, String> additionalFilterProperties;
     private Collection<IRequirement> missing = new ArrayList<>();
     private boolean failOnMissing = true;
+
+    private Predicate<IInstallableUnit> acceptor;
+//    private boolean 
 
     public ResolutionDataImpl(ExecutionEnvironmentResolutionHints eeResolutionHints) {
         this.eeResolutionHints = eeResolutionHints;
@@ -139,6 +143,15 @@ public class ResolutionDataImpl implements ResolutionData {
 
     public void clearMissingRequirements() {
         missing.clear();
+    }
+
+    public void setIInstallableUnitAcceptor(Predicate<IInstallableUnit> acceptor) {
+        this.acceptor = acceptor;
+    }
+
+    @Override
+    public Predicate<IInstallableUnit> getIInstallableUnitAcceptor() {
+        return acceptor;
     }
 
 }

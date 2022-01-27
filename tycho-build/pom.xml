@@ -30,6 +30,16 @@
 			<artifactId>tycho-pomless</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>org.eclipse.tycho</groupId>
+			<artifactId>org.eclipse.tycho.core.shared</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.tycho</groupId>
+			<artifactId>org.eclipse.tycho.p2.maven.repository</artifactId>
+			<version>2.7.0-SNAPSHOT</version>
+		</dependency>
 		<!--
 		<dependency>
 			<groupId>org.eclipse.tycho</groupId>
@@ -119,5 +129,13 @@
 			<artifactId>junit</artifactId>
 			<scope>test</scope>
 		</dependency>
+
+		<dependency>
+			<groupId>org.eclipse.tycho</groupId>
+			<artifactId>org.eclipse.tycho.p2.resolver.impl</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+
+
 	</dependencies>
 </project>

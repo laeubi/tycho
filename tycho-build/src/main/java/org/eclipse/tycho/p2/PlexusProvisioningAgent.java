@@ -27,7 +27,7 @@ import org.eclipse.equinox.internal.p2.director.DirectorActivator;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.osgi.framework.BundleContext;
 
-@Component(role = IProvisioningAgent.class)
+@Component(role = IProvisioningAgent.class, hint = "plexus")
 public class PlexusProvisioningAgent implements IProvisioningAgent, Disposable, Initializable {
 
 	private ConcurrentMap<String, Object> serviceMap = new ConcurrentHashMap<String, Object>();
@@ -91,7 +91,7 @@ public class PlexusProvisioningAgent implements IProvisioningAgent, Disposable, 
 
 	@Override
 	public void dispose() {
-		DirectorActivator.context = null;
+//		DirectorActivator.context = null;
 		serviceMap.clear();
 	}
 
