@@ -15,7 +15,6 @@ package org.eclipse.tycho.p2.util.resolution;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -29,6 +28,7 @@ import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.MultiStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.equinox.internal.p2.director.Explanation;
+import org.eclipse.equinox.internal.p2.director.Explanation.HardRequirement;
 import org.eclipse.equinox.internal.p2.director.Explanation.IUToInstall;
 import org.eclipse.equinox.internal.p2.director.Explanation.MissingIU;
 import org.eclipse.equinox.internal.p2.director.Projector;
@@ -76,20 +76,21 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
         ExecutionEnvironmentResolutionHints eeHints = data.getEEResolutionHints();
         boolean hasNoExecutionEnvironment = eeHints instanceof NoExecutionEnvironmentResolutionHints;
         boolean failOnMissingRequirements = data.failOnMissingRequirements();
+        int cnt = 0;
+        Set<IInstallableUnit> seedUnits = new LinkedHashSet<>(data.getRootIUs());
+        List<IRequirement> seedRequires = new ArrayList<>();
+        if (data.getAdditionalRequirements() != null) {
+            seedRequires.addAll(data.getAdditionalRequirements());
+        }
+
+        // force profile UIs to be used during resolution
+        seedUnits.addAll(eeHints.getMandatoryUnits());
+        seedRequires.addAll(eeHints.getMandatoryRequires());
         while (true) {
+            System.out.println("Loop " + cnt++);
             Map<String, String> newSelectionContext = SimplePlanner.createSelectionContext(properties);
 
             IQueryable<IInstallableUnit> slice = slice(properties, additionalUnits, monitor);
-
-            Set<IInstallableUnit> seedUnits = new LinkedHashSet<>(data.getRootIUs());
-            List<IRequirement> seedRequires = new ArrayList<>();
-            if (data.getAdditionalRequirements() != null) {
-                seedRequires.addAll(data.getAdditionalRequirements());
-            }
-
-            // force profile UIs to be used during resolution
-            seedUnits.addAll(eeHints.getMandatoryUnits());
-            seedRequires.addAll(eeHints.getMandatoryRequires());
 
             projector = new Projector(slice, newSelectionContext, new HashSet<IInstallableUnit>(), false);
             projector.encode(createUnitRequiring("tycho", seedUnits, seedRequires),
@@ -102,9 +103,14 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
                     List<IRequirement> missingRequirements = collectMissingRequirements(explanation,
                             hasNoExecutionEnvironment, failOnMissingRequirements);
                     if (missingRequirements.size() > 0) {
+                        System.out.println("Some requirements are not meet (" + missingRequirements + "):");
+                        for (IRequirement requirement : missingRequirements) {
+                            System.out.println(" > " + requirement);
+                        }
                         //only start a new resolve if we have collected additional requirements...
                         IInstallableUnit providing = createUnitProviding("tycho.unresolved.requirements",
                                 missingRequirements);
+                        System.out.println("restart with " + providing.getProvidedCapabilities() + " capabilities...");
                         if (providing.getProvidedCapabilities().size() > 0) {
                             //... and we could provide additional capabilities
                             additionalUnits.add(providing);
@@ -130,6 +136,9 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
         if (logger.isExtendedDebugEnabled()) {
             logger.debug("Resolved IUs:\n" + ResolverDebugUtils.toDebugString(newState, false));
         }
+        for (IInstallableUnit iu : newState) {
+            System.out.println("Resolved: " + iu);
+        }
         return newState;
     }
 
@@ -137,28 +146,54 @@ public class ProjectorResolutionStrategy extends AbstractSlicerResolutionStrateg
     private List<IRequirement> collectMissingRequirements(Set<Explanation> explanation,
             boolean hasNoExecutionEnvironment, boolean failOnMissingRequirements) {
         List<IRequirement> missingRequirements = new ArrayList<>();
+        Set<IInstallableUnit> incompleteUnits = new HashSet<>();
         for (Explanation exp : explanation) {
             if (exp instanceof IUToInstall) {
                 //this is one of our root IUs, no need to handle this
                 continue;
             }
-            if (exp instanceof MissingIU) {
+            if (exp instanceof IUToInstall) {
+                IUToInstall iuToInstall = (IUToInstall) exp;
+                incompleteUnits.add(iuToInstall.iu);
+            } else if (exp instanceof MissingIU) {
                 MissingIU missingIU = (MissingIU) exp;
+                incompleteUnits.add(missingIU.iu);
                 if (isEERequirement(missingIU.req)) {
-                    //a missing EE is fatal so break out ...
                     if (hasNoExecutionEnvironment) {
-                        //..to start a new cycle...
-                        return Collections.singletonList(missingIU.req);
+                        missingRequirements.add(missingIU.req);
                     }
-                    //.. or completely fail...
-                    return Collections.emptyList();
+                    continue;
                 }
                 if (failOnMissingRequirements) {
                     continue;
                 }
+                for (IInstallableUnit incomplete : incompleteUnits) {
+                    if (missingIU.req.isMatch(incomplete)) {
+                        System.out.println("Break out because of incomplete prequisite...");
+                        //an incomplete unit matches this unit so we need to restart the cycle here ...
+                        //... otherwise we falsley asume missing items...
+                        return missingRequirements;
+                    }
+                }
+                System.out.println("Add req " + missingIU.req);
                 logger.debug("Recording missing requirement for IU " + missingIU.iu + ": " + missingIU.req);
                 missingRequirements.add(missingIU.req);
+            } else if (exp instanceof HardRequirement) {
+                HardRequirement hardRequirement = (HardRequirement) exp;
+
+                incompleteUnits.add(hardRequirement.iu);
+                for (IInstallableUnit incomplete : incompleteUnits) {
+                    if (hardRequirement.req.isMatch(incomplete)) {
+                        System.out.println("Break out because of incomplete prequisite HR...");
+                        return missingRequirements;
+                    }
+                }
+                System.out.println("Add req " + hardRequirement.req);
+                logger.info(
+                        "Recording missing HardRequirement for IU " + hardRequirement.iu + ": " + hardRequirement.req);
+                missingRequirements.add(hardRequirement.req);
             } else {
+                System.out.println("!!!! >>> " + exp);
                 if (logger.isExtendedDebugEnabled()) {
                     logger.debug("Ignoring Explanation of type " + exp.getClass()
                             + " in computation of missing requirements: " + exp);

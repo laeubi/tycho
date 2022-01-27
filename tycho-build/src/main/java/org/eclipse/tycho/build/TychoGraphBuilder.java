@@ -197,7 +197,8 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 //						missingUnits, seedUnits, availableIUs);
 //				resolve.removeAll(seedUnits);
 //				resolve.removeAll(additionalUnits);
-				Collection<IInstallableUnit> resolve = resolveProject(seedUnits, availableIUs);
+				Collection<IInstallableUnit> resolve = resolveProject(availableIUs, seedUnits);
+				resolve.removeAll(seedUnits);
 				projectDependecies.put(entry.getKey(), resolve);
 //				System.out.println("::: the following requirements are missing (" + missingReq.size() + ") ::::");
 //				for (IRequirement requirement : missingReq) {
@@ -213,8 +214,9 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 		}
 		for (Entry<MavenProject, Collection<IInstallableUnit>> dependecies : projectDependecies.entrySet()) {
 			System.out.println("#### ---- [" + dependecies.getKey().getName() + "] ---- ####");
+			System.out.println(dependecies.getKey().getName() + " depends on:");
 			for (IInstallableUnit ius : dependecies.getValue()) {
-				System.out.println("\t require " + ius);
+				System.out.println(">  " + ius);
 			}
 		}
 
@@ -253,7 +255,8 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 		};
 
 		// TODO add problems here!
-		return Result.newResult(graph, build.getProblems());
+		// return Result.newResult(graph, build.getProblems());
+		return build;
 	}
 
 	protected Collection<IInstallableUnit> resolveProject(Collection<IInstallableUnit> availableIUs,
@@ -263,8 +266,8 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 				new MavenLoggerAdapter(log, true));
 		ResolutionDataImpl data = new ResolutionDataImpl(NoExecutionEnvironmentResolutionHints.INSTANCE);
 		data.setFailOnMissing(false);
-		data.setAvailableIUs(availableIUs);
-		data.setRootIUs(rootIUs);
+		data.setAvailableIUs(Collections.unmodifiableCollection(availableIUs));
+		data.setRootIUs(Collections.unmodifiableCollection(rootIUs));
 		data.setIInstallableUnitAcceptor(always -> true);
 		resolutionStrategy.setData(data);
 
