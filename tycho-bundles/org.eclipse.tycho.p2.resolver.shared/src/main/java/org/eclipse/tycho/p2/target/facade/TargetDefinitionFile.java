@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2021 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2022 Sonatype Inc. and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -70,7 +70,7 @@ public final class TargetDefinitionFile implements TargetDefinition {
 
     private String targetEE;
 
-    private static abstract class AbstractPathLocation implements TargetDefinition.PathLocation {
+    private abstract static class AbstractPathLocation implements TargetDefinition.PathLocation {
         private String path;
 
         public AbstractPathLocation(String path) {
@@ -143,7 +143,6 @@ public final class TargetDefinitionFile implements TargetDefinition {
     private static class TargetRef implements TargetDefinition.TargetReferenceLocation {
 
         private String uri;
-        private URI resolvedUri;
 
         public TargetRef(String uri) {
             this.uri = uri;
@@ -164,7 +163,7 @@ public final class TargetDefinitionFile implements TargetDefinition {
     private static class MavenLocation implements TargetDefinition.MavenGAVLocation {
 
         private final Set<String> globalExcludes;
-        private final String includeDependencyScope;
+        private final Collection<String> includeDependencyScopes;
         private final MissingManifestStrategy manifestStrategy;
         private final boolean includeSource;
         private final Collection<BNDInstructions> instructions;
@@ -173,12 +172,12 @@ public final class TargetDefinitionFile implements TargetDefinition {
         private final Collection<MavenArtifactRepositoryReference> repositoryReferences;
         private final Element featureTemplate;
 
-        public MavenLocation(Collection<MavenDependency> roots, String includeDependencyScope,
+        public MavenLocation(Collection<MavenDependency> roots, Collection<String> includeDependencyScopes,
                 MissingManifestStrategy manifestStrategy, Set<String> globalExcludes, boolean includeSource,
                 Collection<BNDInstructions> instructions, DependencyDepth dependencyDepth,
                 Collection<MavenArtifactRepositoryReference> repositoryReferences, Element featureTemplate) {
             this.roots = roots;
-            this.includeDependencyScope = includeDependencyScope;
+            this.includeDependencyScopes = includeDependencyScopes;
             this.manifestStrategy = manifestStrategy;
             this.globalExcludes = globalExcludes;
             this.includeSource = includeSource;
@@ -188,9 +187,8 @@ public final class TargetDefinitionFile implements TargetDefinition {
             this.featureTemplate = featureTemplate == null ? null : (Element) featureTemplate.cloneNode(true);
         }
 
-        @Override
-        public String getIncludeDependencyScope() {
-            return includeDependencyScope;
+        public Collection<String> getIncludeDependencyScopes() {
+            return includeDependencyScopes;
         }
 
         @Override
@@ -208,7 +206,7 @@ public final class TargetDefinitionFile implements TargetDefinition {
             StringBuilder builder = new StringBuilder("MavenDependencyRoots = ");
             builder.append(getRoots());
             builder.append(", IncludeDependencyScope = ");
-            builder.append(getIncludeDependencyScope());
+            builder.append(getIncludeDependencyScopes());
             builder.append(", MissingManifestStrategy = ");
             builder.append(getMissingManifestStrategy());
             builder.append(", IncludeSource = ");
@@ -260,6 +258,19 @@ public final class TargetDefinitionFile implements TargetDefinition {
             this.classifier = classifier;
             this.type = type;
             this.globalExcludes = globalExcludes;
+        }
+
+        private static String getKey(IArtifactFacade artifact) {
+            if (artifact == null) {
+                return "";
+            }
+            String key = artifact.getGroupId() + ":" + artifact.getArtifactId();
+            String classifier = artifact.getClassifier();
+            if (classifier != null && !classifier.isBlank()) {
+                key += ":" + classifier;
+            }
+            key += ":" + artifact.getVersion();
+            return key;
         }
 
         @Override
@@ -323,10 +334,9 @@ public final class TargetDefinitionFile implements TargetDefinition {
         NodeList list = element.getChildNodes();
 
         int length = list.getLength();
-        List<Node> nodes = IntStream.range(0, length).mapToObj(item -> list.item(item)).collect(Collectors.toList());
-        return nodes.stream().filter(Element.class::isInstance).map(Element.class::cast).filter(e -> {
-            return e.getNodeName().equals(tagName);
-        }).collect(Collectors.toList());
+        List<Node> nodes = IntStream.range(0, length).mapToObj(list::item).collect(Collectors.toList());
+        return nodes.stream().filter(Element.class::isInstance).map(Element.class::cast)
+                .filter(e -> e.getNodeName().equals(tagName)).collect(Collectors.toList());
     }
 
     private static Element getChild(Element element, String tagName) {
@@ -335,19 +345,6 @@ public final class TargetDefinitionFile implements TargetDefinition {
             return null;
         }
         return list.get(0);
-    }
-
-    private static String getKey(IArtifactFacade artifact) {
-        if (artifact == null) {
-            return "";
-        }
-        String key = artifact.getGroupId() + ":" + artifact.getArtifactId();
-        String classifier = artifact.getClassifier();
-        if (classifier != null && !classifier.isBlank()) {
-            key += ":" + classifier;
-        }
-        key += ":" + artifact.getVersion();
-        return key;
     }
 
     private static class IULocation implements TargetDefinition.InstallableUnitLocation {
@@ -463,8 +460,7 @@ public final class TargetDefinitionFile implements TargetDefinition {
             throws ParserConfigurationException, SAXException, IOException {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
-        Document document = builder.parse(input);
-        return document;
+        return builder.parse(input);
     }
 
     public static void writeDocument(Document document, OutputStream outputStream) throws IOException {
@@ -569,9 +565,37 @@ public final class TargetDefinitionFile implements TargetDefinition {
         for (Element element : getChildren(dom, "exclude")) {
             globalExcludes.add(element.getTextContent());
         }
+        Collection<String> scopes = new ArrayList<>();
         String scope = dom.getAttribute("includeDependencyScope");
+        if (dom.hasAttribute("includeDependencyScopes")) {
+            String scopesAttribute = dom.getAttribute("includeDependencyScopes");
+            for (String s : scopesAttribute.split(",")) {
+                scopes.add(s.strip());
+            }
+        } else {
+            //backward compat ...
+            String SCOPE_COMPILE = "compile";
+            String SCOPE_TEST = "test";
+            String SCOPE_RUNTIME = "runtime";
+            String SCOPE_PROVIDED = "provided";
+            String SCOPE_SYSTEM = "system";
+            if (scope == null || scope.isBlank() || SCOPE_COMPILE.equalsIgnoreCase(scope)) {
+                scopes.add(SCOPE_COMPILE);
+            } else if (SCOPE_PROVIDED.equalsIgnoreCase(scope)) {
+                scopes.add(SCOPE_PROVIDED);
+                scopes.add(SCOPE_COMPILE);
+                scopes.add(SCOPE_SYSTEM);
+                scopes.add(SCOPE_RUNTIME);
+            } else if (SCOPE_TEST.equalsIgnoreCase(scope)) {
+                scopes.add(SCOPE_TEST);
+                scopes.add(SCOPE_COMPILE);
+                scopes.add(SCOPE_PROVIDED);
+                scopes.add(SCOPE_SYSTEM);
+                scopes.add(SCOPE_RUNTIME);
+            }
+        }
         Element featureTemplate = getChild(dom, "feature");
-        return new MavenLocation(parseRoots(dom, globalExcludes), scope, parseManifestStrategy(dom), globalExcludes,
+        return new MavenLocation(parseRoots(dom, globalExcludes), scopes, parseManifestStrategy(dom), globalExcludes,
                 Boolean.parseBoolean(dom.getAttribute("includeSource")), parseInstructions(dom),
                 parseDependencyDepth(dom, scope), parseRepositoryReferences(dom), featureTemplate);
     }

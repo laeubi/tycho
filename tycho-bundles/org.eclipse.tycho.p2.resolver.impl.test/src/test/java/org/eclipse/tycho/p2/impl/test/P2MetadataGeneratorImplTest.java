@@ -22,19 +22,27 @@ import java.util.List;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.tycho.PackagingType;
+import org.eclipse.tycho.TychoConstants;
+import org.eclipse.tycho.core.shared.MockMavenContext;
 import org.eclipse.tycho.core.shared.TargetEnvironment;
 import org.eclipse.tycho.p2.impl.publisher.DependencyMetadata;
 import org.eclipse.tycho.p2.impl.publisher.P2GeneratorImpl;
 import org.eclipse.tycho.p2.metadata.PublisherOptions;
-import org.eclipse.tycho.p2.repository.RepositoryLayoutHelper;
 import org.eclipse.tycho.test.util.BuildPropertiesParserForTesting;
+import org.eclipse.tycho.test.util.LogVerifier;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 
 public class P2MetadataGeneratorImplTest {
+
+    @Rule
+    public final LogVerifier logVerifier = new LogVerifier();
+
     @Test
     public void gav() throws Exception {
         P2GeneratorImpl impl = new P2GeneratorImpl(false);
+        impl.setMavenContext(new MockMavenContext(null, logVerifier.getLogger()));
         impl.setBuildPropertiesParser(new BuildPropertiesParserForTesting());
         File location = new File("resources/generator/bundle").getCanonicalFile();
         String groupId = "org.eclipse.tycho.p2.impl.test";
@@ -60,14 +68,15 @@ public class P2MetadataGeneratorImplTest {
         Assert.assertEquals("org.eclipse.tycho.p2.impl.test.bundle", ad.getArtifactKey().getId());
         Assert.assertEquals("1.0.0.qualifier", ad.getArtifactKey().getVersion().toString());
 
-        Assert.assertEquals(groupId, ad.getProperties().get(RepositoryLayoutHelper.PROP_GROUP_ID));
-        Assert.assertEquals(artifactId, ad.getProperties().get(RepositoryLayoutHelper.PROP_ARTIFACT_ID));
-        Assert.assertEquals(version, ad.getProperties().get(RepositoryLayoutHelper.PROP_VERSION));
+        Assert.assertEquals(groupId, ad.getProperties().get(TychoConstants.PROP_GROUP_ID));
+        Assert.assertEquals(artifactId, ad.getProperties().get(TychoConstants.PROP_ARTIFACT_ID));
+        Assert.assertEquals(version, ad.getProperties().get(TychoConstants.PROP_VERSION));
     }
 
     @Test
     public void testDownloadStats() throws Exception {
         P2GeneratorImpl impl = new P2GeneratorImpl(false);
+        impl.setMavenContext(new MockMavenContext(null, logVerifier.getLogger()));
         impl.setBuildPropertiesParser(new BuildPropertiesParserForTesting());
         File location = new File("resources/generator/bundle").getCanonicalFile();
         String groupId = "org.eclipse.tycho.p2.impl.test";

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2011 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2022 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -9,6 +9,7 @@
  *
  * Contributors:
  *    Sonatype Inc. - initial API and implementation
+ *    Christoph Läubrich - Issue #572 - Insert dynamic dependencies into the jar included pom 
  *******************************************************************************/
 package org.eclipse.tycho.packaging;
 
@@ -30,13 +31,21 @@ import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.archiver.FileSet;
 import org.codehaus.plexus.archiver.util.DefaultFileSet;
 import org.codehaus.plexus.util.AbstractScanner;
+import org.eclipse.tycho.BuildProperties;
 import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.core.ArtifactDependencyWalker;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
-import org.eclipse.tycho.core.shared.BuildProperties;
 
 public abstract class AbstractTychoPackagingMojo extends AbstractMojo {
+
+	/**
+	 * The output directory of the jar file
+	 * 
+	 * By default this is the Maven "target/" directory.
+	 */
+	@Parameter(property = "project.build.directory", required = true)
+	protected File buildDirectory;
 
     @Parameter(property = "session", readonly = true)
     protected MavenSession session;

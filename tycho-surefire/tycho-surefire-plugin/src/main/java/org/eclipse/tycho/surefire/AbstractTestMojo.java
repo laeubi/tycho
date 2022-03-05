@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2021 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2022 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -73,12 +73,12 @@ import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.BuildDirectory;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.core.BundleProject;
 import org.eclipse.tycho.core.DependencyResolver;
 import org.eclipse.tycho.core.DependencyResolverConfiguration;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
-import org.eclipse.tycho.core.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.ee.shared.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.core.maven.ToolchainProvider;
@@ -292,7 +292,7 @@ public abstract class AbstractTestMojo extends AbstractMojo {
     private String product;
 
     @Parameter(property = "session", readonly = true, required = true)
-    private MavenSession session;
+    protected MavenSession session;
 
     /**
      * Run tests using UI (true) or headless (false) test harness.
@@ -426,7 +426,7 @@ public abstract class AbstractTestMojo extends AbstractMojo {
     private Integer skipAfterFailureCount;
 
     @Component
-    private RepositorySystem repositorySystem;
+    protected RepositorySystem repositorySystem;
 
     @Component
     private ResolutionErrorHandler resolutionErrorHandler;
@@ -447,7 +447,7 @@ public abstract class AbstractTestMojo extends AbstractMojo {
     private EquinoxLauncher launcher;
 
     @Component(role = TychoProject.class, hint = "eclipse-plugin")
-    private OsgiBundleProject osgiBundle;
+    protected OsgiBundleProject osgiBundle;
 
     /**
      * Normally tycho will automatically determine the test framework provider based on the test
@@ -783,7 +783,7 @@ public abstract class AbstractTestMojo extends AbstractMojo {
             return null;
         }
         TestFrameworkProvider provider = providerHelper.selectProvider(
-                getProjectType().getClasspath(DefaultReactorProject.adapt(project)), getMergedProviderProperties(),
+                getProjectType().getTestClasspath(DefaultReactorProject.adapt(project)), getMergedProviderProperties(),
                 providerHint);
         DependencyResolver platformResolver = dependencyResolverLocator.lookupDependencyResolver(project);
         final List<ArtifactKey> extraDependencies = getExtraDependencies();
@@ -840,14 +840,15 @@ public abstract class AbstractTestMojo extends AbstractMojo {
             }
             testRuntime.addBundle(artifact);
         }
-        for (Artifact artifact : project.getAttachedArtifacts()) {
-            if (ArtifactType.TYPE_ECLIPSE_TEST_FRAGMENT.equals(artifact.getClassifier())) {
-                DefaultArtifactKey key = new DefaultArtifactKey(artifact.getClassifier(), artifact.getId(),
-                        artifact.getVersion());
-                testRuntime.addBundle(key, artifact.getFile());
-            }
-        }
 
+        setupTestBundles(provider, testRuntime);
+
+        getReportsDirectory().mkdirs();
+        return installationFactory.createInstallation(testRuntime, work);
+    }
+
+    protected void setupTestBundles(TestFrameworkProvider provider, EquinoxInstallationDescription testRuntime)
+            throws MojoExecutionException {
         Set<Artifact> testFrameworkBundles = providerHelper.filterTestFrameworkBundles(provider, pluginArtifacts);
         for (Artifact artifact : testFrameworkBundles) {
             DevBundleInfo devInfo = workspaceState.getBundleInfo(session, artifact.getGroupId(),
@@ -863,9 +864,6 @@ public abstract class AbstractTestMojo extends AbstractMojo {
         }
 
         testRuntime.addDevEntries(getTestBundleSymbolicName(), getBuildOutputDirectories());
-
-        getReportsDirectory().mkdirs();
-        return installationFactory.createInstallation(testRuntime, work);
     }
 
     private List<ArtifactKey> getExtraDependencies() {
@@ -887,7 +885,7 @@ public abstract class AbstractTestMojo extends AbstractMojo {
         return getProjectType().getArtifactKey(getReactorProject()).getId();
     }
 
-    private ArtifactKey getBundleArtifactKey(File file) throws MojoExecutionException {
+    protected ArtifactKey getBundleArtifactKey(File file) throws MojoExecutionException {
         ArtifactKey key = osgiBundle.readArtifactKey(file);
         if (key == null) {
             throw new MojoExecutionException("Not an OSGi bundle " + file.getAbsolutePath());
@@ -1003,6 +1001,14 @@ public abstract class AbstractTestMojo extends AbstractMojo {
         TestListResolver resolver = new TestListResolver(includeList, excludeList);
         DirectoryScanner scanner = new DirectoryScanner(getTestClassesDirectory(), resolver);
         DefaultScanResult scanResult = scanner.scan();
+        List<String> classes = scanResult.getClasses();
+        for (String clazz : classes) {
+            getLog().debug("Class " + clazz + " matches the current filter.");
+        }
+        if (classes.isEmpty()) {
+            getLog().debug("Nothing matches pattern = " + includeList + " excluding " + excludeList + " in "
+                    + getTestClassesDirectory());
+        }
         return scanResult;
     }
 
@@ -1139,12 +1145,7 @@ public abstract class AbstractTestMojo extends AbstractMojo {
             throws MalformedURLException, MojoExecutionException {
         EquinoxLaunchConfiguration cli = new EquinoxLaunchConfiguration(testRuntime);
 
-        String executable = null;
-        Toolchain tc = getToolchain();
-        if (tc != null) {
-            getLog().info("Toolchain in tycho-surefire-plugin: " + tc);
-            executable = tc.findTool("java");
-        }
+        String executable = getJavaExecutable();
         cli.setJvmExecutable(executable);
 
         cli.setWorkingDirectory(project.getBasedir());
@@ -1198,6 +1199,24 @@ public abstract class AbstractTestMojo extends AbstractMojo {
             cli.addVMArguments("-ea");
         }
         return cli;
+    }
+
+    protected String getJavaExecutable() throws MojoExecutionException {
+        Toolchain tc = getToolchain();
+        if (tc != null) {
+            getLog().info("Toolchain in tycho-surefire-plugin: " + tc);
+            return tc.findTool("java");
+        }
+        String javaHome = System.getenv("JAVA_HOME");
+        if (javaHome != null && !javaHome.isBlank()) {
+            File file = new File(javaHome, "bin/java");
+            if (file.exists()) {
+                getLog().info("Could not find the Toolchain, using java from JAVA_HOME instead");
+                return file.getAbsolutePath();
+            }
+        }
+        getLog().info("Could not find the Toolchain nor JAVA_HOME, trying java from PATH instead");
+        return "java";
     }
 
     private Map<String, String> getMergedSystemProperties() {

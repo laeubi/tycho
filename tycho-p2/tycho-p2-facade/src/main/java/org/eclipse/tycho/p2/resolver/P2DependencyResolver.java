@@ -13,6 +13,7 @@
  *                          - [Bug 567098] pomDependencies=consider should wrap non-osgi jars
  *                          - [Bug 572481] Tycho does not understand "additional.bundles" directive in build.properties
  *                          - [Issue #462] Delay Pom considered items to the final Target Platform calculation 
+ *                          - [Issue #626] Classpath computation must take fragments into account 
  *******************************************************************************/
 package org.eclipse.tycho.p2.resolver;
 
@@ -57,18 +58,19 @@ import org.codehaus.plexus.personality.plexus.lifecycle.phase.Initializable;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationException;
 import org.eclipse.sisu.equinox.EquinoxServiceFactory;
 import org.eclipse.tycho.ArtifactKey;
+import org.eclipse.tycho.BuildProperties;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.IDependencyMetadata;
 import org.eclipse.tycho.IDependencyMetadata.DependencyMetadataType;
 import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.artifacts.IllegalArtifactReferenceException;
 import org.eclipse.tycho.artifacts.TargetPlatform;
 import org.eclipse.tycho.core.DependencyResolver;
 import org.eclipse.tycho.core.DependencyResolverConfiguration;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
-import org.eclipse.tycho.core.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.ee.shared.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.core.maven.MavenDependencyInjector;
@@ -85,8 +87,6 @@ import org.eclipse.tycho.core.resolver.shared.MavenRepositoryLocation;
 import org.eclipse.tycho.core.resolver.shared.OptionalResolutionAction;
 import org.eclipse.tycho.core.resolver.shared.PomDependencies;
 import org.eclipse.tycho.core.shared.BuildFailureException;
-import org.eclipse.tycho.core.shared.BuildProperties;
-import org.eclipse.tycho.core.shared.BuildPropertiesParser;
 import org.eclipse.tycho.core.shared.TargetEnvironment;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.osgi.adapters.MavenLoggerAdapter;
@@ -116,9 +116,6 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
 
     @Requirement
     private RepositorySystem repositorySystem;
-
-    @Requirement
-    private BuildPropertiesParser buildPropertiesParser;
 
     @Requirement
     private ProjectDependenciesResolver projectDependenciesResolver;
@@ -211,7 +208,6 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
         ExecutionEnvironmentConfiguration ee = TychoProjectUtils.getExecutionEnvironmentConfiguration(reactorProject);
 
         TargetPlatformConfigurationStub tpConfiguration = new TargetPlatformConfigurationStub();
-        tpConfiguration.setIncludePackedArtifacts(configuration.isIncludePackedArtifacts());
         for (ArtifactRepository repository : project.getRemoteArtifactRepositories()) {
             addEntireP2RepositoryToTargetPlatform(repository, tpConfiguration);
         }
@@ -416,7 +412,7 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
             }
         }
 
-        BuildProperties buildProperties = buildPropertiesParser.parse(project.getBasedir());
+        BuildProperties buildProperties = DefaultReactorProject.adapt(project).getBuildProperties();
         Collection<String> additionalBundles = buildProperties.getAdditionalBundles();
         for (String additionalBundle : additionalBundles) {
             resolver.addAdditionalBundleDependency(additionalBundle);
@@ -483,6 +479,10 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
             } else {
                 platform.addArtifactFile(key, () -> entry.getLocation(true), entry.getInstallableUnits());
             }
+        }
+        for (P2ResolutionResult.Entry entry : result.getDependencyFragments()) {
+            ArtifactKey key = new DefaultArtifactKey(entry.getType(), entry.getId(), entry.getVersion());
+            platform.addFragment(key, () -> entry.getLocation(true), entry.getInstallableUnits());
         }
         return platform;
     }

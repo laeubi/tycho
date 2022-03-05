@@ -43,7 +43,6 @@ import org.eclipse.tycho.artifactcomparator.ArtifactComparator;
 import org.eclipse.tycho.artifactcomparator.ArtifactDelta;
 import org.eclipse.tycho.core.resolver.shared.MavenRepositoryLocation;
 import org.eclipse.tycho.p2.metadata.IP2Artifact;
-import org.eclipse.tycho.p2.repository.RepositoryLayoutHelper;
 import org.eclipse.tycho.p2.tools.baseline.facade.BaselineService;
 import org.eclipse.tycho.zipcomparator.internal.CompoundArtifactDelta;
 import org.eclipse.tycho.zipcomparator.internal.SimpleArtifactDelta;
@@ -231,12 +230,6 @@ public class BaselineValidator {
             // - feature jar artifacts
             // - feature rootfiles zip artifacts
             String classifier = classifierEntry.getKey();
-
-            if (RepositoryLayoutHelper.PACK200_CLASSIFIER.equals(classifier)) {
-                // in the unlikely event that reactor and baseline pack200 files have different contents
-                // but bundle jar files are the same, the build will silently use baseline pack200 file
-                continue;
-            }
 
             String deltaKey = classifier != null ? "classifier-" + classifier : "no-classifier";
 

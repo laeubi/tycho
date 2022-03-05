@@ -17,20 +17,10 @@ public final class ArtifactTransferPolicies {
     /**
      * Returns the {@link ArtifactTransferPolicy} optimized for artifacts stored in the local file
      * system. A provider with this policy will use the canonical format (if available) when asked
-     * for an artifact, avoiding unnecessary pack200 decompression operations.
+     * for an artifact.
      */
     public static ArtifactTransferPolicy forLocalArtifacts() {
         return new LocalArtifactTransferPolicy();
-    }
-
-    /**
-     * Returns the {@link ArtifactTransferPolicy} optimized for artifacts stored on a remote server.
-     * A provider with this policy will internally use the size-optimized pack200 format (if
-     * available) when asked for an artifact. This policy leads to a lower network usage, at the
-     * cost of a higher CPU usage.
-     */
-    public static ArtifactTransferPolicy forRemoteArtifacts() {
-        return new RemoteArtifactTransferPolicy();
     }
 
 }

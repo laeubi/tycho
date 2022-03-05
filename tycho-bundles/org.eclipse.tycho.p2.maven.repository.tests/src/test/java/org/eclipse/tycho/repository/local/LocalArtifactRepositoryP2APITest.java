@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2012, 2013 SAP SE and others.
+ * Copyright (c) 2012, 2022 SAP SE and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -9,6 +9,7 @@
  *
  * Contributors:
  *    Tobias Oberlies (SAP SE) - initial API and implementation
+ *    Christoph Läubrich - API adjust
  *******************************************************************************/
 package org.eclipse.tycho.repository.local;
 
@@ -19,7 +20,6 @@ import static org.eclipse.tycho.test.util.StatusMatchers.okStatus;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -56,7 +56,6 @@ import org.eclipse.tycho.repository.streaming.testutil.ProbeArtifactSink;
 import org.eclipse.tycho.repository.streaming.testutil.ProbeOutputStream;
 import org.eclipse.tycho.repository.streaming.testutil.ProbeRawArtifactSink;
 import org.junit.After;
-import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -76,7 +75,6 @@ public class LocalArtifactRepositoryP2APITest {
     private static final IArtifactKey ARTIFACT_B_KEY = TestRepositoryContent.BUNDLE_B_KEY;
 
     private static final Set<String> ARTIFACT_A_CONTENT = TestRepositoryContent.BUNDLE_A_FILES;
-    private static final Set<String> ARTIFACT_B_CONTENT = TestRepositoryContent.BUNDLE_B_FILES;
 
     private static final IArtifactDescriptor ARTIFACT_A_CANONICAL = localCanonicalDescriptorFor(ARTIFACT_A_KEY);
     private static final IArtifactDescriptor ARTIFACT_A_PACKED = localPackedDescriptorFor(ARTIFACT_A_KEY);
@@ -85,7 +83,6 @@ public class LocalArtifactRepositoryP2APITest {
     private static final IArtifactDescriptor ARTIFACT_B_CANONICAL = localCanonicalDescriptorFor(ARTIFACT_B_KEY);
 
     private static final String ARTIFACT_A_CANONICAL_MD5 = TestRepositoryContent.BUNDLE_A_CONTENT_MD5;
-    private static final String ARTIFACT_A_PACKED_MD5 = TestRepositoryContent.BUNDLE_A_PACKED_CONTENT_MD5;
 
     private static final IArtifactDescriptor ARTIFACT_A_DESCRIPTOR_1 = ARTIFACT_A_CANONICAL;
     private static final IArtifactDescriptor ARTIFACT_A_DESCRIPTOR_2 = ARTIFACT_A_PACKED;
@@ -300,7 +297,7 @@ public class LocalArtifactRepositoryP2APITest {
     public void testGetRawArtifactFile() {
         File result = subject.getArtifactFile(ARTIFACT_B_PACKED);
 
-        assertThat(result, is(artifactLocationOf(ARTIFACT_B_KEY, "-pack200.jar.pack.gz")));
+        assertThat(result, is(artifactLocationOf(ARTIFACT_B_KEY, ".jar")));
     }
 
     @Test
@@ -327,17 +324,6 @@ public class LocalArtifactRepositoryP2APITest {
         assertThat(testSink.writeIsStarted(), is(false));
         assertThat(status, is(errorStatus()));
         assertThat(status.getCode(), is(ProvisionException.ARTIFACT_NOT_FOUND));
-    }
-
-    @Test
-    public void testGetArtifactOnlyAvailableInPackedFormat() throws Exception {
-        Assume.assumeTrue("pack200 not available on current Java version", Runtime.version().feature() < 14);
-        testSink = newArtifactSinkFor(ARTIFACT_B_KEY);
-        // this method must return the original artifact, regardless of how the artifact is stored internally
-        status = subject.getArtifact(testSink, null);
-
-        assertThat(status, is(okStatus()));
-        assertThat(testSink.getFilesInZip(), is(ARTIFACT_B_CONTENT));
     }
 
     @Test
@@ -388,11 +374,6 @@ public class LocalArtifactRepositoryP2APITest {
         subject.getArtifact(new NonStartableArtifactSink(), null);
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void testGetArtifactToNonCanonicalSink() throws Exception {
-        subject.getArtifact(newRawArtifactSinkFor(ARTIFACT_A_PACKED), null);
-    }
-
     @SuppressWarnings("deprecation")
     @Test
     public void testGetArtifactToStream() throws Exception {
@@ -411,27 +392,6 @@ public class LocalArtifactRepositoryP2APITest {
         assertThat(testOutputStream.getStatus(), is(errorStatus())); // from IStateful
         assertThat(status, is(errorStatus()));
         assertThat(status.getCode(), is(ProvisionException.ARTIFACT_NOT_FOUND));
-    }
-
-    @SuppressWarnings("deprecation")
-    @Test
-    public void testGetArtifactToStreamOnlyAvailableInPackedFormat() throws Exception {
-        Assume.assumeTrue("pack200 not available on current Java version", Runtime.version().feature() < 14);
-        // this method must always return the original artifact, even if called with a pack200 descriptor  
-        status = subject.getArtifact(ARTIFACT_B_PACKED, testOutputStream, null);
-
-        assertThat(status, is(okStatus()));
-        assertThat(testOutputStream.writtenBytes(), not(is(0)));
-        assertThat(testOutputStream.getFilesInZip(), is(ARTIFACT_B_CONTENT));
-    }
-
-    @Test
-    public void testGetRawArtifact() throws Exception {
-        rawTestSink = newRawArtifactSinkFor(ARTIFACT_A_PACKED);
-        status = subject.getRawArtifact(rawTestSink, null);
-
-        assertThat(status, is(okStatus()));
-        assertThat(rawTestSink.md5AsHex(), is(ARTIFACT_A_PACKED_MD5));
     }
 
     @Test
@@ -476,15 +436,6 @@ public class LocalArtifactRepositoryP2APITest {
 
     @SuppressWarnings("deprecation")
     @Test
-    public void testGetRawArtifactToStream() throws Exception {
-        status = subject.getRawArtifact(ARTIFACT_A_PACKED, testOutputStream, null);
-
-        assertThat(status, is(okStatus()));
-        assertThat(testOutputStream.md5AsHex(), is(ARTIFACT_A_PACKED_MD5));
-    }
-
-    @SuppressWarnings("deprecation")
-    @Test
     public void testGetRawArtifactForCanonicalFormatToStream() throws Exception {
         status = subject.getRawArtifact(ARTIFACT_A_CANONICAL, testOutputStream, null);
 
@@ -508,7 +459,7 @@ public class LocalArtifactRepositoryP2APITest {
 
     @Test
     public void testWriteArtifact() throws Exception {
-        IArtifactSink addSink = subject.newAddingArtifactSink(NEW_KEY);
+        IArtifactSink addSink = subject.newAddingArtifactSink(new ArtifactDescriptor(NEW_KEY));
         addSink.beginWrite().write(new byte[33]);
         addSink.commitWrite();
 
@@ -522,7 +473,7 @@ public class LocalArtifactRepositoryP2APITest {
         // LocalArtifactRepository doesn't allow overwrites -> this may be different in other IArtifactRepository implementations
         ProvisionException expectedException = null;
         try {
-            IArtifactSink addSink = subject.newAddingArtifactSink(ARTIFACT_A_KEY);
+            IArtifactSink addSink = subject.newAddingArtifactSink(new ArtifactDescriptor(ARTIFACT_A_KEY));
             addSink.beginWrite();
             addSink.commitWrite();
         } catch (ProvisionException e) {
@@ -535,7 +486,7 @@ public class LocalArtifactRepositoryP2APITest {
 
     @Test
     public void testWriteArtifactAndCancel() throws Exception {
-        IArtifactSink addSink = subject.newAddingArtifactSink(NEW_KEY);
+        IArtifactSink addSink = subject.newAddingArtifactSink(new ArtifactDescriptor(NEW_KEY));
         addSink.beginWrite().write(new byte[33]);
         addSink.abortWrite();
 
@@ -545,7 +496,7 @@ public class LocalArtifactRepositoryP2APITest {
 
     @Test
     public void testWriteArtifactOnSecondAttempt() throws Exception {
-        IArtifactSink addSink = subject.newAddingArtifactSink(NEW_KEY);
+        IArtifactSink addSink = subject.newAddingArtifactSink(new ArtifactDescriptor(NEW_KEY));
         addSink.beginWrite().write(new byte[11]);
         addSink.beginWrite().write(new byte[22]);
         addSink.commitWrite();

@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2021 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2022 Sonatype Inc. and others.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,7 @@
  *    Christoph Läubrich -  [Bug 572416] Tycho does not understand "additional.bundles" directive in build.properties
  *                          [Bug 572416] Compile all source folders contained in .classpath
  *                          [Issue #460] Delay classpath resolution to the compile phase 
+ *                          [Issue #626] Classpath computation must take fragments into account 
  *******************************************************************************/
 package org.eclipse.tycho.core.osgitools;
 
@@ -48,6 +49,7 @@ import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.artifacts.TargetPlatform;
 import org.eclipse.tycho.classpath.ClasspathEntry;
@@ -57,7 +59,6 @@ import org.eclipse.tycho.core.ArtifactDependencyWalker;
 import org.eclipse.tycho.core.BundleProject;
 import org.eclipse.tycho.core.PluginDescription;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
-import org.eclipse.tycho.core.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.dotClasspath.ClasspathParser;
 import org.eclipse.tycho.core.dotClasspath.JUnitClasspathContainerEntry;
@@ -73,7 +74,6 @@ import org.eclipse.tycho.core.osgitools.project.BuildOutputJar;
 import org.eclipse.tycho.core.osgitools.project.EclipsePluginProject;
 import org.eclipse.tycho.core.osgitools.project.EclipsePluginProjectImpl;
 import org.eclipse.tycho.core.resolver.shared.PlatformPropertiesUtils;
-import org.eclipse.tycho.core.shared.BuildPropertiesParser;
 import org.eclipse.tycho.core.shared.TargetEnvironment;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.model.Feature;
@@ -99,9 +99,6 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
 
     @Requirement
     private BundleReader bundleReader;
-
-    @Requirement
-    private BuildPropertiesParser buildPropertiesParser;
 
     @Requirement
     private ClasspathParser classpathParser;
@@ -351,8 +348,7 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
                 .getContextValue(TychoConstants.CTX_ECLIPSE_PLUGIN_PROJECT);
         if (pdeProject == null) {
             try {
-                pdeProject = new EclipsePluginProjectImpl(otherProject,
-                        buildPropertiesParser.parse(otherProject.getBasedir()),
+                pdeProject = new EclipsePluginProjectImpl(otherProject, otherProject.getBuildProperties(),
                         classpathParser.parse(otherProject.getBasedir()));
                 if (otherProject instanceof DefaultReactorProject) {
                     populateProperties(((DefaultReactorProject) otherProject).project.getProperties(), pdeProject);
@@ -501,6 +497,15 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
                 ArtifactKey projectKey = getArtifactKey(project);
                 classpath.add(new DefaultClasspathEntry(project, projectKey,
                         Collections.singletonList(libraryClasspathEntry.getLibraryPath()), null));
+            }
+        }
+        //Fragments are like embedded depdnecies...
+        for (ArtifactDescriptor fragment : artifacts.getFragments()) {
+            ArtifactKey projectKey = getArtifactKey(project);
+            File location = fragment.getLocation(true);
+            if (location != null) {
+                classpath
+                        .add(new DefaultClasspathEntry(project, projectKey, Collections.singletonList(location), null));
             }
         }
     }
@@ -658,16 +663,28 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
 
     @Override
     public List<ClasspathEntry> getTestClasspath(ReactorProject reactorProject) {
-        @SuppressWarnings("unchecked")
+        return getTestClasspath(reactorProject, true);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<ClasspathEntry> getTestClasspath(ReactorProject reactorProject, boolean complete) {
         List<ClasspathEntry> classpath = (List<ClasspathEntry>) reactorProject
                 .getContextValue(TychoConstants.CTX_ECLIPSE_PLUGIN_TEST_CLASSPATH);
         if (classpath == null) {
             List<ClasspathEntry> testClasspath = new ArrayList<>(getClasspath(reactorProject));
-            testClasspath.addAll(computeExtraTestClasspath(reactorProject));
+            Collection<ClasspathEntry> extraTestClasspath = computeExtraTestClasspath(reactorProject);
+            reactorProject.setContextValue(TychoConstants.CTX_ECLIPSE_PLUGIN_TEST_EXTRA_CLASSPATH, extraTestClasspath);
+            testClasspath.addAll(extraTestClasspath);
             reactorProject.setContextValue(TychoConstants.CTX_ECLIPSE_PLUGIN_TEST_CLASSPATH, testClasspath);
             return testClasspath;
         }
-        return classpath;
+        if (complete) {
+            return classpath;
+        } else {
+            return (List<ClasspathEntry>) reactorProject
+                    .getContextValue(TychoConstants.CTX_ECLIPSE_PLUGIN_TEST_EXTRA_CLASSPATH);
+        }
     }
 
     public DependencyArtifacts getTestDependencyArtifacts(ReactorProject project) {

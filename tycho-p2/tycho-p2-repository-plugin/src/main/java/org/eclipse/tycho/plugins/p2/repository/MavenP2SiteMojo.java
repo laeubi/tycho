@@ -37,8 +37,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.BooleanUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.handler.ArtifactHandler;
 import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
@@ -72,7 +70,7 @@ import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.eclipse.sisu.equinox.EquinoxServiceFactory;
 import org.eclipse.sisu.equinox.launching.internal.P2ApplicationLauncher;
-import org.eclipse.tycho.p2.repository.RepositoryLayoutHelper;
+import org.eclipse.tycho.TychoConstants;
 
 /**
  * <p>
@@ -482,12 +480,12 @@ public class MavenP2SiteMojo extends AbstractMojo {
             File p2 = File.createTempFile("p2properties", ".inf");
             p2.deleteOnExit();
             Properties properties = new Properties();
-            addProvidesAndProperty(properties, RepositoryLayoutHelper.PROP_GROUP_ID, artifact.getGroupId(), cnt++);
-            addProvidesAndProperty(properties, RepositoryLayoutHelper.PROP_ARTIFACT_ID, artifact.getArtifactId(),
+            addProvidesAndProperty(properties, TychoConstants.PROP_GROUP_ID, artifact.getGroupId(), cnt++);
+            addProvidesAndProperty(properties, TychoConstants.PROP_ARTIFACT_ID, artifact.getArtifactId(),
                     cnt++);
-            addProvidesAndProperty(properties, RepositoryLayoutHelper.PROP_VERSION, artifact.getVersion(), cnt++);
-            addProvidesAndProperty(properties, RepositoryLayoutHelper.PROP_EXTENSION, artifact.getType(), cnt++);
-            addProvidesAndProperty(properties, RepositoryLayoutHelper.PROP_CLASSIFIER, artifact.getClassifier(), cnt++);
+            addProvidesAndProperty(properties, TychoConstants.PROP_VERSION, artifact.getVersion(), cnt++);
+            addProvidesAndProperty(properties, TychoConstants.PROP_EXTENSION, artifact.getType(), cnt++);
+            addProvidesAndProperty(properties, TychoConstants.PROP_CLASSIFIER, artifact.getClassifier(), cnt++);
             addProvidesAndProperty(properties, "maven-scope", artifact.getScope(), cnt++);
             properties.store(new FileOutputStream(p2), null);
             return p2;
@@ -610,7 +608,7 @@ public class MavenP2SiteMojo extends AbstractMojo {
     protected boolean isSkippedDeploy(MavenProject mavenProject) {
         String property = mavenProject.getProperties().getProperty("maven.deploy.skip");
         if (property != null) {
-            boolean skip = BooleanUtils.toBoolean(property);
+            boolean skip = Boolean.parseBoolean(property);
             getLog().debug("deploy is " + (skip ? "" : "not") + " skipped in MavenProject " + mavenProject.getName()
                     + " because of property 'maven.deploy.skip'");
             return skip;
@@ -618,7 +616,7 @@ public class MavenP2SiteMojo extends AbstractMojo {
         String pluginId = "org.apache.maven.plugins:maven-deploy-plugin";
         property = getPluginParameter(mavenProject, pluginId, "skip");
         if (property != null) {
-            boolean skip = BooleanUtils.toBoolean(property);
+            boolean skip = Boolean.parseBoolean(property);
             getLog().debug("deploy is " + (skip ? "" : "not") + " skipped in MavenProject " + mavenProject.getName()
                     + " because of configuration of the plugin 'org.apache.maven.plugins:maven-deploy-plugin'");
             return skip;
@@ -645,8 +643,8 @@ public class MavenP2SiteMojo extends AbstractMojo {
         Plugin plugin = getPlugin(p, pluginId);
         if (plugin != null) {
             Xpp3Dom xpp3Dom = (Xpp3Dom) plugin.getConfiguration();
-            if (xpp3Dom != null && xpp3Dom.getChild(param) != null
-                    && StringUtils.isNotEmpty(xpp3Dom.getChild(param).getValue())) {
+            if (xpp3Dom != null && xpp3Dom.getChild(param) != null && xpp3Dom.getChild(param).getValue() != null
+                    && !xpp3Dom.getChild(param).getValue().isEmpty()) {
                 return xpp3Dom.getChild(param).getValue();
             }
         }

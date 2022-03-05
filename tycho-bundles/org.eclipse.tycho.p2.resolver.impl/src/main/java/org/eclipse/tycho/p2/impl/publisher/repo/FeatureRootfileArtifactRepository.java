@@ -33,18 +33,14 @@ import org.eclipse.equinox.p2.publisher.PublisherInfo;
 import org.eclipse.equinox.p2.publisher.actions.IPropertyAdvice;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.equinox.spi.p2.publisher.PublisherHelper;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.p2.impl.publisher.MavenPropertiesAdvice;
 import org.eclipse.tycho.p2.impl.publisher.P2Artifact;
 import org.eclipse.tycho.p2.impl.publisher.rootfiles.FeatureRootAdvice;
 import org.eclipse.tycho.p2.metadata.IP2Artifact;
-import org.eclipse.tycho.p2.repository.RepositoryLayoutHelper;
 
 @SuppressWarnings("restriction")
 public class FeatureRootfileArtifactRepository extends TransientArtifactRepository {
-    private static final String ROOTFILE_CLASSIFIER = "root";
-
-    private static final String ROOTFILE_EXTENSION = "zip";
-
     private final File outputDirectory;
 
     private final PublisherInfo publisherInfo;
@@ -72,15 +68,16 @@ public class FeatureRootfileArtifactRepository extends TransientArtifactReposito
 
     private OutputStream createRootfileOutputStream(IArtifactKey artifactKey) throws ProvisionException, IOException {
         File outputFile = new File(this.outputDirectory, artifactKey.getId() + "-" + artifactKey.getVersion() + "-"
-                + ROOTFILE_CLASSIFIER + "." + ROOTFILE_EXTENSION);
+                + TychoConstants.ROOTFILE_CLASSIFIER + "." + TychoConstants.ROOTFILE_EXTENSION);
 
         OutputStream target = null;
         try {
-            SimpleArtifactDescriptor simpleArtifactDescriptor = (SimpleArtifactDescriptor) createArtifactDescriptor(artifactKey);
+            SimpleArtifactDescriptor simpleArtifactDescriptor = (SimpleArtifactDescriptor) createArtifactDescriptor(
+                    artifactKey);
 
-            Collection<IPropertyAdvice> advices = publisherInfo.getAdvice(null, false, simpleArtifactDescriptor
-                    .getArtifactKey().getId(), simpleArtifactDescriptor.getArtifactKey().getVersion(),
-                    IPropertyAdvice.class);
+            Collection<IPropertyAdvice> advices = publisherInfo.getAdvice(null, false,
+                    simpleArtifactDescriptor.getArtifactKey().getId(),
+                    simpleArtifactDescriptor.getArtifactKey().getVersion(), IPropertyAdvice.class);
 
             boolean mavenPropAdviceExists = false;
             for (IPropertyAdvice entry : advices) {
@@ -91,14 +88,16 @@ public class FeatureRootfileArtifactRepository extends TransientArtifactReposito
             }
 
             if (!mavenPropAdviceExists) {
-                throw new ProvisionException("MavenPropertiesAdvice does not exist for artifact: "
-                        + simpleArtifactDescriptor);
+                throw new ProvisionException(
+                        "MavenPropertiesAdvice does not exist for artifact: " + simpleArtifactDescriptor);
             }
 
-            String mavenArtifactClassifier = getRootFileArtifactClassifier(simpleArtifactDescriptor.getArtifactKey()
-                    .getId());
-            simpleArtifactDescriptor.setProperty(RepositoryLayoutHelper.PROP_CLASSIFIER, mavenArtifactClassifier);
-            simpleArtifactDescriptor.setProperty(RepositoryLayoutHelper.PROP_EXTENSION, ROOTFILE_EXTENSION);
+            String mavenArtifactClassifier = getRootFileArtifactClassifier(
+                    simpleArtifactDescriptor.getArtifactKey().getId());
+            simpleArtifactDescriptor.setProperty(TychoConstants.PROP_CLASSIFIER, mavenArtifactClassifier);
+            //Type and extension are the same for rootfiles ...
+            simpleArtifactDescriptor.setProperty(TychoConstants.PROP_EXTENSION, TychoConstants.ROOTFILE_EXTENSION);
+            simpleArtifactDescriptor.setProperty(TychoConstants.PROP_TYPE, TychoConstants.ROOTFILE_EXTENSION);
 
             target = new BufferedOutputStream(new FileOutputStream(outputFile));
 
@@ -122,13 +121,13 @@ public class FeatureRootfileArtifactRepository extends TransientArtifactReposito
 
                 for (String config : configurations) {
                     if (!"".equals(config) && artifactId.endsWith(config)) {
-                        return ROOTFILE_CLASSIFIER + "." + config;
+                        return TychoConstants.ROOTFILE_CLASSIFIER + "." + config;
                     }
                 }
             }
         }
 
-        return ROOTFILE_CLASSIFIER;
+        return TychoConstants.ROOTFILE_CLASSIFIER;
     }
 
     public Map<String, IP2Artifact> getPublishedArtifacts() {

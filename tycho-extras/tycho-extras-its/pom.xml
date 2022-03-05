@@ -17,7 +17,7 @@
 	<parent>
 		<groupId>org.eclipse.tycho.extras</groupId>
 		<artifactId>tycho-extras</artifactId>
-		<version>2.7.0-SNAPSHOT</version>
+		<version>3.0.0-SNAPSHOT</version>
 	</parent>
 
 	<artifactId>tycho-extras-its</artifactId>
@@ -25,7 +25,7 @@
 	<name>Tycho Extras Integration Tests</name>
 
 	<properties>
-		<its-maven-version>3.8.3</its-maven-version>
+		<its-maven-version>3.8.4</its-maven-version>
 		<maven-dir>${project.build.directory}/apache-maven-${its-maven-version}</maven-dir>
 	</properties>
 

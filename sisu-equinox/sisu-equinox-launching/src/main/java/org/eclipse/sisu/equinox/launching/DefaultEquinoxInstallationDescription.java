@@ -84,7 +84,7 @@ public class DefaultEquinoxInstallationDescription implements EquinoxInstallatio
     @Override
     public List<ArtifactDescriptor> getBundles() {
         return bundles.getArtifacts(key -> ArtifactType.TYPE_ECLIPSE_PLUGIN.equals(key.getType())
-                || ArtifactType.TYPE_ECLIPSE_TEST_FRAGMENT.equals(key.getType()));
+                || ArtifactType.TYPE_ECLIPSE_TEST_PLUGIN.equals(key.getType()));
     }
 
     @Override
@@ -144,7 +144,7 @@ public class DefaultEquinoxInstallationDescription implements EquinoxInstallatio
     @Override
     public void addDevEntries(String id, String entries) {
         if (entries != null) {
-            devEntries.put(id, entries);
+            devEntries.merge(id, entries, (s1, s2) -> s1 + "," + s2);
         }
     }
 

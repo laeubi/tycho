@@ -70,15 +70,11 @@ public class GAVArtifactDescriptor extends GAVArtifactDescriptorBase {
     /**
      * @return fake Maven coordinates derived from the given key; never <code>null</code>
      */
-    private static MavenRepositoryCoordinates getP2DerivedCoordinates(IArtifactKey key, Map<String, String> properties) {
+    private static MavenRepositoryCoordinates getP2DerivedCoordinates(IArtifactKey key,
+            Map<String, String> properties) {
         GAV gav = RepositoryLayoutHelper.getP2Gav(key.getClassifier(), key.getId(), key.getVersion().toString());
-        String classifier = null;
-        String extension = RepositoryLayoutHelper.DEFAULT_EXTERNSION;
-
-        if (properties != null && IArtifactDescriptor.FORMAT_PACKED.equals(properties.get(IArtifactDescriptor.FORMAT))) {
-            classifier = RepositoryLayoutHelper.PACK200_CLASSIFIER;
-            extension = RepositoryLayoutHelper.PACK200_EXTENSION;
-        }
+        String classifier = RepositoryLayoutHelper.getClassifier(properties);
+        String extension = RepositoryLayoutHelper.getType(properties);
 
         return new MavenRepositoryCoordinates(gav, classifier, extension);
     }

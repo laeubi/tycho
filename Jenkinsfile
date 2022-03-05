@@ -2,6 +2,7 @@ pipeline {
 	options {
 		timeout(time: 180, unit: 'MINUTES')
 		buildDiscarder(logRotator(numToKeepStr:'10'))
+		disableConcurrentBuilds(abortPrevious: true)
 	}
 	agent {
 		label "centos-8"
@@ -30,12 +31,12 @@ pipeline {
 				sh 'mvn -V deploy -DskipTests -DaltDeploymentRepository=repo.eclipse.org::default::https://repo.eclipse.org/content/repositories/tycho-snapshots/'
 			}
 		}
-		stage('Build downstream') {
+		stage('Deploy sitedocs') {
 			when {
 				branch 'master'
 			}
 			steps {
-				build job: '/tycho-sitedocs'
+				sh 'mvn -V clean install site site:stage -DskipTests=true'
 			}
 		}
 	}

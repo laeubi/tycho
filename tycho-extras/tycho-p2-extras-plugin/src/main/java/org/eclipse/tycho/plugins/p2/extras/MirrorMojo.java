@@ -111,12 +111,6 @@ public class MirrorMojo extends AbstractMojo {
     private boolean includeFeatures;
 
     /**
-     * Whether or not to include pack200 artifacts.
-     */
-    @Parameter(defaultValue = "false")
-    private boolean includePacked;
-
-    /**
      * Whether or not to follow optional requirements.
      */
     @Parameter(defaultValue = "true")
@@ -236,12 +230,14 @@ public class MirrorMojo extends AbstractMojo {
         } else {
             sourceDescriptor = new RepositoryReferences();
         }
-        for (final Repository sourceRepository : source) {
-            if (sourceRepository.getLayout().hasMetadata()) {
-                sourceDescriptor.addMetadataRepository(sourceRepository.getLocation());
-            }
-            if (sourceRepository.getLayout().hasArtifacts()) {
-                sourceDescriptor.addArtifactRepository(sourceRepository.getLocation());
+        if (source != null) {
+            for (final Repository sourceRepository : source) {
+                if (sourceRepository.getLayout().hasMetadata()) {
+                    sourceDescriptor.addMetadataRepository(sourceRepository.getLocation());
+                }
+                if (sourceRepository.getLayout().hasArtifacts()) {
+                    sourceDescriptor.addArtifactRepository(sourceRepository.getLocation());
+                }
             }
         }
         if (sourceDescriptor.getArtifactRepositories().isEmpty()
@@ -273,7 +269,6 @@ public class MirrorMojo extends AbstractMojo {
         options.setIncludeOptional(includeOptional);
         options.setLatestVersionOnly(latestVersionOnly);
         options.getFilter().putAll(filter);
-        options.setIncludePacked(includePacked);
         options.setIgnoreErrors(ignoreErrors);
         return options;
     }

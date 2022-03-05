@@ -13,7 +13,6 @@
  *******************************************************************************/
 package org.eclipse.tycho.repository.p2base.artifact.repository;
 
-import static java.util.Arrays.asList;
 import static org.eclipse.tycho.p2.maven.repository.tests.TestRepositoryContent.BUNDLE_A_KEY;
 import static org.eclipse.tycho.p2.maven.repository.tests.TestRepositoryContent.BUNDLE_B_KEY;
 import static org.eclipse.tycho.p2.maven.repository.tests.TestRepositoryContent.REPO_BUNDLE_A_CORRUPT;
@@ -26,7 +25,6 @@ import static org.eclipse.tycho.test.util.StatusMatchers.errorStatus;
 import static org.eclipse.tycho.test.util.StatusMatchers.warningStatus;
 import static org.hamcrest.CoreMatchers.both;
 import static org.hamcrest.CoreMatchers.containsString;
-import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertThrows;
@@ -47,17 +45,15 @@ import org.eclipse.core.runtime.Status;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactRepository;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactRequest;
-import org.eclipse.tycho.p2.maven.repository.tests.TestRepositoryContent;
 import org.eclipse.tycho.repository.p2base.artifact.provider.CompositeArtifactProviderTestBase;
 import org.eclipse.tycho.repository.p2base.artifact.provider.IRawArtifactProvider;
 import org.eclipse.tycho.repository.p2base.artifact.provider.formats.ArtifactTransferPolicies;
 import org.eclipse.tycho.repository.p2base.artifact.provider.formats.ArtifactTransferPolicy;
-import org.junit.Assume;
 import org.junit.Test;
 
 public class RepositoryArtifactProviderTest extends CompositeArtifactProviderTestBase<IRawArtifactProvider> {
 
-    private static final ArtifactTransferPolicy TRANSFER_POLICY = ArtifactTransferPolicies.forRemoteArtifacts();
+    private static final ArtifactTransferPolicy TRANSFER_POLICY = ArtifactTransferPolicies.forLocalArtifacts();
 
     @Override
     protected IRawArtifactProvider createCompositeArtifactProvider(URI... repositoryURLs) throws Exception {
@@ -99,19 +95,6 @@ public class RepositoryArtifactProviderTest extends CompositeArtifactProviderTes
         assertThat(status.getMessage(), both(containsString("An error occurred while transferring artifact"))
                 .and(containsString(REPO_BUNDLE_A_CORRUPT.toString())));
         assertThat(rawTestSink.writeIsCommitted(), is(false));
-    }
-
-    @Test
-    public void testGetArtifactWherePreferredFormatIsCorrupt() throws Exception {
-        Assume.assumeTrue("This test requires pack200", Runtime.version().feature() < 14);
-        subject = createCompositeArtifactProvider(REPO_BUNLDE_AB_PACK_CORRUPT);
-
-        testSink = newArtifactSinkFor(BUNDLE_A_KEY);
-        status = subject.getArtifact(testSink, null);
-
-        assertThat(status, is(warningStatus()));
-        assertThat(asList(status.getChildren()), hasItem(errorStatus()));
-        assertThat(testSink.getFilesInZip(), is(TestRepositoryContent.BUNDLE_A_FILES));
     }
 
     @Test

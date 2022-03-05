@@ -26,6 +26,7 @@ import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.LegacySupport;
 import org.apache.maven.plugin.Mojo;
+import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.shared.utils.io.FileUtils;
@@ -42,7 +43,7 @@ public class MirrorMojoTest extends AbstractTychoMojoTestCase {
     protected void setUp() throws Exception {
         super.setUp();
         File basedir = getBasedir("mirroring/testProject");
-        List<MavenProject> projects = getSortedProjects(basedir, null);
+        List<MavenProject> projects = getSortedProjects(basedir);
         MavenProject project = projects.get(0);
         initLegacySupport(projects, project);
         mirrorDestinationDir = new File(project.getFile().getParent(), "target/repository").getCanonicalFile();
@@ -115,6 +116,21 @@ public class MirrorMojoTest extends AbstractTychoMojoTestCase {
         assertEquals(2, new File(mirrorDestinationDir, "plugins").listFiles().length);
         assertMirroredBundle(mirrorDestinationDir, "test.bundle1", "1.0.0.201108100850");
         assertMirroredBundle(mirrorDestinationDir, "test.bundle2", "1.0.0.201108100850");
+    }
+
+    public void testTargetPlatformAsSource() throws Exception {
+        Iu featureIU = new Iu();
+        featureIU.id = "test.feature.feature.group";
+        setVariableValueToObject(mirrorMojo, "ius", Collections.singletonList(featureIU));
+        setVariableValueToObject(mirrorMojo, "targetPlatformAsSource", Boolean.TRUE);
+        try {
+            // Source is allowed to be empty, for example when targetPlatformAsSource is set, but in this test
+            // project we have no target platform so it should fail gracefully instead of throwing a NPE
+            mirrorMojo.execute();
+            fail();
+        } catch (MojoExecutionException e) {
+            assertEquals(e.getMessage(), "No repository provided as 'source'");
+        }
     }
 
     private static void assertMirroredBundle(File publishedContentDir, String bundleID, String version) {

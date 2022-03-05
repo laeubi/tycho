@@ -23,12 +23,12 @@ import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.tycho.ArtifactDescriptor;
 import org.eclipse.tycho.MavenDependencyDescriptor;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.shared.MavenContext;
 import org.eclipse.tycho.core.shared.MavenLogger;
 import org.eclipse.tycho.p2.remote.RemoteAgentManager;
 import org.eclipse.tycho.p2.repository.LocalRepositoryP2Indices;
 import org.eclipse.tycho.p2.repository.LocalRepositoryReader;
-import org.eclipse.tycho.p2.repository.RepositoryLayoutHelper;
 import org.eclipse.tycho.p2.repository.RepositoryReader;
 import org.eclipse.tycho.p2.resolver.facade.P2ResolverFactory;
 import org.eclipse.tycho.p2.target.PomDependencyCollectorImpl;
@@ -53,7 +53,7 @@ public class P2ResolverFactoryImpl implements P2ResolverFactory {
             LocalRepositoryP2Indices localRepoIndices) {
         if (localMetadataRepository == null) {
             File localMavenRepoRoot = context.getLocalRepositoryRoot();
-            RepositoryReader contentLocator = new LocalRepositoryReader(localMavenRepoRoot);
+            RepositoryReader contentLocator = new LocalRepositoryReader(context);
             localMetadataRepository = new LocalMetadataRepository(localMavenRepoRoot.toURI(),
                     localRepoIndices.getMetadataIndex(), contentLocator);
 
@@ -64,7 +64,7 @@ public class P2ResolverFactoryImpl implements P2ResolverFactory {
     private static synchronized LocalArtifactRepository getLocalArtifactRepository(MavenContext mavenContext,
             LocalRepositoryP2Indices localRepoIndices) {
         if (localArtifactRepository == null) {
-            RepositoryReader contentLocator = new LocalRepositoryReader(mavenContext.getLocalRepositoryRoot());
+            RepositoryReader contentLocator = new LocalRepositoryReader(mavenContext);
             localArtifactRepository = new LocalArtifactRepository(localRepoIndices, contentLocator);
         }
         return localArtifactRepository;
@@ -116,9 +116,9 @@ public class P2ResolverFactoryImpl implements P2ResolverFactory {
         return artifactDescriptor.getInstallableUnits().stream().filter(IInstallableUnit.class::isInstance)
                 .map(IInstallableUnit.class::cast).map(iu -> {
                     Map<String, String> properties = iu.getProperties();
-                    String groupId = properties.get(RepositoryLayoutHelper.PROP_GROUP_ID);
-                    String artifactId = properties.get(RepositoryLayoutHelper.PROP_ARTIFACT_ID);
-                    String version = properties.get(RepositoryLayoutHelper.PROP_VERSION);
+                    String groupId = properties.get(TychoConstants.PROP_GROUP_ID);
+                    String artifactId = properties.get(TychoConstants.PROP_ARTIFACT_ID);
+                    String version = properties.get(TychoConstants.PROP_VERSION);
                     if (groupId == null || artifactId == null || version == null) {
                         //these properties are required!
                         return null;
@@ -132,7 +132,7 @@ public class P2ResolverFactoryImpl implements P2ResolverFactory {
 
                         @Override
                         public String getType() {
-                            return properties.get(RepositoryLayoutHelper.PROP_EXTENSION);
+                            return properties.get(TychoConstants.PROP_EXTENSION);
                         }
 
                         @Override
@@ -142,12 +142,17 @@ public class P2ResolverFactoryImpl implements P2ResolverFactory {
 
                         @Override
                         public String getClassifier() {
-                            return properties.get(RepositoryLayoutHelper.PROP_CLASSIFIER);
+                            return properties.get(TychoConstants.PROP_CLASSIFIER);
                         }
 
                         @Override
                         public String getArtifactId() {
                             return artifactId;
+                        }
+
+                        @Override
+                        public String getRepository() {
+                            return properties.get(TychoConstants.PROP_REPOSITORY);
                         }
                     };
                 }).filter(Objects::nonNull).findFirst().orElse(null);

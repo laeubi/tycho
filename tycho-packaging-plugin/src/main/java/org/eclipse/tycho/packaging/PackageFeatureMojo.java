@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2020 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2022 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -10,6 +10,7 @@
  * Contributors:
  *    Sonatype Inc. - initial API and implementation
  *    Bachmann electronic GmbH. - #519941 Copy the shared license info
+ *    Christoph Läubrich - Issue #572 - Insert dynamic dependencies into the jar included pom 
  *******************************************************************************/
 package org.eclipse.tycho.packaging;
 
@@ -32,16 +33,16 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.archiver.Archiver;
 import org.codehaus.plexus.archiver.FileSet;
 import org.codehaus.plexus.archiver.jar.JarArchiver;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.util.IOUtil;
+import org.eclipse.tycho.BuildProperties;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.artifacts.TargetPlatform;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
-import org.eclipse.tycho.core.shared.BuildProperties;
-import org.eclipse.tycho.core.shared.BuildPropertiesParser;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.model.Feature;
 
@@ -107,9 +108,6 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
     @Component
     private LicenseFeatureHelper licenseFeatureHelper;
 
-    @Component
-    private BuildPropertiesParser buildPropertiesParser;
-
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         synchronized (LOCK) {
@@ -129,7 +127,7 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
                 throw new MojoExecutionException("Error updating feature.xml", e);
             }
 
-            BuildProperties buildProperties = buildPropertiesParser.parse(project.getBasedir());
+			BuildProperties buildProperties = DefaultReactorProject.adapt(project).getBuildProperties();
             checkBinIncludesExist(buildProperties);
 
             File featureProperties = getFeatureProperties(licenseFeature, buildProperties);
@@ -157,7 +155,8 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
                     archive = new MavenArchiveConfiguration();
                     archive.setAddMavenDescriptor(false);
                 }
-                archiver.createArchive(session, project, archive);
+				MavenProject mavenProject = project;
+				archiver.createArchive(session, mavenProject, archive);
             } catch (Exception e) {
                 throw new MojoExecutionException("Error creating feature package", e);
             }

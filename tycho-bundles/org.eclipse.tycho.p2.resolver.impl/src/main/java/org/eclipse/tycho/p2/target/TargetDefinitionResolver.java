@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2011, 2020 SAP SE and others.
+ * Copyright (c) 2011, 2022 SAP SE and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -14,6 +14,7 @@
  *                          - [Bug 568729] Support new "Maven" Target location
  *                          - [Bug 569060] All ids of target file must be different 
  *                          - [Bug 569481] Support for maven target location includeSource="true" attribute
+ *                          - [Issue #401] Support nested targets
  *******************************************************************************/
 package org.eclipse.tycho.p2.target;
 
@@ -133,6 +134,7 @@ public final class TargetDefinitionResolver {
         Map<String, FileTargetDefinitionContent> fileRepositories = new LinkedHashMap<>();
         Map<String, URITargetDefinitionContent> uriRepositories = new LinkedHashMap<>();
         List<MavenTargetDefinitionContent> mavenLocations = new ArrayList<>();
+        List<TargetDefinitionContent> referencedTargetLocations = new ArrayList<>();
         for (Location locationDefinition : definition.getLocations()) {
             if (locationDefinition instanceof InstallableUnitLocation) {
                 InstallableUnitLocation installableUnitLocation = (InstallableUnitLocation) locationDefinition;
@@ -182,7 +184,7 @@ public final class TargetDefinitionResolver {
             } else if (locationDefinition instanceof MavenGAVLocation) {
                 MavenGAVLocation location = (MavenGAVLocation) locationDefinition;
                 MavenTargetDefinitionContent targetDefinitionContent = new MavenTargetDefinitionContent(location,
-                        mavenDependenciesResolver, includeSourceMode, provisioningAgent, logger);
+                        mavenDependenciesResolver, includeSourceMode, provisioningAgent, mavenContext);
                 mavenLocations.add(targetDefinitionContent);
                 IQueryResult<IInstallableUnit> result = targetDefinitionContent.query(QueryUtil.ALL_UNITS,
                         new LoggingProgressMonitor(logger));
@@ -199,7 +201,7 @@ public final class TargetDefinitionResolver {
                 String resolvePath = resolvePath(referenceLocation.getUri(), definition);
                 URI resolvedUri;
                 try {
-                    resolvedUri = new URI(resolvePath);
+                    resolvedUri = new URI(convertRawToUri(resolvePath));
                 } catch (URISyntaxException e) {
                     throw new ResolverException("Invalid URI " + resolvePath + ": " + e.getMessage(), e);
                 }
@@ -209,6 +211,7 @@ public final class TargetDefinitionResolver {
                 IQueryResult<IInstallableUnit> result = content.query(QueryUtil.ALL_UNITS,
                         new LoggingProgressMonitor(logger));
                 unitResultSet.addAll(result);
+                referencedTargetLocations.add(content);
             } else {
                 logger.warn("Target location type '" + locationDefinition.getTypeDescription() + "' is not supported");
             }
@@ -236,6 +239,11 @@ public final class TargetDefinitionResolver {
         for (MavenTargetDefinitionContent mavenContent : mavenLocations) {
             metadataRepositories.add(mavenContent.getMetadataRepository());
             artifactRepositories.add(mavenContent.getArtifactRepository());
+        }
+        //preliminary step: add all referenced targets:
+        for (TargetDefinitionContent referenceContent : referencedTargetLocations) {
+            metadataRepositories.add(referenceContent.getMetadataRepository());
+            artifactRepositories.add(referenceContent.getArtifactRepository());
         }
         //now we can resolve the p2 sources
         if (installableUnitResolver != null) {
@@ -272,6 +280,17 @@ public final class TargetDefinitionResolver {
             }
 
         };
+    }
+
+    static String convertRawToUri(String resolvePath) {
+        //We need to convert windows path separators here...
+        resolvePath = resolvePath.replace('\\', '/');
+        String lc = resolvePath.toLowerCase();
+        if (lc.startsWith("file:") && !lc.startsWith("file:/")) {
+            //according to rfc a file URI must always start with a slash
+            resolvePath = resolvePath.replaceFirst("(?i)^file:", "file:/");
+        }
+        return resolvePath;
     }
 
     protected String resolvePath(String path, TargetDefinition definition) {

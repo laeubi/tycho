@@ -18,12 +18,11 @@ import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.logging.AbstractLogEnabled;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.artifacts.DependencyArtifacts;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
-import org.eclipse.tycho.core.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.ee.shared.ExecutionEnvironmentConfiguration;
-import org.eclipse.tycho.core.osgitools.targetplatform.LocalDependencyResolver;
 import org.eclipse.tycho.core.osgitools.targetplatform.MultiEnvironmentDependencyArtifacts;
 import org.eclipse.tycho.core.shared.TargetEnvironment;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
@@ -64,14 +63,6 @@ public abstract class AbstractTychoProject extends AbstractLogEnabled implements
 
     public void setupProject(MavenSession session, MavenProject project) {
         // do nothing by default
-    }
-
-    /**
-     * @deprecated Only needed for {@link LocalDependencyResolver}; p2 resolver checks consistency
-     *             itself
-     */
-    @Deprecated
-    public void checkForMissingDependencies(ReactorProject project) {
     }
 
     protected TargetEnvironment[] getEnvironments(ReactorProject project, TargetEnvironment environment) {

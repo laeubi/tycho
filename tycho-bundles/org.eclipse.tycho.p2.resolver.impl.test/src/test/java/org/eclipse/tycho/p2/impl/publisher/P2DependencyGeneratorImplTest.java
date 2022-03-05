@@ -27,12 +27,15 @@ import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.equinox.p2.metadata.expression.IMatchExpression;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.tycho.PackagingType;
+import org.eclipse.tycho.TychoConstants;
+import org.eclipse.tycho.core.shared.MockMavenContext;
 import org.eclipse.tycho.core.shared.TargetEnvironment;
 import org.eclipse.tycho.p2.impl.test.ArtifactMock;
 import org.eclipse.tycho.p2.metadata.PublisherOptions;
-import org.eclipse.tycho.p2.repository.RepositoryLayoutHelper;
 import org.eclipse.tycho.test.util.BuildPropertiesParserForTesting;
+import org.eclipse.tycho.test.util.LogVerifier;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 
 @SuppressWarnings("restriction")
@@ -43,10 +46,13 @@ public class P2DependencyGeneratorImplTest {
     private P2GeneratorImpl subject;
     private List<IInstallableUnit> units;
     private List<IArtifactDescriptor> artifacts;
+    @Rule
+    public final LogVerifier logVerifier = new LogVerifier();
 
     @Before
     public void resetTestSubjectAndResultFields() {
         subject = new P2GeneratorImpl(true);
+        subject.setMavenContext(new MockMavenContext(null, logVerifier.getLogger()));
         subject.setBuildPropertiesParser(new BuildPropertiesParserForTesting());
     }
 
@@ -74,7 +80,7 @@ public class P2DependencyGeneratorImplTest {
         assertEquals("org.eclipse.tycho.p2.impl.test.bundle", unit.getId());
         assertEquals("1.0.0.qualifier", unit.getVersion().toString());
         assertEquals(3, unit.getRequirements().size());
-        assertEquals(DEFAULT_CLASSIFIER, unit.getProperty(RepositoryLayoutHelper.PROP_CLASSIFIER));
+        assertEquals(DEFAULT_CLASSIFIER, unit.getProperty(TychoConstants.PROP_CLASSIFIER));
 
         // not really necessary, but we get this because we reuse standard p2 implementation
         assertEquals(1, artifacts.size());
@@ -118,7 +124,7 @@ public class P2DependencyGeneratorImplTest {
 
         assertEquals("org.eclipse.tycho.p2.impl.test.feature.feature.group", unit.getId());
         assertEquals("1.0.0.qualifier", unit.getVersion().toString());
-        assertEquals(DEFAULT_CLASSIFIER, unit.getProperty(RepositoryLayoutHelper.PROP_CLASSIFIER));
+        assertEquals(DEFAULT_CLASSIFIER, unit.getProperty(TychoConstants.PROP_CLASSIFIER));
 
         List<IRequirement> requirements = new ArrayList<>(unit.getRequirements());
         assertEquals(6, requirements.size());

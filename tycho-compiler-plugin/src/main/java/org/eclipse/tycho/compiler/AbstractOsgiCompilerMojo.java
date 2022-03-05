@@ -107,8 +107,6 @@ public abstract class AbstractOsgiCompilerMojo extends AbstractCompilerMojo
      */
     public static final String RULE_EXCLUDE_ALL = "?**/*";
 
-    private static final Object LOCK = new Object();
-
     private static final Set<String> MATCH_ALL = Collections.singleton("**/*");
 
     private static final String PREFS_FILE_PATH = ".settings" + File.separator + "org.eclipse.jdt.core.prefs";
@@ -585,7 +583,7 @@ public abstract class AbstractOsgiCompilerMojo extends AbstractCompilerMojo
                 JREClasspathEntry jreClasspathEntry = (JREClasspathEntry) cpe;
                 if (jreClasspathEntry.isModule()) {
                     Collection<String> modules = jreClasspathEntry.getLimitModules();
-                    if (modules.size() > 0) {
+                    if (!modules.isEmpty()) {
                         compilerConfiguration.addCompilerCustomArgument("--limit-modules", String.join(",", modules));
                     }
                 }

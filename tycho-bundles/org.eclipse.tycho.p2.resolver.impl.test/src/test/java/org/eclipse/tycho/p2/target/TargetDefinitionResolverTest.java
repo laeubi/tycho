@@ -13,13 +13,16 @@
  *******************************************************************************/
 package org.eclipse.tycho.p2.target;
 
-import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,8 +36,7 @@ import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.equinox.p2.metadata.VersionedId;
 import org.eclipse.equinox.p2.query.QueryUtil;
 import org.eclipse.tycho.core.resolver.shared.IncludeSourceMode;
-import org.eclipse.tycho.core.shared.BuildFailureException;
-import org.eclipse.tycho.core.shared.MavenContextImpl;
+import org.eclipse.tycho.core.shared.MockMavenContext;
 import org.eclipse.tycho.core.shared.TargetEnvironment;
 import org.eclipse.tycho.p2.impl.test.ResourceUtil;
 import org.eclipse.tycho.p2.target.facade.TargetDefinition;
@@ -89,11 +91,23 @@ public class TargetDefinitionResolverTest {
     public void initContext() throws Exception {
         subject = new TargetDefinitionResolver(defaultEnvironments(),
                 ExecutionEnvironmentTestUtils.NOOP_EE_RESOLUTION_HINTS, IncludeSourceMode.honor,
-                new MavenContextImpl(tempManager.newFolder("localRepo"), logVerifier.getLogger()), null);
+                new MockMavenContext(tempManager.newFolder("localRepo"), logVerifier.getLogger()), null);
     }
 
     static List<TargetEnvironment> defaultEnvironments() {
         return Collections.singletonList(new TargetEnvironment(null, null, null));
+    }
+
+    @Test
+    public void testURI() throws URISyntaxException, MalformedURLException {
+        String uri = TargetDefinitionResolver
+                .convertRawToUri("file:C:\\ws\\target-testcase\\tycho\\target.references\\target.refs/base.target");
+        //check that it has the missing / infront of the protocol
+        assertTrue(uri + " does not start with file:/", uri.startsWith("file:/"));
+        //check that this could be parsed as an URI afterwards
+        URI parsed = new URI(uri);
+        parsed.toURL();
+
     }
 
     @Test
@@ -149,11 +163,13 @@ public class TargetDefinitionResolverTest {
         assertThat(versionedIdsOf(units), hasItem(REFERENCED_BUNDLE_V1));
     }
 
-    @Test(expected = BuildFailureException.class)
+    @Test
     public void testResolveDependenciesAcrossLocations() throws Exception {
-        logVerifier.expectError(containsString("Cannot resolve target definition"));
+        // TODO currently slicer treats every location as isolated so it warns about dependencies not being available here
+        // but this behavior is confusing because the dependencies actually are available and planner would not warn
+        // logVerifier.expectNoWarnings();
         TargetDefinition definition = definitionWith(new LocationStub(TestRepositories.UNSATISFIED, TARGET_FEATURE),
-                new LocationStub(TestRepositories.V1_AND_V2));
+                new LocationStub(TestRepositories.V1_AND_V2, MAIN_BUNDLE, REFERENCED_BUNDLE_V1));
         TargetDefinitionContent units = subject.resolveContent(definition, p2Context.getAgent());
         assertThat(versionedIdsOf(units), hasItem(MAIN_BUNDLE));
         assertThat(versionedIdsOf(units), hasItem(REFERENCED_BUNDLE_V1));

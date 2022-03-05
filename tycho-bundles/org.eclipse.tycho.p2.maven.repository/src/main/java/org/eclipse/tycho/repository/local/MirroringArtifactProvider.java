@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2012, 2021 SAP SE and others.
+ * Copyright (c) 2012, 2022 SAP SE and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -9,12 +9,17 @@
  *
  * Contributors:
  *    Tobias Oberlies (SAP SE) - initial API and implementation
+ *    Christoph Läubrich - Issue #658 - Tycho strips p2 artifact properties (eg PGP, maven info...)
  *******************************************************************************/
 package org.eclipse.tycho.repository.local;
 
 import static org.eclipse.tycho.repository.util.internal.BundleConstants.BUNDLE_ID;
 
 import java.io.File;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeSet;
 import java.util.concurrent.locks.Lock;
 
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -28,6 +33,9 @@ import org.eclipse.equinox.p2.query.IQuery;
 import org.eclipse.equinox.p2.query.IQueryResult;
 import org.eclipse.equinox.p2.query.IQueryable;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
+import org.eclipse.tycho.PackagingType;
+import org.eclipse.tycho.TychoConstants;
+import org.eclipse.tycho.core.shared.MavenContext;
 import org.eclipse.tycho.core.shared.MavenLogger;
 import org.eclipse.tycho.core.shared.MultiLineLogger;
 import org.eclipse.tycho.repository.p2base.artifact.provider.IRawArtifactFileProvider;
@@ -66,6 +74,7 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
     protected final LocalArtifactRepository localArtifactRepository;
 
     protected final IProgressMonitor monitor;
+    private MavenContext mavenContext;
 
     /**
      * Creates a new {@link MirroringArtifactProvider} instance.
@@ -76,28 +85,22 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
      *            The provider that will be queried by this instance when it is asked for an
      *            artifact which is not (yet) available in the local Maven repository. Typically
      *            this provider is backed by remote p2 repositories.
-     * @param mirrorPacked
-     *            If <code>true</code>, the returned instance will also mirror the packed format of
-     *            all artifacts it is asked for.
      * @param logger
      *            a logger for progress output
      */
     public static MirroringArtifactProvider createInstance(LocalArtifactRepository localArtifactRepository,
-            IRawArtifactProvider remoteProviders, boolean mirrorPacked, MavenLogger logger) {
-        if (!mirrorPacked) {
-            return new MirroringArtifactProvider(localArtifactRepository, remoteProviders, logger);
-        } else {
-            return new PackedFormatMirroringArtifactProvider(localArtifactRepository, remoteProviders, logger);
-        }
+            IRawArtifactProvider remoteProviders, MavenContext context) {
+        return new MirroringArtifactProvider(localArtifactRepository, remoteProviders, context);
     }
 
     MirroringArtifactProvider(LocalArtifactRepository localArtifactRepository, IRawArtifactProvider remoteProviders,
-            MavenLogger logger) {
+            MavenContext mavenContext) {
         this.remoteProviders = remoteProviders;
         this.localArtifactRepository = localArtifactRepository;
-        this.logger = logger;
-        this.splittingLogger = new MultiLineLogger(logger);
-        this.monitor = new LoggingProgressMonitor(logger);
+        this.mavenContext = mavenContext;
+        this.logger = mavenContext.getLogger();
+        this.splittingLogger = new MultiLineLogger(this.logger);
+        this.monitor = new LoggingProgressMonitor(this.logger);
     }
 
     // pass through methods
@@ -208,14 +211,18 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
     protected boolean makeOneFormatLocallyAvailable(IArtifactKey key)
             throws MirroringFailedException, ProvisionException, ArtifactSinkException {
 
-        if (localArtifactRepository.contains(key)) {
+        if (isFileAlreadyAvailable(key)) {
             return true;
         } else if (remoteProviders.contains(key)) {
             Lock downloadLock = localArtifactRepository.getLockForDownload(key);
             downloadLock.lock();
             try {
-                if (!localArtifactRepository.contains(key)) { // check again within lock
+                if (!isFileAlreadyAvailable(key)) { // check again within lock
+                    if (localArtifactRepository.contains(key)) {
+                        localArtifactRepository.removeDescriptor(key);
+                    }
                     downloadArtifact(key);
+                    localArtifactRepository.save();
                 }
             } finally {
                 downloadLock.unlock();
@@ -250,41 +257,19 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
 
     protected final IStatus downloadCanonicalArtifact(IArtifactKey key)
             throws ProvisionException, ArtifactSinkException {
-        // TODO 397355 ignore ProvisionException.ARTIFACT_EXISTS - artifact may have been added by other thread in the meantime
-        IArtifactSink localSink = localArtifactRepository.newAddingArtifactSink(key);
+        GAVArtifactDescriptor localDescriptor = localArtifactRepository.createArtifactDescriptor(key);
+        IArtifactDescriptor remoteDescriptor = findCanonicalDescriptor(remoteProviders.getArtifactDescriptors(key));
+        Map<String, String> properties = getProperties(remoteDescriptor);
+        properties.forEach(localDescriptor::setProperty);
+        IArtifactSink localSink = localArtifactRepository.newAddingArtifactSink(localDescriptor);
         return remoteProviders.getArtifact(localSink, monitorForDownload());
     }
 
     private void ensureArtifactIsPresentInCanonicalFormat(IArtifactKey key)
             throws ProvisionException, ArtifactSinkException {
         if (findCanonicalDescriptor(localArtifactRepository.getArtifactDescriptors(key)) == null) {
-            boolean isPack200able = Runtime.version().feature() <= 13;
-            if (isPack200able) {
-                // there was at least format available, but not the canonical format -> create it from the packed format 
-                createCanonicalArtifactFromLocalPackedArtifact(key);
-            } else {
-                downloadCanonicalArtifact(key);
-            }
+            downloadCanonicalArtifact(key);
         }
-    }
-
-    private void createCanonicalArtifactFromLocalPackedArtifact(IArtifactKey key)
-            throws ProvisionException, ArtifactSinkException {
-        logger.info("Unpacking " + key.getId() + "_" + key.getVersion() + "...");
-
-        // TODO 397355 ignore ProvisionException.ARTIFACT_EXISTS
-        IArtifactSink sink = localArtifactRepository.newAddingArtifactSink(key);
-        localArtifactRepository.getArtifact(sink, monitor);
-    }
-
-    @Deprecated(forRemoval = true)
-    static IArtifactDescriptor findPackedDescriptor(IArtifactDescriptor[] descriptors) {
-        for (IArtifactDescriptor descriptor : descriptors) {
-            if (ArtifactTransferPolicy.isPack200Format(descriptor)) {
-                return descriptor;
-            }
-        }
-        return null;
     }
 
     static IArtifactDescriptor findCanonicalDescriptor(IArtifactDescriptor[] descriptors) {
@@ -329,6 +314,59 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
 
     @Override
     public boolean isFileAlreadyAvailable(IArtifactKey artifactKey) {
-        return localArtifactRepository.contains(artifactKey);
+        if (localArtifactRepository.contains(artifactKey)) {
+            if (mavenContext.isOffline()) {
+                return true;
+            }
+            if (remoteProviders.contains(artifactKey)) {
+                //we must compare remote versus local!
+                IArtifactDescriptor[] remoteDescriptors = remoteProviders.getArtifactDescriptors(artifactKey);
+                IArtifactDescriptor remoteDescriptor = findCanonicalDescriptor(remoteDescriptors);
+                IArtifactDescriptor[] localDescriptors = localArtifactRepository.getArtifactDescriptors(artifactKey);
+                GAVArtifactDescriptor localDescriptor = (GAVArtifactDescriptor) findCanonicalDescriptor(
+                        localDescriptors);
+                if (remoteDescriptor != null && localDescriptor != null && localDescriptor.getMavenCoordinates()
+                        .getGroupId().startsWith(TychoConstants.P2_GROUPID_PREFIX)) {
+                    Map<String, String> remoteProperties = getProperties(remoteDescriptor);
+                    Map<String, String> localProperties = getProperties(localDescriptor);
+                    if (!Objects.equals(remoteProperties, localProperties)) {
+                        if (logger.isExtendedDebugEnabled()) {
+                            logger.info("ArtifactKey " + artifactKey + " differs between local and remote:");
+                            TreeSet<String> allKeys = new TreeSet<>();
+                            allKeys.addAll(remoteProperties.keySet());
+                            allKeys.addAll(localProperties.keySet());
+                            for (String key : allKeys) {
+                                String remoteValue = remoteProperties.get(key);
+                                String localValue = localProperties.get(key);
+                                if (Objects.equals(remoteValue, localValue)) {
+                                    continue;
+                                }
+                                logger.info(
+                                        "\t" + key + " diverged, remote = " + remoteValue + ", local = " + localValue);
+                            }
+                        }
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    @SuppressWarnings("deprecation")
+    private Map<String, String> getProperties(IArtifactDescriptor descriptor) {
+        if (descriptor == null) {
+            return Map.of();
+        }
+        Map<String, String> map = new LinkedHashMap<>(descriptor.getProperties());
+        //fix bad metadata in p2...
+        if (ArtifactTransferPolicy.isCanonicalFormat(descriptor)
+                && "pack200".equals(map.get(TychoConstants.PROP_CLASSIFIER))) {
+            map.remove(TychoConstants.PROP_CLASSIFIER);
+            map.put(TychoConstants.PROP_EXTENSION, "jar");
+            map.put(TychoConstants.PROP_TYPE, PackagingType.TYPE_ECLIPSE_PLUGIN);
+        }
+        return map;
     }
 }

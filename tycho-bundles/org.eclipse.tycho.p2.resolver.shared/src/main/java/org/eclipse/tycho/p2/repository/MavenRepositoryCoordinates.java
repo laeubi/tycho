@@ -12,27 +12,31 @@
  *******************************************************************************/
 package org.eclipse.tycho.p2.repository;
 
+import java.util.Objects;
+
+import org.eclipse.tycho.core.shared.MavenContext;
+
 /**
  * Coordinates (groupId, artifactId, version, classifier, extension) of an artifact in the local
  * Maven repository.
  */
 public final class MavenRepositoryCoordinates {
 
-    public static final String DEFAULT_EXTENSION = RepositoryLayoutHelper.DEFAULT_EXTERNSION;
+    private static final String DEFAULT_TYPE = "jar";
 
     private final GAV gav;
     private final String classifier;
-    private final String extension;
+    private final String type;
 
-    public MavenRepositoryCoordinates(GAV gav, String classifier, String extension) {
+    public MavenRepositoryCoordinates(GAV gav, String classifier, String type) {
         this.gav = gav; // TODO check for null?
         this.classifier = classifier;
-        this.extension = DEFAULT_EXTENSION.equals(extension) ? null : extension;
+        this.type = DEFAULT_TYPE.equals(type) ? null : type;
     }
 
     public MavenRepositoryCoordinates(String groupId, String artifactId, String version, String classifier,
-            String extension) {
-        this(new GAV(groupId, artifactId, version), classifier, extension);
+            String type) {
+        this(new GAV(groupId, artifactId, version), classifier, type);
     }
 
     public GAV getGav() {
@@ -59,24 +63,18 @@ public final class MavenRepositoryCoordinates {
     }
 
     /**
-     * The artifact file extension, or <code>null</code> for the default extension <code>jar</code>.
+     * The artifact type that is used to determine its extension, or <code>null</code> if the type
+     * is unknown.
      */
-    public String getExtension() {
-        return extension;
-    }
-
-    public String getExtensionOrDefault() {
-        if (extension == null)
-            return DEFAULT_EXTENSION;
-        else
-            return extension;
+    public String getType() {
+        return type;
     }
 
     /**
      * Returns the local Maven repository path corresponding to the these coordinates.
      */
-    public String getLocalRepositoryPath() {
-        return RepositoryLayoutHelper.getRelativePath(getGav(), getClassifier(), getExtension());
+    public String getLocalRepositoryPath(MavenContext mavenContext) {
+        return RepositoryLayoutHelper.getRelativePath(getGav(), getClassifier(), getType(), mavenContext);
     }
 
     @Override
@@ -87,7 +85,7 @@ public final class MavenRepositoryCoordinates {
         result.append(':');
         result.append(getArtifactId());
         result.append(':');
-        result.append(getExtensionOrDefault());
+        result.append(Objects.requireNonNullElse(getType(), DEFAULT_TYPE));
         if (getClassifier() != null) {
             result.append(':');
             result.append(getClassifier());
@@ -103,7 +101,7 @@ public final class MavenRepositoryCoordinates {
         int result = 1;
         result = prime * result + ((gav == null) ? 0 : gav.hashCode());
         result = prime * result + ((classifier == null) ? 0 : classifier.hashCode());
-        result = prime * result + ((extension == null) ? 0 : extension.hashCode());
+        result = prime * result + ((type == null) ? 0 : type.hashCode());
         return result;
     }
 
@@ -115,7 +113,7 @@ public final class MavenRepositoryCoordinates {
             return false;
 
         MavenRepositoryCoordinates other = (MavenRepositoryCoordinates) obj;
-        return eq(gav, other.gav) && eq(classifier, other.classifier) && eq(extension, other.extension);
+        return eq(gav, other.gav) && eq(classifier, other.classifier) && eq(type, other.type);
     }
 
     private static <T> boolean eq(T left, T right) {

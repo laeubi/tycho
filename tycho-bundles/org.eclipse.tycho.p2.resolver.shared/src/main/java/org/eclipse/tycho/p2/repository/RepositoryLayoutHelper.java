@@ -14,67 +14,56 @@
 package org.eclipse.tycho.p2.repository;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.StringTokenizer;
 
+import org.eclipse.tycho.TychoConstants;
+import org.eclipse.tycho.core.shared.MavenContext;
+
 public class RepositoryLayoutHelper {
-    public static final String PROP_GROUP_ID = "maven-groupId";
-
-    public static final String PROP_ARTIFACT_ID = "maven-artifactId";
-
-    public static final String PROP_VERSION = "maven-version";
-
-    public static final String PROP_CLASSIFIER = "maven-classifier";
-
-    public static final String PROP_EXTENSION = "maven-extension";
-
-    public static final String CLASSIFIER_P2_METADATA = "p2metadata";
-
-    public static final String EXTENSION_P2_METADATA = "xml";
-
-    /**
-     * Name of the file where the module p2 metadata is stored in the target directory. The name
-     * needs to be known so that the target folder can be read as p2 metadata repository.
-     */
-    public static final String FILE_NAME_P2_METADATA = "p2content.xml";
-
-    public static final String CLASSIFIER_P2_ARTIFACTS = "p2artifacts";
-
-    public static final String EXTENSION_P2_ARTIFACTS = "xml";
-
-    /**
-     * Name of the file that contains the p2 artifact index. This file is one of the files needed to
-     * read the target folder as p2 artifact repository. The location is relative to the build
-     * target directory root.
-     */
-    public static final String FILE_NAME_P2_ARTIFACTS = "p2artifacts.xml";
-
-    /**
-     * Name of the file that stores the location of the Maven artifact in the target folder. This
-     * file is one of the files needed to read the target folder as p2 artifact repository.
-     */
-    public static final String FILE_NAME_LOCAL_ARTIFACTS = "local-artifacts.properties";
-
-    /**
-     * Key for the main artifact location in {@value #FILE_NAME_LOCAL_ARTIFACTS} files.
-     */
-    public static final String KEY_ARTIFACT_MAIN = "artifact.main";
-
-    /**
-     * Key prefix for attached artifact locations in {@value #FILE_NAME_LOCAL_ARTIFACTS} files.
-     */
-    public static final String KEY_ARTIFACT_ATTACHED = "artifact.attached.";
-
-    public static final String DEFAULT_EXTERNSION = "jar";
-
-    public static final String PACK200_CLASSIFIER = "pack200";
-    public static final String PACK200_EXTENSION = "jar.pack.gz";
+    public static String getRelativePath(GAV gav, String classifier, String type, MavenContext mavenContext) {
+        return getRelativePath(gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), classifier, type, mavenContext);
+    }
 
     public static String getRelativePath(GAV gav, String classifier, String extension) {
+        if (extension == null) {
+            extension = TychoConstants.JAR_EXTENSION;
+        }
         return getRelativePath(gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), classifier, extension);
     }
 
     public static String getRelativePath(String groupId, String artifactId, String version, String classifier,
+            String type, MavenContext mavenContext) {
+        //we need to handle some legacy cases here where type == extension was used
+        String extension;
+        if (type == null) {
+            extension = TychoConstants.JAR_EXTENSION;
+        } else if (TychoConstants.CLASSIFIER_P2_METADATA.equals(classifier)) {
+            extension = TychoConstants.EXTENSION_P2_METADATA;
+        } else if (TychoConstants.CLASSIFIER_P2_ARTIFACTS.equals(classifier)) {
+            extension = TychoConstants.EXTENSION_P2_ARTIFACTS;
+        } else if (TychoConstants.ROOTFILE_CLASSIFIER.equals(classifier)
+                || (classifier != null && classifier.startsWith(TychoConstants.ROOTFILE_CLASSIFIER + "."))) {
+            extension = TychoConstants.ROOTFILE_EXTENSION;
+        } else {
+            switch (type) {
+            case TychoConstants.JAR_EXTENSION:
+            case "zip":
+            case "target":
+            case "xml":
+                extension = type;
+                break;
+            default:
+                extension = mavenContext.getExtension(type);
+            }
+        }
+        return getRelativePath(groupId, artifactId, version, classifier, extension);
+    }
+
+    public static String getRelativePath(String groupId, String artifactId, String version, String classifier,
             String extension) {
+        Objects.requireNonNull(extension);
+
         StringBuilder sb = new StringBuilder();
 
         // basedir
@@ -89,23 +78,23 @@ public class RepositoryLayoutHelper {
         if (classifier != null && !classifier.isEmpty()) {
             sb.append('-').append(classifier);
         }
-        sb.append('.').append(extension != null ? extension : DEFAULT_EXTERNSION);
+
+        sb.append('.').append(extension);
 
         return sb.toString();
     }
 
     public static GAV getP2Gav(String classifier, String id, String version) {
-        // Should match MavenDependencyCollector#createSystemScopeDependency
-        return new GAV("p2." + classifier, id, version);
+        return new GAV(TychoConstants.P2_GROUPID_PREFIX + classifier, id, version);
     }
 
     // TODO these methods do not belong here - they should go to GAV or some kind of GAV helper
     // TODO writing to Maps should be implemented next to reading
 
     public static GAV getGAV(Map<?, ?> properties) {
-        String groupId = (String) properties.get(PROP_GROUP_ID);
-        String artifactId = (String) properties.get(PROP_ARTIFACT_ID);
-        String version = (String) properties.get(PROP_VERSION);
+        String groupId = (String) properties.get(TychoConstants.PROP_GROUP_ID);
+        String artifactId = (String) properties.get(TychoConstants.PROP_ARTIFACT_ID);
+        String version = (String) properties.get(TychoConstants.PROP_VERSION);
 
         // TODO partial information should be an error!?
         return getGAV(groupId, artifactId, version);
@@ -121,11 +110,21 @@ public class RepositoryLayoutHelper {
 
     // TODO it would be useful to have a GAV+C+T class
     public static String getClassifier(Map<?, ?> properties) {
-        return (String) properties.get(PROP_CLASSIFIER);
+        if (properties == null) {
+            return null;
+        }
+        return (String) properties.get(TychoConstants.PROP_CLASSIFIER);
     }
 
-    public static String getExtension(Map<?, ?> properties) {
-        String explicitExtension = (String) properties.get(PROP_EXTENSION);
-        return explicitExtension == null ? DEFAULT_EXTERNSION : explicitExtension;
+    public static String getType(Map<?, ?> properties) {
+        if (properties == null) {
+            return null;
+        }
+        String type = (String) properties.get(TychoConstants.PROP_TYPE);
+        if (type == null) {
+            //fallback for older repository formats
+            type = (String) properties.get(TychoConstants.PROP_EXTENSION);
+        }
+        return type;
     }
 }

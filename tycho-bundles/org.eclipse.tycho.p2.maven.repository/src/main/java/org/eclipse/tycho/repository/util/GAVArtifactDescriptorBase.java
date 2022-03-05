@@ -17,6 +17,7 @@ import java.util.Map;
 import org.eclipse.equinox.p2.metadata.IArtifactKey;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.equinox.p2.repository.artifact.spi.ArtifactDescriptor;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.p2.repository.GAV;
 import org.eclipse.tycho.p2.repository.MavenRepositoryCoordinates;
 import org.eclipse.tycho.p2.repository.RepositoryLayoutHelper;
@@ -54,11 +55,13 @@ public class GAVArtifactDescriptorBase extends ArtifactDescriptor {
     }
 
     protected final void setMavenCoordinateProperties() {
-        properties.put(RepositoryLayoutHelper.PROP_GROUP_ID, coordinates.getGroupId());
-        properties.put(RepositoryLayoutHelper.PROP_ARTIFACT_ID, coordinates.getArtifactId());
-        properties.put(RepositoryLayoutHelper.PROP_VERSION, coordinates.getVersion());
-        putOrRemoveOnNull(properties, RepositoryLayoutHelper.PROP_CLASSIFIER, coordinates.getClassifier());
-        putOrRemoveOnNull(properties, RepositoryLayoutHelper.PROP_EXTENSION, coordinates.getExtension());
+        properties.put(TychoConstants.PROP_GROUP_ID, coordinates.getGroupId());
+        properties.put(TychoConstants.PROP_ARTIFACT_ID, coordinates.getArtifactId());
+        properties.put(TychoConstants.PROP_VERSION, coordinates.getVersion());
+        putOrRemoveOnNull(properties, TychoConstants.PROP_CLASSIFIER, coordinates.getClassifier());
+        //This is only for older tycho versions trying to read newver repository formats
+        putOrRemoveOnNull(properties, TychoConstants.PROP_EXTENSION, coordinates.getType());
+        putOrRemoveOnNull(properties, TychoConstants.PROP_TYPE, coordinates.getType());
     }
 
     private static void putOrRemoveOnNull(Map<String, String> properties, String key, String value) {
@@ -80,7 +83,7 @@ public class GAVArtifactDescriptorBase extends ArtifactDescriptor {
         }
 
         String classifier = RepositoryLayoutHelper.getClassifier(descriptor.getProperties());
-        String extension = RepositoryLayoutHelper.getExtension(descriptor.getProperties());
+        String extension = RepositoryLayoutHelper.getType(descriptor.getProperties());
         return new MavenRepositoryCoordinates(gav, classifier, extension);
     }
 
