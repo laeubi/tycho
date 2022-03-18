@@ -17,11 +17,13 @@ import java.io.InputStream;
 import java.util.Collection;
 import java.util.Dictionary;
 
+import javax.xml.parsers.SAXParserFactory;
+
+import org.apache.sling.testing.mock.osgi.MockOsgi;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.Disposable;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.Initializable;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationException;
-import org.eclipse.osgi.internal.framework.FilterImpl;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
@@ -35,9 +37,11 @@ import org.osgi.framework.ServiceObjects;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
 
-//FIXME this should not be necessary at all see https://bugs.eclipse.org/bugs/show_bug.cgi?id=578387
 @Component(role = BundleContext.class, hint = "plexus")
 public class PlexusBundleContext implements BundleContext, Initializable, Disposable {
+
+	private BundleContext bundleContextMock = MockOsgi.newBundleContext();
+
 
 	@Override
 	public String getProperty(String key) {
@@ -45,149 +49,150 @@ public class PlexusBundleContext implements BundleContext, Initializable, Dispos
 	}
 
 	@Override
+	public void initialize() throws InitializationException {
+		bundleContextMock.registerService(SAXParserFactory.class, SAXParserFactory.newInstance(), null);
+	}
+
+	@Override
+	public void dispose() {
+	}
+
+	@Override
 	public Bundle getBundle() {
-		throw new IllegalStateException("this is not OSGi!");
+
+		return bundleContextMock.getBundle();
 	}
 
 	@Override
 	public Bundle installBundle(String location, InputStream input) throws BundleException {
-		throw new BundleException("this context does not support installations");
+		return bundleContextMock.installBundle(location, input);
 	}
 
 	@Override
 	public Bundle installBundle(String location) throws BundleException {
-		throw new BundleException("this context does not support installations");
+		return bundleContextMock.installBundle(location);
 	}
 
 	@Override
 	public Bundle getBundle(long id) {
-		return getBundle();
+		return bundleContextMock.getBundle(id);
 	}
 
 	@Override
 	public Bundle[] getBundles() {
-		return new Bundle[0];
+		return bundleContextMock.getBundles();
 	}
 
 	@Override
 	public void addServiceListener(ServiceListener listener, String filter) throws InvalidSyntaxException {
-
+		bundleContextMock.addServiceListener(listener, filter);
 	}
 
 	@Override
 	public void addServiceListener(ServiceListener listener) {
-
+		bundleContextMock.addServiceListener(listener);
 	}
 
 	@Override
 	public void removeServiceListener(ServiceListener listener) {
-
+		bundleContextMock.removeServiceListener(listener);
 	}
 
 	@Override
 	public void addBundleListener(BundleListener listener) {
-
+		bundleContextMock.addBundleListener(listener);
 	}
 
 	@Override
 	public void removeBundleListener(BundleListener listener) {
-
+		bundleContextMock.removeBundleListener(listener);
 	}
 
 	@Override
 	public void addFrameworkListener(FrameworkListener listener) {
-
+		bundleContextMock.addFrameworkListener(listener);
 	}
 
 	@Override
 	public void removeFrameworkListener(FrameworkListener listener) {
-
+		bundleContextMock.removeFrameworkListener(listener);
 	}
 
 	@Override
 	public ServiceRegistration<?> registerService(String[] clazzes, Object service, Dictionary<String, ?> properties) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.registerService(clazzes, service, properties);
 	}
 
 	@Override
 	public ServiceRegistration<?> registerService(String clazz, Object service, Dictionary<String, ?> properties) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.registerService(clazz, service, properties);
 	}
 
 	@Override
 	public <S> ServiceRegistration<S> registerService(Class<S> clazz, S service, Dictionary<String, ?> properties) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.registerService(clazz, service, properties);
 	}
 
 	@Override
 	public <S> ServiceRegistration<S> registerService(Class<S> clazz, ServiceFactory<S> factory,
 			Dictionary<String, ?> properties) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.registerService(clazz, factory, properties);
 	}
 
 	@Override
 	public ServiceReference<?>[] getServiceReferences(String clazz, String filter) throws InvalidSyntaxException {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.getServiceReferences(clazz, filter);
 	}
 
 	@Override
 	public ServiceReference<?>[] getAllServiceReferences(String clazz, String filter) throws InvalidSyntaxException {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.getAllServiceReferences(clazz, filter);
 	}
 
 	@Override
 	public ServiceReference<?> getServiceReference(String clazz) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.getServiceReference(clazz);
 	}
 
 	@Override
 	public <S> ServiceReference<S> getServiceReference(Class<S> clazz) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.getServiceReference(clazz);
 	}
 
 	@Override
 	public <S> Collection<ServiceReference<S>> getServiceReferences(Class<S> clazz, String filter)
 			throws InvalidSyntaxException {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.getServiceReferences(clazz, filter);
 	}
 
 	@Override
 	public <S> S getService(ServiceReference<S> reference) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.getService(reference);
 	}
 
 	@Override
 	public boolean ungetService(ServiceReference<?> reference) {
-		return true;
+		return bundleContextMock.ungetService(reference);
 	}
 
 	@Override
 	public <S> ServiceObjects<S> getServiceObjects(ServiceReference<S> reference) {
-		throw new IllegalStateException("this is not OSGi!");
+		return bundleContextMock.getServiceObjects(reference);
 	}
 
 	@Override
 	public File getDataFile(String filename) {
-		return null;
+		return bundleContextMock.getDataFile(filename);
 	}
 
 	@Override
 	public Filter createFilter(String filter) throws InvalidSyntaxException {
-		return FilterImpl.newInstance(filter);
+		return bundleContextMock.createFilter(filter);
 	}
 
 	@Override
 	public Bundle getBundle(String location) {
-		return getBundle();
-	}
-
-	@Override
-	public void initialize() throws InitializationException {
-
-	}
-
-	@Override
-	public void dispose() {
+		return bundleContextMock.getBundle(location);
 	}
 
 }

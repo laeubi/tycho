@@ -24,6 +24,53 @@
 					<supportIncrementalBuild>true</supportIncrementalBuild>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.2.1</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+						<phase>prepare-package</phase>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.eclipse.tycho</groupId>
+				<artifactId>tycho-source-plugin</artifactId>
+				<version>${tycho-version}</version>
+				<executions>
+					<execution>
+						<id>generate-pde-source-header</id>
+						<goals>
+							<goal>generate-pde-source-header</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.eclipse.tycho</groupId>
+				<artifactId>p2-maven-plugin</artifactId>
+				<version>${tycho-version}</version>
+				<executions>
+					<execution>
+						<id>attached-p2-metadata</id>
+						<phase>package</phase>
+						<goals>
+							<goal>p2-metadata</goal>
+						</goals>
+<!-- 						<configuration> -->
+<!-- 							<supportedProjectTypes> -->
+<!-- 								<value>bundle</value> -->
+<!-- 								<value>jar</value> -->
+<!-- 							</supportedProjectTypes> -->
+<!-- 						</configuration> -->
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 </project>
