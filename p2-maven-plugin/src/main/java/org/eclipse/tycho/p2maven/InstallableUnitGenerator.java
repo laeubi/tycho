@@ -15,8 +15,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.descriptor.PluginDescriptor;
@@ -42,6 +46,9 @@ import org.eclipse.equinox.internal.p2.publisher.eclipse.IProductDescriptor;
 import org.eclipse.equinox.internal.p2.updatesite.CategoryParser;
 import org.eclipse.equinox.internal.p2.updatesite.SiteModel;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
+import org.eclipse.equinox.p2.metadata.IInstallableUnitFragment;
+import org.eclipse.equinox.p2.metadata.IRequirement;
+import org.eclipse.equinox.p2.metadata.MetadataFactory;
 import org.eclipse.equinox.p2.publisher.IPublisherAction;
 import org.eclipse.equinox.p2.publisher.eclipse.BundlesAction;
 import org.eclipse.equinox.p2.publisher.eclipse.Feature;
@@ -91,18 +98,20 @@ public class InstallableUnitGenerator {
 	 * Computes the {@link IInstallableUnit}s for a collection of projects.
 	 * 
 	 * @param projects the projects to compute InstallableUnits for
+	 * @param session  the session used to find additional providers
 	 * @return a map from the passed project to the InstallebalUnits
 	 * @throws CoreException if computation for any project failed
 	 */
 	public Map<MavenProject, Collection<IInstallableUnit>> getInstallableUnits(Collection<MavenProject> projects,
-			MavenSession session)
-			throws CoreException {
+			MavenSession session) throws CoreException {
 		Objects.requireNonNull(session);
 		List<CoreException> errors = new CopyOnWriteArrayList<CoreException>();
 		Map<MavenProject, Collection<IInstallableUnit>> result = new ConcurrentHashMap<MavenProject, Collection<IInstallableUnit>>();
 		projects.parallelStream().unordered().takeWhile(nil -> errors.isEmpty()).forEach(project -> {
 			try {
-				result.put(project, getInstallableUnits(project, session, false));
+				Collection<IInstallableUnit> units = getInstallableUnits(project, session, false);
+				result.put(project, units);
+				System.out.println(project + "===" + units);
 			} catch (CoreException e) {
 				errors.add(e);
 			}
@@ -121,6 +130,64 @@ public class InstallableUnitGenerator {
 	}
 
 	/**
+	 * Computes the {@link IInstallableUnit}s for a collection of projects and
+	 * resolve any fragment for them.
+	 * 
+	 * @param projects the projects to compute InstallableUnits for
+	 * @param session  the session used to find additional providers
+	 * @return a map from the passed project to the InstallebalUnits
+	 * @throws CoreException if computation for any project failed
+	 */
+	public Map<MavenProject, Collection<IInstallableUnit>> getResolvedInstallableUnits(
+			Collection<MavenProject> projects, MavenSession session) throws CoreException {
+		Map<MavenProject, Collection<IInstallableUnit>> projectUnitsMap = getInstallableUnits(projects, session);
+		Map<IInstallableUnit, FragmentBundle> iuToFragment = new HashMap<>();
+		Map<IInstallableUnit, FragmentBundle> fragments = projectUnitsMap.values().stream().flatMap(Collection::stream)
+				.map(iu -> {
+					FragmentBundle fragment = createFragment(iu);
+					if (fragment != null) {
+						System.out.println(iu + " requires hosts " + fragment.getHost());
+						iuToFragment.put(iu, fragment);
+					}
+					return fragment;
+				}).filter(Objects::nonNull)
+				.collect(Collectors.toMap(FragmentBundle::getBundleUnit, Function.identity()));
+		Map<MavenProject, Collection<IInstallableUnit>> resolvedUnits = new HashMap<>();
+		// Eclipse-ExtensibleAPI
+		for (var entry : projectUnitsMap.entrySet()) {
+			Collection<IInstallableUnit> resolved = new ArrayList<IInstallableUnit>();
+			for (IInstallableUnit iu : entry.getValue()) {
+				if (fragments.containsKey(iu)) {
+					// fragments can not have any fragments...
+					resolved.add(iu);
+					continue;
+				}
+				IInstallableUnitFragment[] unitFragments = fragments.values().stream()
+						.filter(fragment -> fragment.getHost().stream().anyMatch(iu::satisfies))
+						.toArray(IInstallableUnitFragment[]::new);
+				System.out.println(iu + " resolves fragments " + Arrays.toString(unitFragments));
+				resolved.add(MetadataFactory.createResolvedInstallableUnit(iu, unitFragments));
+			}
+			resolvedUnits.put(entry.getKey(), resolved);
+		}
+		return resolvedUnits;
+	}
+
+	private static FragmentBundle createFragment(IInstallableUnit unit) {
+		List<IRequirement> hosts = MavenProjectDependencyProcessor.getFragmentHostRequirement(unit)
+				.collect(Collectors.toList());
+		if (hosts.size() > 0) {
+			FragmentBundle unitFragment = new FragmentBundle(unit);
+			unitFragment.setId(unit.getId());
+			unitFragment.setVersion(unit.getVersion());
+			unitFragment.setHost(hosts);
+			unitFragment.setProperty("project-attached-fragment", Boolean.TRUE.toString());
+			return unitFragment;
+		}
+		return null;
+	}
+
+	/**
 	 * Computes the {@link IInstallableUnit}s for the given project, the computation
 	 * is cached unless forceUpdate is <code>true</code> meaning data is always
 	 * regenerated from scratch.
@@ -134,8 +201,7 @@ public class InstallableUnitGenerator {
 	 */
 	@SuppressWarnings("unchecked")
 	public Collection<IInstallableUnit> getInstallableUnits(MavenProject project, MavenSession session,
-			boolean forceUpdate)
-			throws CoreException {
+			boolean forceUpdate) throws CoreException {
 		Objects.requireNonNull(session);
 		log.debug("Computing installable units for " + project + ", force update = " + forceUpdate);
 		synchronized (project) {

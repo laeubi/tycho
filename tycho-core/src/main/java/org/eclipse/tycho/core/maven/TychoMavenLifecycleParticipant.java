@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +47,7 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.sisu.equinox.EquinoxServiceFactory;
 import org.eclipse.tycho.BuildPropertiesParser;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.osgitools.BundleReader;
 import org.eclipse.tycho.core.osgitools.DefaultBundleReader;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
@@ -90,6 +92,9 @@ public class TychoMavenLifecycleParticipant extends AbstractMavenLifecyclePartic
 
     @Requirement
     private ModelWriter modelWriter;
+
+    @Requirement(role = TychoProject.class)
+    private Map<String, TychoProject> projectTypes;
 
     public TychoMavenLifecycleParticipant() {
         // needed for plexus
@@ -139,9 +144,18 @@ public class TychoMavenLifecycleParticipant extends AbstractMavenLifecyclePartic
                             session);
                     for (MavenProject project : projects) {
                         Model model = project.getModel();
+//                        boolean fragment = closure.isFragment(project);
                         Set<String> existingDependencies = model.getDependencies().stream().map(dep -> getKey(dep))
                                 .collect(Collectors.toCollection(HashSet::new));
+                        System.out.println("=== " + project.getId() + "===");
                         for (MavenProject dependencyProject : closure.getDependencyProjects(project)) {
+                            System.out.println(" --> " + dependencyProject.getId());
+                            if (requiresFragmentAttatch(dependencyProject)) {
+                                Collection<MavenProject> fragments = closure.getFragments(dependencyProject);
+                                for (MavenProject mavenProject : fragments) {
+                                    System.out.println(" --> # " + mavenProject.getId());
+                                }
+                            }
                             Dependency dependency = new Dependency();
                             dependency.setArtifactId(dependencyProject.getArtifactId());
                             dependency.setGroupId(dependencyProject.getGroupId());
@@ -174,6 +188,11 @@ public class TychoMavenLifecycleParticipant extends AbstractMavenLifecyclePartic
             // trace by wrapping it in MavenExecutionException   
             throw new MavenExecutionException(e.getMessage(), e);
         }
+    }
+
+    private boolean requiresFragmentAttatch(MavenProject mavenProject) {
+        //projectTypes.get(mavenProject)
+        return false;
     }
 
     private static String getKey(Dependency dependency) {
