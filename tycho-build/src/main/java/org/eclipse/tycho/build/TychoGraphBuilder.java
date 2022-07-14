@@ -48,12 +48,10 @@ import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.tycho.PackagingType;
-import org.eclipse.tycho.core.shared.MavenLogger;
 import org.eclipse.tycho.p2maven.InstallableUnitGenerator;
 import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor;
 import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor.ProjectDependencyClosure;
 import org.eclipse.tycho.pomless.AbstractTychoMapping;
-import org.osgi.framework.BundleContext;
 import org.sonatype.maven.polyglot.mapping.Mapping;
 
 @Component(role = GraphBuilder.class, hint = GraphBuilder.HINT)
@@ -61,9 +59,6 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 
 	@Requirement
 	private Logger log;
-
-	@Requirement(hint = "plexus")
-	private BundleContext bundleContext;
 
 	@Requirement(role = Mapping.class)
 	private Map<String, Mapping> polyglotMappings;
@@ -96,14 +91,12 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 			return graphResult;
 		}
 		session.getUserProperties().put("tycho.mode", "extension");
-		MavenLogger loggerAdapter = new MavenLoggerAdapter(log,
-				Boolean.valueOf(session.getUserProperties().getProperty("tycho.debug.resolver")));
 		String makeBehavior = request.getMakeBehavior();
-		if (loggerAdapter.isExtendedDebugEnabled()) {
-			loggerAdapter.debug("TychoGraphBuilder:");
-			loggerAdapter.debug("  - SelectedProjects: " + request.getSelectedProjects());
-			loggerAdapter.debug("  - ExcludedProjects: " + request.getExcludedProjects());
-			loggerAdapter.debug("  - MakeBehavior:     " + makeBehavior);
+		if (log.isDebugEnabled()) {
+			log.debug("TychoGraphBuilder:");
+			log.debug("  - SelectedProjects: " + request.getSelectedProjects());
+			log.debug("  - ExcludedProjects: " + request.getExcludedProjects());
+			log.debug("  - MakeBehavior:     " + makeBehavior);
 		}
 		boolean makeUpstream = MavenExecutionRequest.REACTOR_MAKE_UPSTREAM.equals(makeBehavior)
 				|| MavenExecutionRequest.REACTOR_MAKE_BOTH.equals(makeBehavior);
@@ -132,19 +125,19 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 				return Result.error(graph, toProblems(e.getStatus(), new ArrayList<>()));
 			}
 
-			if (loggerAdapter.isExtendedDebugEnabled()) {
+			if (log.isDebugEnabled()) {
 				for (MavenProject project : projects) {
 					Collection<IInstallableUnit> depends = dependencyClosure.getProjectDependecies(project);
 					if (depends.isEmpty()) {
 						continue;
 					}
-					loggerAdapter.debug("[[ project " + project.getName() + " depends on: ]]");
+					log.debug("[[ project " + project.getName() + " depends on: ]]");
 					for (IInstallableUnit dependency : depends) {
 						Optional<MavenProject> mavenProject = dependencyClosure.getProject(dependency);
 						if (mavenProject.isEmpty()) {
-							loggerAdapter.debug(" IU: " + dependency);
+							log.debug(" IU: " + dependency);
 						} else {
-							loggerAdapter
+							log
 									.debug(" IU: " + dependency + " [of project " + mavenProject.get().getName() + "]");
 						}
 					}
@@ -152,7 +145,7 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 			}
 			Queue<ProjectRequest> queue = new ConcurrentLinkedQueue<>(graph.getSortedProjects().stream()
 					.map(p -> new ProjectRequest(p, makeDownstream, makeUpstream, null)).collect(Collectors.toList()));
-			loggerAdapter.debug("Computing additional " + makeBehavior
+			log.debug("Computing additional " + makeBehavior
 					+ " dependencies based on initial project set of " + queue.stream().map(r -> r.mavenProject)
 							.map(MavenProject::getName).collect(Collectors.joining(", ")));
 			while (!queue.isEmpty()) {
@@ -160,7 +153,7 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 				if (selectedProjects.add(projectRequest.mavenProject)) {
 					if (projectRequest.requestUpstream) {
 						dependencyClosure.getDependencyProjects(projectRequest.mavenProject).forEach(project -> {
-							loggerAdapter.debug(" + add upstream project '" + project.getName() + "' of project '"
+							log.debug(" + add upstream project '" + project.getName() + "' of project '"
 									+ projectRequest.mavenProject.getName() + "'...");
 							// make behaviors are both false here as projectDependenciesMap includes
 							// transitive already
@@ -176,7 +169,7 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 								})//
 								.map(Entry::getKey)//
 								.distinct()//
-								.peek(project -> loggerAdapter.debug(" + add downstream project '" + project.getName()
+								.peek(project -> log.debug(" + add downstream project '" + project.getName()
 										+ "' of project '" + projectRequest.mavenProject.getName() + "'..."))//
 								// request dependencies of dependants, otherwise, -amd would not be able to
 								// produce a satisfiable build graph
