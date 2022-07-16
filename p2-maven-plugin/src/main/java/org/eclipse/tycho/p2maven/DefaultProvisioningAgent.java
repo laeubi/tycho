@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
+import org.eclipse.core.runtime.spi.IRegistryProvider;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.eclipse.equinox.p2.core.spi.IAgentServiceFactory;
 import org.osgi.framework.BundleContext;
@@ -29,10 +30,15 @@ public class DefaultProvisioningAgent implements IProvisioningAgent {
 	private Logger log;
 
 	@Requirement(hint = "plexus")
+	// This requirement is not used but needed to bootstrap the bundle context!
 	private BundleContext bundleContext;
 
 	@Requirement(role = IAgentServiceFactory.class)
 	private Map<String, IAgentServiceFactory> factoryMap;
+
+	@Requirement
+	// This requirement is not used but needed to bootstrap the registry!
+	private IRegistryProvider registryProvider;
 
 	private Map<String, Object> services = new ConcurrentHashMap<String, Object>();
 
@@ -43,13 +49,14 @@ public class DefaultProvisioningAgent implements IProvisioningAgent {
 			if (serviceFactory != null) {
 				return serviceFactory.createService(DefaultProvisioningAgent.this);
 			}
+			log.error("Agent service " + serviceName + " not found!");
 			return null;
 		});
 	}
 
 	@Override
 	public void registerService(String serviceName, Object service) {
-		throw new UnsupportedOperationException();
+		services.put(serviceName, service);
 	}
 
 	@Override
@@ -59,7 +66,7 @@ public class DefaultProvisioningAgent implements IProvisioningAgent {
 
 	@Override
 	public void unregisterService(String serviceName, Object service) {
-		throw new UnsupportedOperationException();
+		services.remove(serviceName);
 	}
 
 }

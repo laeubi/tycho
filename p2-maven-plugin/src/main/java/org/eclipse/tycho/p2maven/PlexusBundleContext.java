@@ -25,6 +25,7 @@ import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.Disposable;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.Initializable;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationException;
+import org.eclipse.core.internal.adapter.AdapterManagerListener;
 import org.eclipse.osgi.internal.framework.FilterImpl;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleActivator;
@@ -203,6 +204,8 @@ public class PlexusBundleContext implements BundleContext, Initializable, Dispos
 				log.warn("Can't init " + bundleActivator.getClass() + "! (" + e + ")");
 			}
 		}
+		// register adapter extensions...
+		new AdapterManagerListener();
 	}
 
 	@Override
