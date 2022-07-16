@@ -49,7 +49,7 @@ public class P2ArtifactRepositoryLayout implements ArtifactRepositoryLayout, Art
     @Override
     public ArtifactRepository newMavenArtifactRepository(String id, String url, ArtifactRepositoryPolicy snapshots,
             ArtifactRepositoryPolicy releases) {
-        return new MavenArtifactRepository(id, url, this, DISABLED_POLICY, DISABLED_POLICY);
+		return new MavenArtifactRepository(id, url, this, snapshots, releases);
     }
 
 }
