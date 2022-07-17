@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -36,13 +35,19 @@ import org.eclipse.core.runtime.IExtensionRegistry;
 import org.eclipse.core.runtime.spi.IRegistryProvider;
 import org.eclipse.core.runtime.spi.RegistryContributor;
 import org.eclipse.core.runtime.spi.RegistryStrategy;
+import org.eclipse.tycho.plexus.osgi.PlexusFramework;
+import org.osgi.framework.Bundle;
 import org.osgi.framework.Constants;
+import org.osgi.framework.launch.Framework;
 
 @Component(role = IRegistryProvider.class)
 public class DefaultRegistryProvider implements IRegistryProvider, Initializable, Disposable {
 
 	@Requirement
 	private Logger log;
+
+	@Requirement(hint = PlexusFramework.HINT)
+	private Framework framework;
 
 	private static final Collection<String> EXTENSION_DESCRIPTORS = List.of("plugin.xml", "fragment.xml");
 	private IExtensionRegistry registry;
@@ -57,7 +62,7 @@ public class DefaultRegistryProvider implements IRegistryProvider, Initializable
 	}
 
 	// TODO contribute this to equinox?
-	private static class ClasspathRegistryStrategy extends RegistryStrategy {
+	private class ClasspathRegistryStrategy extends RegistryStrategy {
 
 		private Logger log;
 
@@ -69,33 +74,34 @@ public class DefaultRegistryProvider implements IRegistryProvider, Initializable
 		@Override
 		public void onStart(IExtensionRegistry registry, boolean loadedFromCache) {
 			super.onStart(registry, loadedFromCache);
-			try {
+			Bundle[] bundles = framework.getBundleContext().getBundles();
+			for (Bundle bundle : bundles) {
 				for (String descriptorFile : EXTENSION_DESCRIPTORS) {
-					log.debug("Scanning for " + descriptorFile + " contributions...");
-					Enumeration<URL> resources = DefaultRegistryProvider.class.getClassLoader()
-							.getResources(descriptorFile);
-					int id = 0;
-					while (resources.hasMoreElements()) {
-						URL url = resources.nextElement();
-						log.debug("Processing " + url + " ...");
-						Manifest manifest = readManifest(url);
-						if (manifest == null) {
-							continue;
-						}
-						String value = manifest.getMainAttributes().getValue(Constants.BUNDLE_SYMBOLICNAME);
-						if (value == null) {
-							continue;
-						}
-						String bundleId = null;
-						String hostId = null;
-						String hostName = null;
-						// TODO handle fragments?
-						bundleId = value.split(";")[0];
-						if (bundleId == null) {
-							continue;
-						}
-						RegistryContributor contributor = new RegistryContributor(String.valueOf(id++), bundleId,
-								hostId, hostName);
+					log.debug("Scanning for " + descriptorFile + " contributions in " + bundle + "...");
+					URL url = bundle.getEntry(descriptorFile);
+					if (url == null) {
+						continue;
+					}
+					log.debug("Processing " + url + " ...");
+					Manifest manifest = readManifest(url);
+					if (manifest == null) {
+						continue;
+					}
+					String value = manifest.getMainAttributes().getValue(Constants.BUNDLE_SYMBOLICNAME);
+					if (value == null) {
+						continue;
+					}
+					String bundleId = null;
+					String hostId = null;
+					String hostName = null;
+					// TODO handle fragments?
+					bundleId = value.split(";")[0];
+					if (bundleId == null) {
+						continue;
+					}
+					RegistryContributor contributor = new RegistryContributor(String.valueOf(bundle.getBundleId()),
+							bundle.getSymbolicName(), hostId, hostName);
+					try {
 						try (InputStream stream = url.openStream()) {
 							if (registry.addContribution(stream, contributor, false, null, null, null)) {
 								IExtensionPoint[] points = registry.getExtensionPoints(contributor);
@@ -104,11 +110,10 @@ public class DefaultRegistryProvider implements IRegistryProvider, Initializable
 								log.error("Contributions can't be processed for " + url);
 							}
 						}
+					} catch (IOException e) {
+						log.warn("Can't read contribution from " + url);
 					}
 				}
-
-			} catch (IOException e) {
-				log.error("Scanning for contributions failed!", e);
 			}
 		}
 

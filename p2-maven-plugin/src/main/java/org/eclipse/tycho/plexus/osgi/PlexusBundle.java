@@ -10,13 +10,13 @@ import java.util.Dictionary;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.jar.JarFile;
 
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.LegacySupport;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.PlexusContainer;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.Constants;
@@ -25,8 +25,7 @@ import org.osgi.framework.Version;
 
 class PlexusBundle implements Bundle {
 
-	@Requirement
-	private LegacySupport legacySupport;
+	private static final String JAR_FILE_PREFIX = "jar:file:";
 	private PlexusBundleContext bundleContext;
 	private long bundleId;
 	private String location;
@@ -34,6 +33,9 @@ class PlexusBundle implements Bundle {
 	private String symbolicName;
 	private Version version;
 	private Dictionary<String, String> headers;
+
+	private int state = RESOLVED;
+	private BundleActivator bundleActivator;
 
 	PlexusBundle(long bundleId, String location, String symbolicName, Version version,
 			Dictionary<String, String> headers, PlexusBundle systemBundle) {
@@ -44,10 +46,10 @@ class PlexusBundle implements Bundle {
 		this.headers = headers;
 		bundleContext = new PlexusBundleContext(this, systemBundle);
 	}
-	
+
 	@Override
 	public File getDataFile(String filename) {
-		MavenSession session = legacySupport.getSession();
+		MavenSession session = getBundleContext().getBundle(Constants.SYSTEM_BUNDLE_ID).adapt(MavenSession.class);
 		if (session != null) {
 			MavenProject project = session.getCurrentProject();
 			if (project != null) {
@@ -67,23 +69,45 @@ class PlexusBundle implements Bundle {
 	}
 
 	@Override
-	public int getState() {
-		return Bundle.ACTIVE;
+	public synchronized int getState() {
+		return state;
 	}
 
 	@Override
-	public void start(int options) throws BundleException {
-		throw notImplementedBundleMethod();
+	public synchronized void start(int options) throws BundleException {
+		if (state == RESOLVED) {
+			state = ACTIVE;
+			String activatorClass = getHeaders().get(Constants.BUNDLE_ACTIVATOR);
+			if (activatorClass != null) {
+				try {
+					bundleActivator = (BundleActivator) loadClass(activatorClass).getConstructor().newInstance();
+					bundleActivator.start(getBundleContext());
+				} catch (Exception e) {
+					throw new BundleException("can't activate bundle " + getSymbolicName(), e);
+				}
+			}
+		}
 	}
 
 	@Override
-	public void start() throws BundleException {
+	public synchronized void start() throws BundleException {
 		start(0);
 	}
 
 	@Override
 	public void stop(int options) throws BundleException {
-		throw notImplementedBundleMethod();
+		if (state == ACTIVE) {
+			if (bundleActivator != null) {
+				try {
+					bundleActivator.stop(getBundleContext());
+				} catch (Exception e) {
+					throw new BundleException("can't stop bundle " + getSymbolicName(), e);
+				} finally {
+					bundleActivator = null;
+				}
+			}
+			state = RESOLVED;
+		}
 	}
 
 	@Override
@@ -168,6 +192,21 @@ class PlexusBundle implements Bundle {
 
 	@Override
 	public URL getEntry(String path) {
+		if (path.startsWith("/")) {
+			path = path.substring(1);
+		}
+		if (!path.isEmpty()) {
+			String loc = getLocation();
+			if (loc.startsWith(JAR_FILE_PREFIX)) {
+				try (JarFile jarFile = new JarFile(loc.substring(JAR_FILE_PREFIX.length()).split("!")[0])) {
+					if (jarFile.getEntry(path) != null) {
+						URL url = new URL(new URL(loc), "/" + path);
+						return url;
+					}
+				} catch (IOException e) {
+				}
+			}
+		}
 		return null;
 	}
 

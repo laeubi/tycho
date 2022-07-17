@@ -33,6 +33,8 @@ import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.logging.Logger;
+import org.codehaus.plexus.personality.plexus.lifecycle.phase.Initializable;
+import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationException;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.MultiStatus;
@@ -53,6 +55,8 @@ import org.eclipse.tycho.p2maven.actions.ProductDependenciesAction;
 import org.eclipse.tycho.p2maven.actions.ProductFile2;
 import org.eclipse.tycho.p2maven.helper.PluginRealmHelper;
 import org.eclipse.tycho.p2maven.io.MetadataIO;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.BundleException;
 import org.osgi.framework.launch.Framework;
 import org.xml.sax.SAXException;
 
@@ -61,7 +65,7 @@ import org.xml.sax.SAXException;
  *
  */
 @Component(role = InstallableUnitGenerator.class)
-public class InstallableUnitGenerator {
+public class InstallableUnitGenerator implements Initializable {
 
 	private static final boolean DUMP_DATA = Boolean.getBoolean("tycho.p2.dump")
 			|| Boolean.getBoolean("tycho.p2.dump.units");
@@ -73,7 +77,7 @@ public class InstallableUnitGenerator {
 
 	// this requirement is here to bootstrap P2 service access
 	@Requirement(hint = "plexus")
-	private Framework bundleContext;
+	private Framework framework;
 
 	@Requirement(role = InstallableUnitProvider.class)
 	private Map<String, InstallableUnitProvider> additionalUnitProviders;
@@ -269,6 +273,21 @@ public class InstallableUnitGenerator {
 		}
 		return pluginDescriptor.getDependencies().stream().filter(dep -> P2Plugin.GROUP_ID.equals(dep.getGroupId()))
 				.filter(dep -> P2Plugin.ARTIFACT_ID.equals(dep.getArtifactId())).findAny().isPresent();
+	}
+
+	@Override
+	public void initialize() throws InitializationException {
+		for (Bundle bundle : framework.getBundleContext().getBundles()) {
+			// see https://github.com/eclipse-equinox/p2/issues/100
+			if ("org.eclipse.equinox.p2.publisher.eclipse".equals(bundle.getSymbolicName())) {
+				try {
+					bundle.start();
+				} catch (BundleException e) {
+					log.warn("Can't start bundle " + bundle.getSymbolicName(), e);
+				}
+				break;
+			}
+		}
 	}
 
 }
