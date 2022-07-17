@@ -35,7 +35,6 @@ public class PlexusFramework extends PlexusBundle implements Framework {
 		super(Constants.SYSTEM_BUNDLE_ID,
 				PlexusFramework.class.getProtectionDomain().getCodeSource().getLocation().toString(),
 				Constants.SYSTEM_BUNDLE_SYMBOLICNAME, new Version("1"), new Hashtable<>(), null);
-		PlexusFrameworkUtilHelper.addFramework(this);
 	}
 
 	@Override

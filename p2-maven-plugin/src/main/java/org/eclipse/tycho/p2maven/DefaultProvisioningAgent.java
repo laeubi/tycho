@@ -23,10 +23,13 @@ import org.codehaus.plexus.personality.plexus.lifecycle.phase.Initializable;
 import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationException;
 import org.eclipse.core.internal.adapter.AdapterManagerListener;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
+import org.eclipse.equinox.p2.core.spi.IAgentService;
 import org.eclipse.equinox.p2.core.spi.IAgentServiceFactory;
+import org.eclipse.tycho.plexus.osgi.PlexusFrameworkFactory;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.launch.Framework;
+import org.osgi.util.tracker.ServiceTracker;
 
 @Component(role = IProvisioningAgent.class)
 public class DefaultProvisioningAgent implements IProvisioningAgent, Initializable {
@@ -34,8 +37,8 @@ public class DefaultProvisioningAgent implements IProvisioningAgent, Initializab
 	@Requirement
 	private Logger log;
 
-	@Requirement(hint = "plexus")
-	private Framework framework;
+	@Requirement
+	private PlexusFrameworkFactory frameworkFactory;
 
 	@Requirement(role = IAgentServiceFactory.class)
 	private Map<String, IAgentServiceFactory> factoryMap;
@@ -127,14 +130,25 @@ public class DefaultProvisioningAgent implements IProvisioningAgent, Initializab
 
 	@Override
 	public void initialize() throws InitializationException {
-		for (Bundle bundle : framework.getBundleContext().getBundles()) {
-			if (requiredActiveBundles.contains(bundle.getSymbolicName())) {
-				try {
-					bundle.start();
-				} catch (BundleException e) {
-					log.warn("Can't start required  active bundle " + bundle.getSymbolicName(), e);
+		try {
+			Framework fw = frameworkFactory.getFramework(P2Plugin.class.getClassLoader());
+			for (Bundle bundle : fw.getBundleContext()
+					.getBundles()) {
+				if (requiredActiveBundles.contains(bundle.getSymbolicName())) {
+					try {
+						bundle.start();
+					} catch (BundleException e) {
+						log.warn("Can't start required  active bundle " + bundle.getSymbolicName(), e);
+					}
 				}
 			}
+			ServiceTracker<IAgentService, IAgentService> tracker = new ServiceTracker<>(fw.getBundleContext(),
+					IAgentService.class, null);
+			tracker.open(true);
+			IAgentService agentService = tracker.getService();
+			System.out.println("The agent service is: " + agentService);
+		} catch (BundleException e) {
+			throw new InitializationException("can't get OSGi framework!", e);
 		}
 		// register adapter extensions... TODO can we simply start the activator?
 		new AdapterManagerListener();
