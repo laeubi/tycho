@@ -18,10 +18,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
-import org.eclipse.core.runtime.spi.IRegistryProvider;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.eclipse.equinox.p2.core.spi.IAgentServiceFactory;
-import org.osgi.framework.BundleContext;
+import org.osgi.framework.launch.Framework;
 
 @Component(role = IProvisioningAgent.class)
 public class DefaultProvisioningAgent implements IProvisioningAgent {
@@ -29,16 +28,12 @@ public class DefaultProvisioningAgent implements IProvisioningAgent {
 	@Requirement
 	private Logger log;
 
+	// we require an OSGi framework, even if we don't use it directly
 	@Requirement(hint = "plexus")
-	// This requirement is not used but needed to bootstrap the bundle context!
-	private BundleContext bundleContext;
+	private Framework osgi;
 
 	@Requirement(role = IAgentServiceFactory.class)
 	private Map<String, IAgentServiceFactory> factoryMap;
-
-	@Requirement
-	// This requirement is not used but needed to bootstrap the registry!
-	private IRegistryProvider registryProvider;
 
 	private Map<String, Object> services = new ConcurrentHashMap<String, Object>();
 
