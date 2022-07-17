@@ -117,7 +117,29 @@
 			<artifactId>tycho-embedder-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
-		<!-- ECF dependecies -->
+		<!-- P2 -->
+		<dependency>
+		    <groupId>org.eclipse.platform</groupId>
+		    <artifactId>org.eclipse.equinox.p2.jarprocessor</artifactId>
+		    <version>1.2.300</version>
+		</dependency>
+		<!-- Equinox -->
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.equinox.concurrent</artifactId>
+			<version>1.2.100</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.eclipse.platform</groupId>
+		    <artifactId>org.eclipse.equinox.simpleconfigurator</artifactId>
+		    <version>1.4.0</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.eclipse.platform</groupId>
+		    <artifactId>org.eclipse.equinox.app</artifactId>
+		    <version>1.6.100</version>
+		</dependency>
+		<!-- ECF  -->
 		<dependency>
 			<groupId>org.eclipse.platform</groupId>
 			<artifactId>org.eclipse.equinox.p2.transport.ecf</artifactId>
@@ -139,10 +161,23 @@
 			<version>5.1.102</version>
 		</dependency>
 		<dependency>
-		    <groupId>org.eclipse.ecf</groupId>
-		    <artifactId>org.eclipse.ecf</artifactId>
-		    <version>3.10.0</version>
+			<groupId>org.eclipse.ecf</groupId>
+			<artifactId>org.eclipse.ecf</artifactId>
+			<version>3.10.0</version>
 		</dependency>
+		<!-- others -->
+		<dependency>
+		    <groupId>org.bouncycastle</groupId>
+		    <artifactId>bcpg-jdk15on</artifactId>
+		    <version>1.70</version>
+		</dependency>
+		<dependency>
+		    <groupId>org.bouncycastle</groupId>
+		    <artifactId>bcprov-jdk15on</artifactId>
+		    <version>1.70</version>
+		</dependency>
+
+
 	</dependencies>
 
 	<build>
