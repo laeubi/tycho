@@ -50,7 +50,6 @@ public class DefaultRegistryProvider implements IRegistryProvider, Initializable
 	@Override
 	public IExtensionRegistry getRegistry() {
 		if (registry == null) {
-
 			registry = new ExtensionRegistry(new ClasspathRegistryStrategy(null, null, log), null, null);
 		}
 		return registry;
