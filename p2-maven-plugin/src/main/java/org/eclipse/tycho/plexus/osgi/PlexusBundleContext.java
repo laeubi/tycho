@@ -13,21 +13,29 @@
 package org.eclipse.tycho.plexus.osgi;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Dictionary;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 import java.util.stream.Stream;
 
 import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
+import org.codehaus.plexus.logging.Logger;
 import org.eclipse.osgi.internal.framework.FilterImpl;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleContext;
@@ -42,6 +50,7 @@ import org.osgi.framework.ServiceListener;
 import org.osgi.framework.ServiceObjects;
 import org.osgi.framework.ServiceReference;
 import org.osgi.framework.ServiceRegistration;
+import org.osgi.framework.Version;
 
 class PlexusBundleContext implements BundleContext {
 
@@ -50,6 +59,8 @@ class PlexusBundleContext implements BundleContext {
 	private PlexusBundle plexusBundle;
 
 	private PlexusBundle systemBundle;
+
+	private Map<Long, PlexusBundle> bundleMap;
 
 	PlexusBundleContext(PlexusBundle plexusBundle, PlexusBundle systemBundle) {
 		this.plexusBundle = plexusBundle;
@@ -62,7 +73,7 @@ class PlexusBundleContext implements BundleContext {
 	}
 
 	@Override
-	public Bundle getBundle() {
+	public PlexusBundle getBundle() {
 		return plexusBundle;
 	}
 
@@ -89,7 +100,7 @@ class PlexusBundleContext implements BundleContext {
 		return null;
 	}
 
-	private Bundle getSystemBundle() {
+	private PlexusBundle getSystemBundle() {
 		if (systemBundle == null) {
 			return getBundle();
 		}
@@ -98,11 +109,58 @@ class PlexusBundleContext implements BundleContext {
 
 	@Override
 	public Bundle[] getBundles() {
-		if (systemBundle == null) {
-			// TODO discover more....
-			return new Bundle[] { getSystemBundle() };
+		PlexusBundle system = getSystemBundle();
+		if (system == getBundle()) {
+			Logger logger = system.adapt(Logger.class);
+			synchronized (this) {
+				if (bundleMap == null) {
+					bundleMap = new HashMap<Long, PlexusBundle>();
+					bundleMap.put(Constants.SYSTEM_BUNDLE_ID, getBundle());
+					try {
+						Enumeration<URL> resources = PlexusBundleContext.class.getClassLoader()
+								.getResources(JarFile.MANIFEST_NAME);
+						long id = Constants.SYSTEM_BUNDLE_ID + 1;
+						while (resources.hasMoreElements()) {
+							URL url = resources.nextElement();
+							logger.debug("Scan " + url + " for bundle data...");
+							Manifest manifest = readManifest(url);
+							if (manifest == null) {
+								continue;
+							}
+							try {
+								Attributes mainAttributes = manifest.getMainAttributes();
+								if (mainAttributes == null) {
+									continue;
+								}
+								String bundleSymbolicName = mainAttributes.getValue(Constants.BUNDLE_SYMBOLICNAME);
+								if (bundleSymbolicName == null) {
+									continue;
+								}
+								bundleSymbolicName = bundleSymbolicName.split(";")[0];
+								String version = mainAttributes.getValue(Constants.BUNDLE_VERSION);
+								if (version == null) {
+									version = "1";
+								}
+								logger.debug("Discovered bundle " + bundleSymbolicName + " with version " + version);
+								Hashtable<String, String> headers = new Hashtable<>();
+								for (Entry<Object, Object> entry : mainAttributes.entrySet()) {
+									headers.put(entry.getKey().toString(), entry.getValue().toString());
+								}
+								PlexusBundle bundle = new PlexusBundle(id++, url.toString(), bundleSymbolicName,
+										new Version(version), headers, system);
+								bundleMap.put(bundle.getBundleId(), bundle);
+							} catch (RuntimeException e) {
+								logger.warn("Can't read " + url, e);
+							}
+						}
+					} catch (IOException e) {
+						logger.warn("Error reading bundle infos!", e);
+					}
+				}
+				return bundleMap.values().toArray(Bundle[]::new);
+			}
 		}
-		return getBundle(0).getBundleContext().getBundles();
+		return system.getBundleContext().getBundles();
 	}
 
 	@Override
@@ -171,11 +229,9 @@ class PlexusBundleContext implements BundleContext {
 	public ServiceReference<?>[] getServiceReferences(String clazz, String filter) {
 		try {
 			Stream<PlexusServiceReference<?>> plexusServices = getBundle().adapt(PlexusContainer.class)
-					.lookupList(clazz).stream()
-					.map(PlexusServiceReference::new);
+					.lookupList(clazz).stream().map(PlexusServiceReference::new);
 			Stream<PlexusServiceReference<?>> dynamicServices = registrationMap
-					.getOrDefault(clazz, Collections.emptyList()).stream()
-					.map(sr -> sr.serviceReference);
+					.getOrDefault(clazz, Collections.emptyList()).stream().map(sr -> sr.serviceReference);
 			Stream<PlexusServiceReference<?>> factoryServices;
 			try {
 				// TODO more than one service factory!
@@ -277,91 +333,13 @@ class PlexusBundleContext implements BundleContext {
 		return getBundle();
 	}
 
-	private static final class PlexusServiceRegistration<S> implements ServiceRegistration<S> {
-
-		private PlexusServiceReference<S> serviceReference;
-
-		public PlexusServiceRegistration(S service, Dictionary<String, ?> properties) {
-			serviceReference = new PlexusServiceReference<S>(service);
-			if (properties != null) {
-				Enumeration<String> keys = properties.keys();
-				while (keys.hasMoreElements()) {
-					String key = keys.nextElement();
-					serviceReference.properties.put(key, properties.get(key));
-
-				}
+	private static Manifest readManifest(URL url) {
+		try {
+			try (InputStream stream = url.openStream()) {
+				return new Manifest(stream);
 			}
-		}
-
-		@Override
-		public ServiceReference<S> getReference() {
-			return serviceReference;
-		}
-
-		@Override
-		public void setProperties(Dictionary<String, ?> properties) {
-
-		}
-
-		@Override
-		public void unregister() {
-			// TODO
-		}
-
-	}
-
-	private static final class PlexusServiceReference<S> implements ServiceReference<S> {
-
-		private final Hashtable<String, Object> properties = new Hashtable<String, Object>();
-		private final S service;
-
-		public PlexusServiceReference(S service) {
-			this.service = service;
-		}
-
-		@Override
-		public Object getProperty(String key) {
-			if (Constants.SERVICE_ID.equals(key)) {
-				// TODO assign an id for each service
-				return 0L;
-			}
-			return properties.get(key);
-		}
-
-		@Override
-		public String[] getPropertyKeys() {
-			return new String[0];
-		}
-
-		@Override
-		public Bundle getBundle() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public Bundle[] getUsingBundles() {
-			throw new UnsupportedOperationException();
-		}
-
-		@Override
-		public boolean isAssignableTo(Bundle bundle, String className) {
-			return true;
-		}
-
-		@Override
-		public int compareTo(Object reference) {
-			return 0;
-		}
-
-		@Override
-		public Dictionary<String, Object> getProperties() {
-			return properties;
-		}
-
-		@Override
-		public <A> A adapt(Class<A> type) {
+		} catch (IOException e) {
 			return null;
 		}
-
 	}
 }

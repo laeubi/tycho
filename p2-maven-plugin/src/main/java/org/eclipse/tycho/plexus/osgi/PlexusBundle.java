@@ -8,7 +8,6 @@ import java.security.cert.X509Certificate;
 import java.util.Collections;
 import java.util.Dictionary;
 import java.util.Enumeration;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 
@@ -34,12 +33,15 @@ class PlexusBundle implements Bundle {
 	private long lastModified = System.currentTimeMillis();
 	private String symbolicName;
 	private Version version;
+	private Dictionary<String, String> headers;
 
-	PlexusBundle(long bundleId, String location, String symbolicName, Version version, PlexusBundle systemBundle) {
+	PlexusBundle(long bundleId, String location, String symbolicName, Version version,
+			Dictionary<String, String> headers, PlexusBundle systemBundle) {
 		this.bundleId = bundleId;
 		this.location = location;
 		this.symbolicName = symbolicName;
 		this.version = version;
+		this.headers = headers;
 		bundleContext = new PlexusBundleContext(this, systemBundle);
 	}
 	
@@ -106,7 +108,7 @@ class PlexusBundle implements Bundle {
 
 	@Override
 	public Dictionary<String, String> getHeaders() {
-		return new Hashtable<String, String>();
+		return headers;
 	}
 
 	@Override
@@ -204,5 +206,10 @@ class PlexusBundle implements Bundle {
 
 	protected static BundleException notImplementedBundleMethod() {
 		return new BundleException("no implemented");
+	}
+
+	@Override
+	public String toString() {
+		return "Plexus Bundle: " + getSymbolicName() + " @ " + getLocation();
 	}
 }

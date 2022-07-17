@@ -1,6 +1,7 @@
 package org.eclipse.tycho.plexus.osgi;
 
 
+import java.util.Hashtable;
 import java.util.List;
 
 import org.codehaus.plexus.PlexusContainer;
@@ -73,7 +74,7 @@ public class PlexusFramework extends PlexusBundle implements Initializable, Disp
 		// TODO derive version from manifest
 		super(Constants.SYSTEM_BUNDLE_ID,
 				PlexusFramework.class.getProtectionDomain().getCodeSource().getLocation().toString(),
-				Constants.SYSTEM_BUNDLE_SYMBOLICNAME, new Version("1"), null);
+				Constants.SYSTEM_BUNDLE_SYMBOLICNAME, new Version("1"), new Hashtable<>(), null);
 	}
 
 	@Override
@@ -120,6 +121,9 @@ public class PlexusFramework extends PlexusBundle implements Initializable, Disp
 	public <A> A adapt(Class<A> type) {
 		if (type.isInstance(plexusContainer)) {
 			return type.cast(plexusContainer);
+		}
+		if (type.isInstance(log)) {
+			return type.cast(log);
 		}
 		return super.adapt(type);
 	}

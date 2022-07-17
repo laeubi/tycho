@@ -82,11 +82,15 @@ public class DefaultRegistryProvider implements IRegistryProvider, Initializable
 						if (manifest == null) {
 							continue;
 						}
+						String value = manifest.getMainAttributes().getValue(Constants.BUNDLE_SYMBOLICNAME);
+						if (value == null) {
+							continue;
+						}
 						String bundleId = null;
 						String hostId = null;
 						String hostName = null;
 						// TODO handle fragments?
-						bundleId = manifest.getMainAttributes().getValue(Constants.BUNDLE_SYMBOLICNAME).split(";")[0];
+						bundleId = value.split(";")[0];
 						if (bundleId == null) {
 							continue;
 						}

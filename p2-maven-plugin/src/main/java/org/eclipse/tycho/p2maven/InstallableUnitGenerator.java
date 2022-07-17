@@ -53,7 +53,7 @@ import org.eclipse.tycho.p2maven.actions.ProductDependenciesAction;
 import org.eclipse.tycho.p2maven.actions.ProductFile2;
 import org.eclipse.tycho.p2maven.helper.PluginRealmHelper;
 import org.eclipse.tycho.p2maven.io.MetadataIO;
-import org.osgi.framework.BundleContext;
+import org.osgi.framework.launch.Framework;
 import org.xml.sax.SAXException;
 
 /**
@@ -73,7 +73,7 @@ public class InstallableUnitGenerator {
 
 	// this requirement is here to bootstrap P2 service access
 	@Requirement(hint = "plexus")
-	private BundleContext bundleContext;
+	private Framework bundleContext;
 
 	@Requirement(role = InstallableUnitProvider.class)
 	private Map<String, InstallableUnitProvider> additionalUnitProviders;
