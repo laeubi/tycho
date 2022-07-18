@@ -39,7 +39,9 @@ public class OSGiProxyConfigurator extends EquinoxLifecycleListener {
         MavenSession session = context.getSession();
 
         ProxyServiceFacade proxyService = framework.getServiceFactory().getService(ProxyServiceFacade.class);
-
+        if (proxyService == null) {
+            return;
+        }
         // make sure there is no old state from previous aborted builds
         clearProxyConfiguration(proxyService);
 

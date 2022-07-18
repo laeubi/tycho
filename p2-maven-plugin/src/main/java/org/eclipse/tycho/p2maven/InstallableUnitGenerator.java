@@ -41,10 +41,12 @@ import org.eclipse.equinox.internal.p2.publisher.eclipse.FeatureParser;
 import org.eclipse.equinox.internal.p2.publisher.eclipse.IProductDescriptor;
 import org.eclipse.equinox.internal.p2.updatesite.CategoryParser;
 import org.eclipse.equinox.internal.p2.updatesite.SiteModel;
+import org.eclipse.equinox.p2.core.spi.IAgentService;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.publisher.IPublisherAction;
 import org.eclipse.equinox.p2.publisher.eclipse.BundlesAction;
 import org.eclipse.equinox.p2.publisher.eclipse.Feature;
+import org.eclipse.sisu.equinox.EquinoxServiceFactory;
 import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.p2maven.actions.AuthoredIUAction;
 import org.eclipse.tycho.p2maven.actions.CategoryDependenciesAction;
@@ -53,7 +55,6 @@ import org.eclipse.tycho.p2maven.actions.ProductDependenciesAction;
 import org.eclipse.tycho.p2maven.actions.ProductFile2;
 import org.eclipse.tycho.p2maven.helper.PluginRealmHelper;
 import org.eclipse.tycho.p2maven.io.MetadataIO;
-import org.osgi.framework.BundleContext;
 import org.xml.sax.SAXException;
 
 /**
@@ -71,9 +72,8 @@ public class InstallableUnitGenerator {
 
 	private static final String KEY_UNITS = "InstallableUnitGenerator.units";
 
-	// this requirement is here to bootstrap P2 service access
-	@Requirement(hint = "plexus")
-	private BundleContext bundleContext;
+	@Requirement(hint = P2Plugin.HINT)
+	private EquinoxServiceFactory frameworkFactory;
 
 	@Requirement(role = InstallableUnitProvider.class)
 	private Map<String, InstallableUnitProvider> additionalUnitProviders;
@@ -98,6 +98,7 @@ public class InstallableUnitGenerator {
 			MavenSession session)
 			throws CoreException {
 		Objects.requireNonNull(session);
+		init();
 		List<CoreException> errors = new CopyOnWriteArrayList<CoreException>();
 		Map<MavenProject, Collection<IInstallableUnit>> result = new ConcurrentHashMap<MavenProject, Collection<IInstallableUnit>>();
 		projects.parallelStream().unordered().takeWhile(nil -> errors.isEmpty()).forEach(project -> {
@@ -120,6 +121,13 @@ public class InstallableUnitGenerator {
 		throw new CoreException(multiStatus);
 	}
 
+	private void init() {
+		// this requirement is currently only needed to bootstrap the embedded framework
+		// if https://github.com/eclipse-equinox/p2/issues/100 is fixed, this won't be
+		// strictly necessary because then this P2 part can work without OSGi running!
+		frameworkFactory.getService(IAgentService.class);
+	}
+
 	/**
 	 * Computes the {@link IInstallableUnit}s for the given project, the computation
 	 * is cached unless forceUpdate is <code>true</code> meaning data is always
@@ -137,6 +145,7 @@ public class InstallableUnitGenerator {
 			boolean forceUpdate)
 			throws CoreException {
 		Objects.requireNonNull(session);
+		init();
 		log.debug("Computing installable units for " + project + ", force update = " + forceUpdate);
 		synchronized (project) {
 			if (!forceUpdate) {

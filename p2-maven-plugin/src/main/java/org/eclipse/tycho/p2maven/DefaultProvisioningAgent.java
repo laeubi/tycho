@@ -6,60 +6,44 @@
  * https://www.eclipse.org/legal/epl-2.0/
  *
  * SPDX-License-Identifier: EPL-2.0
- * 
+ *
  * Contributors:
- *     Christoph Läubrich - initial API and implementation
+ *    Christoph Läubrich - initial API and implementation
  *******************************************************************************/
 package org.eclipse.tycho.p2maven;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
-import org.codehaus.plexus.logging.Logger;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
-import org.eclipse.equinox.p2.core.spi.IAgentServiceFactory;
-import org.osgi.framework.BundleContext;
+import org.eclipse.sisu.equinox.EquinoxServiceFactory;
 
 @Component(role = IProvisioningAgent.class)
 public class DefaultProvisioningAgent implements IProvisioningAgent {
 
-	@Requirement
-	private Logger log;
+	@Requirement(hint = P2Plugin.HINT)
+	private EquinoxServiceFactory frameworkFactory;
 
-	@Requirement(hint = "plexus")
-	private BundleContext bundleContext;
-
-	@Requirement(role = IAgentServiceFactory.class)
-	private Map<String, IAgentServiceFactory> factoryMap;
-
-	private Map<String, Object> services = new ConcurrentHashMap<String, Object>();
+	IProvisioningAgent getForeignProvisioningAgent() {
+		return frameworkFactory.getService(IProvisioningAgent.class);
+	}
 
 	@Override
 	public Object getService(String serviceName) {
-		return services.computeIfAbsent(serviceName, role -> {
-			IAgentServiceFactory serviceFactory = factoryMap.get(role);
-			if (serviceFactory != null) {
-				return serviceFactory.createService(DefaultProvisioningAgent.this);
-			}
-			return null;
-		});
+		return getForeignProvisioningAgent().getService(serviceName);
 	}
 
 	@Override
 	public void registerService(String serviceName, Object service) {
-		throw new UnsupportedOperationException();
+		getForeignProvisioningAgent().registerService(serviceName, service);
 	}
 
 	@Override
 	public void stop() {
-
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public void unregisterService(String serviceName, Object service) {
-		throw new UnsupportedOperationException();
+		getForeignProvisioningAgent().unregisterService(serviceName, service);
 	}
-
 }

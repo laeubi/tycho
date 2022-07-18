@@ -20,4 +20,5 @@ public interface P2Plugin {
 	String ARTIFACT_ID = "p2-maven-plugin";
 	String KEY = GROUP_ID + ":" + ARTIFACT_ID;
 	String BUNDLE_ID = GROUP_ID + "." + ARTIFACT_ID.replace('-', '.');
+	String HINT = "p2";
 }
