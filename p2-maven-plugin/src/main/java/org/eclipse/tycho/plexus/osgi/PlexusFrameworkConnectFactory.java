@@ -1,6 +1,8 @@
 package org.eclipse.tycho.plexus.osgi;
 
 import java.io.File;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.ServiceLoader;
@@ -22,14 +24,14 @@ import org.osgi.framework.connect.ConnectFrameworkFactory;
 import org.osgi.framework.launch.Framework;
 
 /**
- * The {@link PlexusFrameworkFactory} creates a {@link Framework} using the
+ * The {@link PlexusFrameworkConnectFactory} creates a {@link Framework} using the
  * <a href=
  * "http://docs.osgi.org/specification/osgi.core/8.0.0/framework.connect.html#framework.connect">Connect
  * Specification</a> that allows to connect the plexus-world with the maven
  * world.
  */
-@Component(role = PlexusFrameworkFactory.class)
-public class PlexusFrameworkFactory implements Initializable, Disposable {
+@Component(role = PlexusFrameworkConnectFactory.class)
+public class PlexusFrameworkConnectFactory implements Initializable, Disposable {
 
 	private static final String FRAMEWORK_STORAGE = "org.osgi.framework.storage";
 
@@ -38,7 +40,7 @@ public class PlexusFrameworkFactory implements Initializable, Disposable {
 
 	final Map<ClassLoader, Framework> frameworkMap = new HashMap<ClassLoader, Framework>();
 
-	static PlexusFrameworkFactory instance;
+	static PlexusFrameworkConnectFactory instance;
 
 	/**
 	 * 
@@ -69,11 +71,12 @@ public class PlexusFrameworkFactory implements Initializable, Disposable {
 		connector.installBundles(osgiFramework.getBundleContext());
 		osgiFramework.start();
 		Bundle[] bundles = osgiFramework.getBundleContext().getBundles();
-		for (Bundle bundle : bundles) {
-			System.out.println(
-					bundle.getBundleId() + " | " + toBundleState(bundle.getState()) + " | "
-							+ bundle.getSymbolicName());
-		}
+		Arrays.stream(bundles).sorted(Comparator.comparing(Bundle::getSymbolicName, String.CASE_INSENSITIVE_ORDER))
+				.forEachOrdered(bundle -> {
+
+					System.out.println(toBundleState(bundle.getState()) + " | " + bundle.getSymbolicName());
+				});
+		frameworkMap.put(classloader, osgiFramework);
 		return osgiFramework;
 
 	}
@@ -81,15 +84,15 @@ public class PlexusFrameworkFactory implements Initializable, Disposable {
 	private String toBundleState(int state) {
 		switch (state) {
 		case Bundle.ACTIVE:
-			return "ACTIVE";
+			return "ACTIVE     ";
 		case Bundle.INSTALLED:
-			return "INSTALLED";
+			return "INSTALLED  ";
 		case Bundle.RESOLVED:
-			return "RESOLVED";
+			return "RESOLVED   ";
 		case Bundle.STARTING:
-			return "STARTING";
+			return "STARTING   ";
 		case Bundle.STOPPING:
-			return "STOPPING";
+			return "STOPPING   ";
 		case Bundle.UNINSTALLED:
 			return "UNINSTALLED";
 		default:

@@ -10,19 +10,24 @@ public class PlexusFrameworkUtilHelper implements FrameworkUtilHelper {
 
 	@Override
 	public Optional<Bundle> getBundle(Class<?> classFromBundle) {
-		PlexusFrameworkFactory factory = PlexusFrameworkFactory.instance;
+		PlexusFrameworkConnectFactory factory = PlexusFrameworkConnectFactory.instance;
 		if (factory != null) {
 			Framework framework = factory.frameworkMap.get(classFromBundle.getClassLoader());
 			if (framework != null) {
 				String location = classFromBundle.getProtectionDomain().getCodeSource().getLocation().toString();
 				for (Bundle bundle : framework.getBundleContext().getBundles()) {
-					if (bundle.getLocation().contains(location)) {
+					String bundleLocation = bundle.getLocation();
+					if (locationsMatch(location, bundleLocation)) {
 						return Optional.of(bundle);
 					}
 				}
 			}
 		}
 		return Optional.empty();
+	}
+
+	private static boolean locationsMatch(String classLocation, String bundleLocation) {
+		return classLocation.endsWith(bundleLocation);
 	}
 
 }

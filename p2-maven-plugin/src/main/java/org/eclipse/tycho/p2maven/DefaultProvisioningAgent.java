@@ -25,7 +25,7 @@ import org.eclipse.core.internal.adapter.AdapterManagerListener;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.eclipse.equinox.p2.core.spi.IAgentService;
 import org.eclipse.equinox.p2.core.spi.IAgentServiceFactory;
-import org.eclipse.tycho.plexus.osgi.PlexusFrameworkFactory;
+import org.eclipse.tycho.plexus.osgi.PlexusFrameworkConnectFactory;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.BundleException;
 import org.osgi.framework.launch.Framework;
@@ -38,7 +38,7 @@ public class DefaultProvisioningAgent implements IProvisioningAgent, Initializab
 	private Logger log;
 
 	@Requirement
-	private PlexusFrameworkFactory frameworkFactory;
+	private PlexusFrameworkConnectFactory frameworkFactory;
 
 	@Requirement(role = IAgentServiceFactory.class)
 	private Map<String, IAgentServiceFactory> factoryMap;
@@ -138,7 +138,13 @@ public class DefaultProvisioningAgent implements IProvisioningAgent, Initializab
 					try {
 						bundle.start();
 					} catch (BundleException e) {
-						log.warn("Can't start required  active bundle " + bundle.getSymbolicName(), e);
+						String message = "Can't start required active bundle " + bundle.getSymbolicName() + ": "
+								+ e.getMessage();
+						if (log.isDebugEnabled()) {
+							log.error(message, e);
+						} else {
+							log.warn(message, e);
+						}
 					}
 				}
 			}
