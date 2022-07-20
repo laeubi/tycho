@@ -4,6 +4,11 @@ This page describes the noteworthy improvements provided by each release of Ecli
 
 ## 3.0.0 (under development)
 
+### new sisu-osgi-connect
+
+The new sisu-osgi-connect provides an implementation for plexus according to the [Connect Specification](http://docs.osgi.org/specification/osgi.core/8.0.0/framework.connect.html#framework.connect) that allows to run an embedded OSGi Framework from the classpath of a maven-plugin.
+As both, the maven plugin and the embedded framework, share the same classlaoder you can use the best of both worlds and interact seamless with them. 
+
 ### Deprecated Features
 
 The `tycho-compiler:compile` and `tycho-compiler:testCompile` option `requireJREPackageImports` is deprecated now and will produce a warning when used, bundles currently rely on this option should migrate to proper importing packages from the non java.* namespace.
