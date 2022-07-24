@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.eclipse.equinox.internal.p2.core.helpers.FileUtils;
@@ -57,6 +58,10 @@ public class ReactorRepositoryManagerImpl implements ReactorRepositoryManager {
 
     private TargetPlatformFactory tpFactory;
 
+    public ReactorRepositoryManagerImpl() {
+        System.out.println();
+    }
+
     @Reference
     public void bindProvisioningAgentFactory(IProvisioningAgentProvider agentFactory) {
         this.agentFactory = agentFactory;
@@ -64,7 +69,13 @@ public class ReactorRepositoryManagerImpl implements ReactorRepositoryManager {
 
     @Reference
     public void bindP2ResolverFactory(P2ResolverFactory p2ResolverFactory) {
-        tpFactory = p2ResolverFactory.getTargetPlatformFactory();
+        try {
+            TargetPlatformFactory targetPlatformFactory = p2ResolverFactory.getTargetPlatformFactory();
+            tpFactory = Objects.requireNonNull(targetPlatformFactory, "P2ResolverFactory ("
+                    + p2ResolverFactory.getClass().getName() + ") returned null TargetPlatformFactory");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Activate

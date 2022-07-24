@@ -33,6 +33,7 @@ import org.eclipse.sisu.equinox.EquinoxServiceFactory;
 import org.eclipse.tycho.IDependencyMetadata;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.core.resolver.shared.OptionalResolutionAction;
+import org.eclipse.tycho.osgi.TychoServiceFactory;
 import org.eclipse.tycho.p2.facade.internal.AttachedArtifact;
 import org.eclipse.tycho.p2.metadata.DependencyMetadataGenerator;
 import org.eclipse.tycho.p2.metadata.IArtifactFacade;
@@ -40,85 +41,86 @@ import org.eclipse.tycho.p2.metadata.PublisherOptions;
 import org.eclipse.tycho.p2.resolver.P2MetadataProvider;
 
 /**
- * This component is invoked during Tycho dependency resolution and provides P2 metadata that
- * describes artifacts that will be created by custom-bundle goal.
+ * This component is invoked during Tycho dependency resolution and provides P2
+ * metadata that describes artifacts that will be created by custom-bundle goal.
  */
 @Component(role = P2MetadataProvider.class, hint = "org.eclipse.tycho.extras.custombundle.CustomBundleP2MetadataProvider")
 public class CustomBundleP2MetadataProvider implements P2MetadataProvider, Initializable {
-    @Requirement
-    private EquinoxServiceFactory equinox;
+	@Requirement(hint = TychoServiceFactory.HINT)
+	private EquinoxServiceFactory equinox;
 
-    private DependencyMetadataGenerator generator;
+	private DependencyMetadataGenerator generator;
 
-    @Override
-    public Map<String, IDependencyMetadata> getDependencyMetadata(MavenSession session, MavenProject project,
-            List<TargetEnvironment> environments, OptionalResolutionAction optionalAction) {
-        Map<String, IDependencyMetadata> metadata = new LinkedHashMap<>();
-        Plugin plugin = project.getPlugin("org.eclipse.tycho.extras:tycho-custom-bundle-plugin");
-        if (plugin != null) {
-            // it is possible to configure manifest location at <plugin> level, but it does not make sense to do so
-            for (PluginExecution execution : plugin.getExecutions()) {
-                File location = getBundleLocation(execution);
-                String classifier = getClassifier(execution);
-                if (location != null && classifier != null) {
-                    IArtifactFacade artifact = new AttachedArtifact(project, location, classifier);
-                    metadata.put(classifier, new SecondaryDependencyMetadata(generator.generateMetadata(artifact,
-                            environments, optionalAction, new PublisherOptions())));
-                }
-            }
-        }
-        return metadata;
-    }
+	@Override
+	public Map<String, IDependencyMetadata> getDependencyMetadata(MavenSession session, MavenProject project,
+			List<TargetEnvironment> environments, OptionalResolutionAction optionalAction) {
+		Map<String, IDependencyMetadata> metadata = new LinkedHashMap<>();
+		Plugin plugin = project.getPlugin("org.eclipse.tycho.extras:tycho-custom-bundle-plugin");
+		if (plugin != null) {
+			// it is possible to configure manifest location at <plugin> level, but it does
+			// not make sense to do so
+			for (PluginExecution execution : plugin.getExecutions()) {
+				File location = getBundleLocation(execution);
+				String classifier = getClassifier(execution);
+				if (location != null && classifier != null) {
+					IArtifactFacade artifact = new AttachedArtifact(project, location, classifier);
+					metadata.put(classifier, new SecondaryDependencyMetadata(generator.generateMetadata(artifact,
+							environments, optionalAction, new PublisherOptions())));
+				}
+			}
+		}
+		return metadata;
+	}
 
-    private String getClassifier(PluginExecution execution) {
-        Xpp3Dom cfg = (Xpp3Dom) execution.getConfiguration();
-        if (cfg == null) {
-            return null;
-        }
-        Xpp3Dom classifierDom = cfg.getChild("classifier");
-        if (classifierDom == null) {
-            return null;
-        }
-        return classifierDom.getValue();
-    }
+	private String getClassifier(PluginExecution execution) {
+		Xpp3Dom cfg = (Xpp3Dom) execution.getConfiguration();
+		if (cfg == null) {
+			return null;
+		}
+		Xpp3Dom classifierDom = cfg.getChild("classifier");
+		if (classifierDom == null) {
+			return null;
+		}
+		return classifierDom.getValue();
+	}
 
-    private File getBundleLocation(PluginExecution execution) {
-        Xpp3Dom cfg = (Xpp3Dom) execution.getConfiguration();
-        if (cfg == null) {
-            return null;
-        }
-        Xpp3Dom locationDom = cfg.getChild("bundleLocation");
-        if (locationDom == null) {
-            return null;
-        }
-        return new File(locationDom.getValue());
-    }
+	private File getBundleLocation(PluginExecution execution) {
+		Xpp3Dom cfg = (Xpp3Dom) execution.getConfiguration();
+		if (cfg == null) {
+			return null;
+		}
+		Xpp3Dom locationDom = cfg.getChild("bundleLocation");
+		if (locationDom == null) {
+			return null;
+		}
+		return new File(locationDom.getValue());
+	}
 
-    @Override
-    public void initialize() throws InitializationException {
-        this.generator = equinox.getService(DependencyMetadataGenerator.class, "(role-hint=dependency-only)");
-    }
+	@Override
+	public void initialize() throws InitializationException {
+		this.generator = equinox.getService(DependencyMetadataGenerator.class, "(role-hint=dependency-only)");
+	}
 
-    private static class SecondaryDependencyMetadata implements IDependencyMetadata {
-        final Set<Object> metadata;
+	private static class SecondaryDependencyMetadata implements IDependencyMetadata {
+		final Set<Object> metadata;
 
-        public SecondaryDependencyMetadata(IDependencyMetadata original) {
-            metadata = Collections.unmodifiableSet(original.getDependencyMetadata());
-        }
+		public SecondaryDependencyMetadata(IDependencyMetadata original) {
+			metadata = Collections.unmodifiableSet(original.getDependencyMetadata());
+		}
 
-        @Override
-        public Set<Object> getDependencyMetadata() {
-            return metadata;
-        }
+		@Override
+		public Set<Object> getDependencyMetadata() {
+			return metadata;
+		}
 
-        @Override
-        public Set<?> getDependencyMetadata(DependencyMetadataType type) {
-            return type == DependencyMetadataType.RESOLVE ? metadata : Collections.emptySet();
-        }
+		@Override
+		public Set<?> getDependencyMetadata(DependencyMetadataType type) {
+			return type == DependencyMetadataType.RESOLVE ? metadata : Collections.emptySet();
+		}
 
-        @Override
-        public void setDependencyMetadata(DependencyMetadataType type, Collection<?> units) {
-            throw new UnsupportedOperationException();
-        }
-    }
+		@Override
+		public void setDependencyMetadata(DependencyMetadataType type, Collection<?> units) {
+			throw new UnsupportedOperationException();
+		}
+	}
 }

@@ -83,7 +83,7 @@ public class TychoOsgiRuntimeLocator implements EquinoxRuntimeLocator {
     @Requirement
     private LegacySupport buildContext;
 
-    @Requirement(hint = "zip")
+//    @Requirement(hint = "zip")
     private UnArchiver unArchiver;
 
     @Requirement

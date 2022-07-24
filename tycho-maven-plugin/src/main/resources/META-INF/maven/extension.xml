@@ -7,29 +7,37 @@
     <exportedPackage>org.osgi</exportedPackage>
     <exportedPackage>org.eclipse.osgi</exportedPackage>
     <exportedPackage>org.eclipse.sisu.equinox</exportedPackage>
-    <exportedPackage>org.eclipse.tycho.p2.resolver</exportedPackage>
-    <!-- P2 Stuff TODO add more? -->
-    <exportedPackage>org.eclipse.equinox.p2.metadata</exportedPackage>
-    <exportedPackage>org.eclipse.equinox.p2.publisher</exportedPackage>
-    <exportedPackage>org.eclipse.equinox.p2.publisher.eclipse</exportedPackage>
-    <exportedPackage>org.eclipse.equinox.p2.query</exportedPackage>
-    <!-- other  -->
+<!--     <exportedPackage>org.eclipse.tycho.p2.resolver</exportedPackage> -->
+<!--     P2 Stuff TODO add more? -->
+<!--     <exportedPackage>org.eclipse.equinox.p2.metadata</exportedPackage> -->
+<!--     <exportedPackage>org.eclipse.equinox.p2.publisher</exportedPackage> -->
+<!--     <exportedPackage>org.eclipse.equinox.p2.publisher.eclipse</exportedPackage> -->
+<!--     <exportedPackage>org.eclipse.equinox.p2.query</exportedPackage> -->
+<!--     other  -->
     <exportedPackage>de.pdark.decentxml</exportedPackage>
   </exportedPackages>
 
   <exportedArtifacts>
     <exportedArtifact>org.eclipse.tycho:org.eclipse.tycho.embedder.shared</exportedArtifact>
-    <exportedArtifact>org.eclipse.tycho:tycho-embedder-api</exportedArtifact>
-    <exportedArtifact>org.eclipse.tycho:tycho-metadata-model</exportedArtifact>
     <exportedArtifact>org.eclipse.tycho:org.eclipse.tycho.core.shared</exportedArtifact>
-    <exportedArtifact>org.eclipse.tycho:tycho-core</exportedArtifact>
     <exportedArtifact>org.eclipse.tycho:org.eclipse.tycho.p2.resolver.shared</exportedArtifact>
     <exportedArtifact>org.eclipse.tycho:org.eclipse.tycho.p2.tools.shared</exportedArtifact>
-    <exportedArtifact>org.eclipse.tycho:tycho-p2-facade</exportedArtifact>
-    <exportedArtifact>org.eclipse.tycho:sisu-equinox-api</exportedArtifact>
-    <exportedArtifact>org.eclipse.tycho:sisu-equinox-embedder</exportedArtifact>
-    <exportedArtifact>org.eclipse.tycho:org.eclipse.osgi</exportedArtifact>
-    
+    <exportedArtifact>org.eclipse.tycho:org.eclipse.tycho.p2.maven.repository</exportedArtifact>
+<!--     <exportedArtifact>org.eclipse.tycho:org.eclipse.tycho.p2.resolver.impl</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:org.eclipse.tycho.p2.tools.impl</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:tycho-embedder-api</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:tycho-metadata-model</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:tycho-core</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:tycho-p2-facade</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:sisu-equinox-api</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:sisu-equinox-embedder</exportedArtifact> -->
+<!--     <exportedArtifact>org.eclipse.tycho:org.eclipse.osgi</exportedArtifact> -->
+<!--     <exportedArtifact>org.ow2.sat4j:org.ow2.sat4j.core</exportedArtifact> -->
+<!--     <exportedArtifact>org.ow2.sat4j:org.ow2.sat4j.pb</exportedArtifact> -->
+<!--     <exportedArtifact>org.apache.felix:org.apache.felix.scr</exportedArtifact> -->
+<!--     <exportedArtifact>org.osgi:org.osgi.service.component</exportedArtifact> -->
+<!--     <exportedArtifact>biz.aQute.bnd:biz.aQute.bndlib</exportedArtifact> -->
+<!--     <exportedArtifact>biz.aQute.bnd:biz.aQute.bnd.util</exportedArtifact> -->
     <exportedArtifact>de.pdark:decentxml</exportedArtifact>
   </exportedArtifacts>
 </extension>

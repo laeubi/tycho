@@ -61,7 +61,7 @@ public class FixArtifactsMetadataMetadataMojo extends AbstractRepositoryMojo {
     @Parameter(defaultValue = "true")
     private boolean keepNonXzIndexFiles;
 
-    @Component
+    @Component(hint = "connect")
     private EquinoxServiceFactory p2;
 
     @Override

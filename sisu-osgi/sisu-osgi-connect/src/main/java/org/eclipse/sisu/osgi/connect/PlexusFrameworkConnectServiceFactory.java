@@ -160,9 +160,9 @@ public class PlexusFrameworkConnectServiceFactory implements Initializable, Disp
 			connectFramework.debug("Calling " + listener + "...");
 			listener.afterFrameworkStarted(connectFramework);
 		}
-		if (log.isDebugEnabled()) {
+//		if (log.isDebugEnabled()) {
 			printFrameworkState(osgiFramework, connectFramework);
-		}
+//		}
 		return connectFramework;
 
 	}

@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Collectors;
 
 import org.eclipse.equinox.internal.p2.metadata.IRequiredCapability;
+import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.eclipse.equinox.p2.core.ProvisionException;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.metadata.IProvidedCapability;
@@ -101,7 +102,8 @@ public class P2ResolverFactoryImpl implements P2ResolverFactory {
             // TODO don't synchronize twice
             LocalMetadataRepository localMetadataRepo = getLocalMetadataRepository(mavenContext, localRepoIndices);
             LocalArtifactRepository localArtifactRepo = getLocalArtifactRepository(mavenContext, localRepoIndices);
-            return new TargetPlatformFactoryImpl(mavenContext, remoteAgentManager.getProvisioningAgent(),
+            IProvisioningAgent provisioningAgent = remoteAgentManager.getProvisioningAgent();
+            return new TargetPlatformFactoryImpl(mavenContext, provisioningAgent,
                     localArtifactRepo, localMetadataRepo, targetDefinitionResolverService);
         } catch (ProvisionException e) {
             throw new RuntimeException(e);

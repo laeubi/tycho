@@ -63,6 +63,7 @@
 							<manifestLocation>META-INF</manifestLocation>
 							<instructions>
 								<Export-Package>*;version=${tycho-api-version}</Export-Package>
+								<!-- <Import-Package>org.apache.maven.*;resolution:=optional,*</Import-Package> -->
 							</instructions>
 						</configuration>
 					</execution>

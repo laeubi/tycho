@@ -33,6 +33,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 
@@ -86,6 +87,7 @@ import org.eclipse.tycho.core.resolver.shared.OptionalResolutionAction;
 import org.eclipse.tycho.core.resolver.shared.PomDependencies;
 import org.eclipse.tycho.core.shared.BuildFailureException;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
+import org.eclipse.tycho.osgi.TychoServiceFactory;
 import org.eclipse.tycho.osgi.adapters.MavenLoggerAdapter;
 import org.eclipse.tycho.p2.facade.internal.AttachedArtifact;
 import org.eclipse.tycho.p2.metadata.DependencyMetadataGenerator;
@@ -107,7 +109,7 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
 
     public static final String ROLE_HINT = "p2";
 
-    @Requirement
+    @Requirement(hint = TychoServiceFactory.HINT)
     private EquinoxServiceFactory equinox;
 
     @Requirement
@@ -491,9 +493,13 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
 
     @Override
     public void initialize() throws InitializationException {
-        this.resolverFactory = equinox.getService(P2ResolverFactory.class);
-        this.generator = equinox.getService(DependencyMetadataGenerator.class, "(role-hint=dependency-only)");
-        this.reactorRepositoryManager = equinox.getService(ReactorRepositoryManagerFacade.class);
+        this.resolverFactory = Objects.requireNonNull(equinox.getService(P2ResolverFactory.class),
+                "P2ResolverFactory service is missing");
+        this.generator = Objects.requireNonNull(
+                equinox.getService(DependencyMetadataGenerator.class, "(role-hint=dependency-only)"),
+                "DependencyMetadataGenerator(role-hint=dependency-only) is missing");
+        this.reactorRepositoryManager = Objects.requireNonNull(equinox.getService(ReactorRepositoryManagerFacade.class),
+                "ReactorRepositoryManagerFacade service is missing");
     }
 
     @Override
