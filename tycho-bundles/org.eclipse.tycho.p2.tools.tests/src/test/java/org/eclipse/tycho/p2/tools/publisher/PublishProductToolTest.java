@@ -53,7 +53,7 @@ import org.eclipse.tycho.DependencyResolutionException;
 import org.eclipse.tycho.Interpolator;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.core.resolver.shared.DependencySeed;
-import org.eclipse.tycho.p2.target.FinalTargetPlatformImpl;
+import org.eclipse.tycho.p2.impl.FinalTargetPlatformImpl;
 import org.eclipse.tycho.p2.target.P2TargetPlatform;
 import org.eclipse.tycho.p2.tools.publisher.facade.PublishProductTool;
 import org.eclipse.tycho.repository.module.PublishingRepositoryImpl;

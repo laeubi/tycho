@@ -20,7 +20,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.equinox.p2.core.ProvisionException;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactRepository;
 import org.eclipse.equinox.p2.repository.artifact.spi.ArtifactRepositoryFactory;
-import org.eclipse.tycho.repository.util.internal.RepositoryFactoryTools;
+import org.eclipse.tycho.repository.util.RepositoryFactoryTools;
 
 public class ModuleArtifactRepositoryFactory extends ArtifactRepositoryFactory {
 

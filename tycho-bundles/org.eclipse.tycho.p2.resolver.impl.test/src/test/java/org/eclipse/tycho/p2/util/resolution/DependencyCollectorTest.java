@@ -28,6 +28,8 @@ import org.eclipse.equinox.p2.metadata.MetadataFactory.InstallableUnitDescriptio
 import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.equinox.p2.metadata.VersionRange;
 import org.eclipse.tycho.p2.target.ExecutionEnvironmentTestUtils;
+import org.eclipse.tycho.p2.util.DependencyCollector;
+import org.eclipse.tycho.p2.util.ResolutionDataImpl;
 import org.eclipse.tycho.test.util.LogVerifier;
 import org.junit.Assert;
 import org.junit.Rule;

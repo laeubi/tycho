@@ -33,10 +33,10 @@ import org.eclipse.equinox.p2.repository.IRepositoryReference;
 import org.eclipse.equinox.p2.repository.metadata.spi.AbstractMetadataRepository;
 import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.TychoConstants;
-import org.eclipse.tycho.p2.maven.repository.xmlio.MetadataIO;
 import org.eclipse.tycho.p2.repository.GAV;
 import org.eclipse.tycho.p2.repository.RepositoryReader;
 import org.eclipse.tycho.p2.repository.TychoRepositoryIndex;
+import org.eclipse.tycho.repository.xmlio.MetadataIO;
 
 public abstract class AbstractMavenMetadataRepository extends AbstractMetadataRepository {
 

@@ -30,6 +30,7 @@ import org.eclipse.equinox.p2.metadata.VersionedId;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.core.resolver.shared.IncludeSourceMode;
 import org.eclipse.tycho.core.shared.MockMavenContext;
+import org.eclipse.tycho.p2.impl.TargetDefinitionResolver;
 import org.eclipse.tycho.p2.target.TargetDefinitionResolverTest.RepositoryStub;
 import org.eclipse.tycho.p2.target.TargetDefinitionResolverTest.UnitStub;
 import org.eclipse.tycho.p2.target.facade.TargetDefinition;

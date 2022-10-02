@@ -17,7 +17,7 @@ import org.eclipse.equinox.p2.publisher.IPublisherInfo;
 import org.eclipse.equinox.p2.publisher.IPublisherResult;
 import org.eclipse.tycho.core.ee.shared.ExecutionEnvironment;
 import org.eclipse.tycho.p2.target.ee.StandardEEResolutionHints;
-import org.eclipse.tycho.p2.util.resolution.ExecutionEnvironmentResolutionHints;
+import org.eclipse.tycho.p2.util.ExecutionEnvironmentResolutionHints;
 
 public class ExecutionEnvironmentAction implements IPublisherAction {
 

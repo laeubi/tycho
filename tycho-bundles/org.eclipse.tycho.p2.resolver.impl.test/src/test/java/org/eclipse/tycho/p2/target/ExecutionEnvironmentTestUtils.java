@@ -21,7 +21,7 @@ import org.eclipse.tycho.core.ee.shared.ExecutionEnvironment;
 import org.eclipse.tycho.p2.target.ee.CustomEEResolutionHints;
 import org.eclipse.tycho.p2.target.ee.ExecutionEnvironmentResolutionHandler;
 import org.eclipse.tycho.p2.target.ee.StandardEEResolutionHints;
-import org.eclipse.tycho.p2.util.resolution.ExecutionEnvironmentResolutionHints;
+import org.eclipse.tycho.p2.util.ExecutionEnvironmentResolutionHints;
 
 public class ExecutionEnvironmentTestUtils {
 

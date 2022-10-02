@@ -31,9 +31,8 @@ import org.eclipse.tycho.core.resolver.shared.IncludeSourceMode;
 import org.eclipse.tycho.core.shared.MavenContext;
 import org.eclipse.tycho.core.shared.MavenDependenciesResolver;
 import org.eclipse.tycho.p2.target.TargetDefinitionContent;
-import org.eclipse.tycho.p2.target.TargetDefinitionResolver;
 import org.eclipse.tycho.p2.target.facade.TargetDefinition;
-import org.eclipse.tycho.p2.util.resolution.ExecutionEnvironmentResolutionHints;
+import org.eclipse.tycho.p2.util.ExecutionEnvironmentResolutionHints;
 
 /**
  * Service instance for resolving target definitions. Results are cached so that there is no

@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.repository.module;
 
-import static org.eclipse.tycho.repository.util.internal.BundleConstants.BUNDLE_ID;
+import static org.eclipse.tycho.repository.util.BundleConstants.BUNDLE_ID;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -34,7 +34,7 @@ import org.eclipse.equinox.p2.query.IQueryResult;
 import org.eclipse.equinox.p2.repository.metadata.IMetadataRepositoryManager;
 import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.p2.maven.repository.AbstractMetadataRepository2;
-import org.eclipse.tycho.p2.maven.repository.xmlio.MetadataIO;
+import org.eclipse.tycho.repository.xmlio.MetadataIO;
 
 /**
  * A p2 metadata repository implementation which is persisted in a <tt>p2content.xml</tt>. The

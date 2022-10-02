@@ -43,18 +43,15 @@ import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.shared.MavenContext;
 import org.eclipse.tycho.core.shared.MavenLogger;
+import org.eclipse.tycho.p2.maven.repository.impl.LocalArtifactRepository;
+import org.eclipse.tycho.p2.maven.repository.impl.LocalMetadataRepository;
 import org.eclipse.tycho.p2.remote.RemoteAgentManager;
 import org.eclipse.tycho.p2.repository.LocalRepositoryP2Indices;
 import org.eclipse.tycho.p2.repository.LocalRepositoryReader;
 import org.eclipse.tycho.p2.repository.RepositoryReader;
-import org.eclipse.tycho.p2.resolver.P2ResolverImpl;
 import org.eclipse.tycho.p2.resolver.facade.P2ResolverFactory;
-import org.eclipse.tycho.p2.target.PomDependencyCollectorImpl;
-import org.eclipse.tycho.p2.target.TargetPlatformFactoryImpl;
 import org.eclipse.tycho.p2.target.facade.PomDependencyCollector;
-import org.eclipse.tycho.p2.util.resolution.ResolutionData;
-import org.eclipse.tycho.repository.local.LocalArtifactRepository;
-import org.eclipse.tycho.repository.local.LocalMetadataRepository;
+import org.eclipse.tycho.p2.util.ResolutionData;
 
 @SuppressWarnings("restriction")
 public class P2ResolverFactoryImpl implements P2ResolverFactory {
