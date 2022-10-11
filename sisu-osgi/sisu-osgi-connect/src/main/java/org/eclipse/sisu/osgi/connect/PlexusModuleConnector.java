@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
@@ -104,7 +105,8 @@ final class PlexusModuleConnector implements ModuleConnector {
 		return storage;
 	}
 
-	public synchronized void installRealm(ClassRealm realm, BundleContext bundleContext, Logger logger) {
+	public synchronized void installRealm(ClassRealm realm, BundleContext bundleContext,
+			Logger logger) {
 		Objects.requireNonNull(realm);
 		if (realmBundles.containsKey(realm)) {
 			// already scanned!
@@ -145,6 +147,7 @@ final class PlexusModuleConnector implements ModuleConnector {
 			// nothing more to do...
 			return;
 		}
+		Map<String, List<Bundle>> bundlesMap = new HashMap<>();
 		// now scan the URLs
 		for (URL url : realm.getURLs()) {
 			File file = getFile(url);
@@ -184,27 +187,22 @@ final class PlexusModuleConnector implements ModuleConnector {
 					String bundleVersion = mainAttributes.getValue(Constants.BUNDLE_VERSION);
 					logger.debug("Discovered bundle " + bundleSymbolicName + " (" + bundleVersion + ") @ " + file);
 					String location = file.getAbsolutePath();
-					Bundle bundle;
 					if (modulesMap.containsKey(location)) {
-						bundle = bundleContext.getBundle(location);
+						continue;
 					} else if (isSingleton(mainAttributes) && !installedSingletons.add(bundleSymbolicName)) {
-						bundle = Arrays.stream(bundleContext.getBundles())
+						Bundle bundle = Arrays.stream(bundleContext.getBundles())
 								.filter(b -> b.getSymbolicName().equals(bundleSymbolicName)).findFirst().orElse(null);
 						logger.debug("More than one singleton bundle found for smybolic name " + bundleSymbolicName
 								+ " one with path " + location + " and one with path "
 								+ (bundle == null ? "???" : bundle.getLocation()));
+						continue;
 					} else {
 						modulesMap.put(location,
 								new PlexusConnectContent(jarFile, getHeaderFromManifest(jarFile), realm));
-						bundle = installBundle(bundleContext, location, logger);
-					}
-					if (bundle != null) {
-						installed.add(location);
-						if (realmExports.bundleStartMap.getOrDefault(bundleSymbolicName, false)) {
-							try {
-								bundle.start();
-							} catch (BundleException e) {
-							}
+						Bundle bundle = installBundle(bundleContext, location, logger);
+						if (bundle != null) {
+							installed.add(location);
+							bundlesMap.computeIfAbsent(bundleSymbolicName, k -> new ArrayList<>()).add(bundle);
 						}
 					}
 				} catch (IOException e) {
@@ -213,6 +211,17 @@ final class PlexusModuleConnector implements ModuleConnector {
 				}
 			} catch (IOException e) {
 				logger.warn("Can't open jar at " + file, e);
+			}
+		}
+		for (Entry<String, Boolean> entry : realmExports.bundleStartMap.entrySet()) {
+			if (entry.getValue()) {
+				List<Bundle> list = bundlesMap.getOrDefault(entry.getKey(), Collections.emptyList());
+				for (Bundle bundle : list) {
+					try {
+						bundle.start();
+					} catch (BundleException e) {
+					}
+				}
 			}
 		}
 	}
