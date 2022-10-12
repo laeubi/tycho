@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.equinox.p2.artifact.repository.artifactChecksums">
+      <artifactChecksum
+            algorithm="SHA-1"
+            id="sha-1">
+      </artifactChecksum>
+   </extension>
+   <extension
+         id="tycho"
+         point="org.eclipse.equinox.security.secureStorage">
+      <provider
+            class="org.eclipse.tycho.security.storage.TychoPasswordProvider"
+            priority="0">
+      </provider>
+   </extension>
+
+</plugin>

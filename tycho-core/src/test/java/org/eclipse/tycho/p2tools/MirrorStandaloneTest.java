@@ -34,12 +34,10 @@ import org.eclipse.tycho.p2.tools.mirroring.facade.MirrorOptions;
 import org.eclipse.tycho.test.util.LogVerifier;
 import org.eclipse.tycho.testing.TychoPlexusTestCase;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-@Ignore("see if other things fail ...")
 public class MirrorStandaloneTest extends TychoPlexusTestCase {
     private static final String DEFAULT_NAME = "dummy";
 

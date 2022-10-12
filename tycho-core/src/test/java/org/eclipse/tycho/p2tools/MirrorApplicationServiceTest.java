@@ -48,7 +48,6 @@ import org.eclipse.tycho.test.util.LogVerifier;
 import org.eclipse.tycho.test.util.ReactorProjectIdentitiesStub;
 import org.eclipse.tycho.testing.TychoPlexusTestCase;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -56,7 +55,6 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
-@Ignore("see if other things fail ...")
 public class MirrorApplicationServiceTest extends TychoPlexusTestCase {
 
     // feature containing org.eclipse.core.runtime 3.4
