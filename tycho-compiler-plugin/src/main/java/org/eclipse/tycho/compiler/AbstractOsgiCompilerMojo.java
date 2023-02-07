@@ -17,6 +17,7 @@
 package org.eclipse.tycho.compiler;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -42,6 +43,7 @@ import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Repository;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
@@ -62,6 +64,11 @@ import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.eclipse.aether.collection.DependencyCollectionException;
 import org.eclipse.aether.resolution.DependencyResolutionException;
+import org.eclipse.equinox.p2.metadata.IInstallableUnit;
+import org.eclipse.equinox.p2.query.IQueryResult;
+import org.eclipse.equinox.p2.query.QueryUtil;
+import org.eclipse.equinox.p2.repository.artifact.IArtifactRepository;
+import org.eclipse.equinox.p2.repository.metadata.IMetadataRepository;
 import org.eclipse.jdt.internal.compiler.util.CtSym;
 import org.eclipse.jdt.internal.compiler.util.JRTUtil;
 import org.eclipse.osgi.util.ManifestElement;
@@ -71,6 +78,7 @@ import org.eclipse.tycho.ClasspathEntry.AccessRule;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.SourcepathEntry;
+import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.classpath.ClasspathContributor;
 import org.eclipse.tycho.core.BundleProject;
 import org.eclipse.tycho.core.TychoProject;
@@ -93,6 +101,7 @@ import org.eclipse.tycho.core.osgitools.project.EclipsePluginProject;
 import org.eclipse.tycho.core.resolver.shared.PomDependencies;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.helper.PluginRealmHelper;
+import org.eclipse.tycho.p2maven.repository.P2RepositoryManager;
 import org.osgi.framework.Constants;
 import org.osgi.framework.Filter;
 import org.osgi.framework.FrameworkUtil;
@@ -339,6 +348,13 @@ public abstract class AbstractOsgiCompilerMojo extends AbstractCompilerMojo impl
     @Parameter
     private String log;
 
+    /**
+     * Configure the repository to use for searching JREs, default uses
+     * https://download.eclipse.org/justj/jres/
+     */
+    @Parameter()
+    private Repository jreRepository;
+
     @Component
     ToolchainProvider toolchainProvider;
 
@@ -353,6 +369,9 @@ public abstract class AbstractOsgiCompilerMojo extends AbstractCompilerMojo impl
 
     @Component
     private MavenDependenciesResolver dependenciesResolver;
+
+    @Component
+    private P2RepositoryManager repositoryManager;
 
     private StandardExecutionEnvironment[] manifestBREEs;
 
@@ -761,11 +780,48 @@ public abstract class AbstractOsgiCompilerMojo extends AbstractCompilerMojo impl
         DefaultJavaToolChain toolChain = (DefaultJavaToolChain) ExecutionEnvironmentUtils.getToolchainFor(toolchainId,
                 toolchainManager, session, logger);
         if (toolChain == null) {
+            Repository repository = getJreRepository();
+            TargetEnvironment runningEnvironment = TargetEnvironment
+                    .getRunningEnvironment(DefaultReactorProject.adapt(project));
+            try {
+                IMetadataRepository metadata = repositoryManager.getMetadataRepository(repository);
+                IArtifactRepository artifactRepository = repositoryManager.getArtifactRepository(repository);
+                IQueryResult<IInstallableUnit> result = metadata.query(QueryUtil.ALL_UNITS, null);
+                IInstallableUnit max = null;
+                for (IInstallableUnit iu : result) {
+                    if (ExecutionEnvironmentUtils.isCompatibleIU(iu, toolchainId)
+                            && runningEnvironment.match(iu.getFilter())) {
+                        if (max == null || iu.getProvidedCapabilities().size() > max.getProvidedCapabilities().size()) {
+                            max = iu;
+                        }
+                    }
+                }
+                System.out.println("Best matched IU is: " + max);
+                if (max != null) {
+                    File file = File.createTempFile("justj", ".jar");
+                    try (FileOutputStream stream = new FileOutputStream(file)) {
+                        repositoryManager.downloadArtifact(max, artifactRepository, stream);
+                    }
+                    System.out.println("Downloaded to " + file);
+                }
+            } catch (Exception e) {
+                getLog().warn("Can't fetch jre automatically!", e);
+            }
             throw new MojoExecutionException("useJDK = BREE configured, but no toolchain of type 'jdk' with id '"
                     + toolchainId + "' found. See https://maven.apache.org/guides/mini/guide-using-toolchains.html");
         }
         compilerConfiguration.addCompilerCustomArgument("use.java.home", toolChain.getJavaHome());
         configureBootClassPath(compilerConfiguration, toolChain);
+    }
+
+    private Repository getJreRepository() {
+        if (jreRepository == null) {
+            Repository repository = new Repository();
+            repository.setName("JustJ");
+            repository.setUrl("https://download.eclipse.org/justj/jres/");
+            return repository;
+        }
+        return jreRepository;
     }
 
     private void configureBootClassPath(CompilerConfiguration compilerConfiguration,
