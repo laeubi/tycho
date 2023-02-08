@@ -539,6 +539,7 @@
 		<module>tycho-apitools-plugin</module>
 		<module>tycho-targetplatform</module>
 		<module>tycho-bnd-plugin</module>
+		<module>tycho-adoptium</module>
 	</modules>
 	<profiles>
 		<profile>
