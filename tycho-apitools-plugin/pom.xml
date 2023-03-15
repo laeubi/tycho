@@ -19,6 +19,11 @@
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.eclipse.tycho</groupId>
+			<artifactId>tycho-core</artifactId>
+			<version>${project.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.maven</groupId>
 			<artifactId>maven-plugin-api</artifactId>
 		</dependency>
@@ -28,54 +33,131 @@
 		</dependency>
 		<!-- PDE -->
 		<dependency>
-		    <groupId>org.eclipse.pde</groupId>
-		    <artifactId>org.eclipse.pde.api.tools</artifactId>
-		    <version>1.2.1200</version>
-		    <type>jar</type>
-		    <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
+			<groupId>org.eclipse.pde</groupId>
+			<artifactId>org.eclipse.pde.api.tools</artifactId>
+			<version>1.2.1200</version>
+			<type>jar</type>
+			<exclusions>
+				<exclusion>
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
-		    <groupId>org.eclipse.pde</groupId>
-		    <artifactId>org.eclipse.pde.core</artifactId>
-		    <version>3.16.0</version>
-		    <type>jar</type>
-		    <exclusions>
-                <exclusion>
-                    <groupId>*</groupId>
-                    <artifactId>*</artifactId>
-                </exclusion>
-            </exclusions>
-		</dependency>
-       <dependency>
-		    <groupId>org.eclipse.platform</groupId>
-		    <artifactId>org.eclipse.equinox.common</artifactId>
-		    <version>3.17.100</version>
+			<groupId>org.eclipse.pde</groupId>
+			<artifactId>org.eclipse.pde.core</artifactId>
+			<version>3.16.0</version>
+			<type>jar</type>
+			<exclusions>
+				<exclusion>
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
-		    <groupId>org.eclipse.jdt</groupId>
-		    <artifactId>org.eclipse.jdt.core</artifactId>
-		    <version>3.33.0</version>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.equinox.common</artifactId>
+			<version>3.17.100</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jdt</groupId>
+			<artifactId>org.eclipse.jdt.core</artifactId>
+			<version>3.33.0</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jdt</groupId>
+			<artifactId>org.eclipse.jdt.launching</artifactId>
+			<version>3.19.800</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.core.filebuffers</artifactId>
+			<version>3.7.200</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.equinox.frameworkadmin</artifactId>
+			<version>2.2.100</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.pde</groupId>
+			<artifactId>org.eclipse.pde.build</artifactId>
+			<version>3.11.400</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.equinox.p2.core</artifactId>
+			<version>2.9.200</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jdt</groupId>
+			<artifactId>ecj</artifactId>
+		</dependency>
+		<!-- E4 ...-->
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.e4.core.contexts</artifactId>
+			<version>1.11.0</version>
+			<exclusions>
+				<exclusion>
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.e4.core.services</artifactId>
+			<version>2.3.400</version>
+			<exclusions>
+				<exclusion>
+					<groupId>*</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.platform</groupId>
+			<artifactId>org.eclipse.team.core</artifactId>
+			<version>3.9.600</version>
 		</dependency>
 		<!-- libs -->
 		<dependency>
-		  <groupId>org.ow2.asm</groupId>
-		  <artifactId>asm</artifactId>
-		  <version>${asm.version}</version>
+			<groupId>org.osgi</groupId>
+			<artifactId>org.osgi.service.event</artifactId>
+			<version>1.4.1</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.ow2.asm</groupId>
-		  <artifactId>asm-tree</artifactId>
-		  <version>${asm.version}</version>
+			<groupId>org.glassfish.hk2.external</groupId>
+			<artifactId>javax.inject</artifactId>
+			<version>1.6.36</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.ow2.asm</groupId>
-		  <artifactId>asm-util</artifactId>
-		  <version>${asm.version}</version>
+			<groupId>com.ibm.icu</groupId>
+			<artifactId>icu4j</artifactId>
+			<version>72.1</version>
+		</dependency>
+		<dependency>
+			<groupId>javax.annotation</groupId>
+			<artifactId>javax.annotation-api</artifactId>
+			<version>1.3.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm</artifactId>
+			<version>${asm.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-tree</artifactId>
+			<version>${asm.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-util</artifactId>
+			<version>${asm.version}</version>
 		</dependency>
 	</dependencies>
 	<build>

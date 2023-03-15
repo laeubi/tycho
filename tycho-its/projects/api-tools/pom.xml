@@ -11,7 +11,7 @@
 		<module>bundle</module>
 	</modules>
 	<properties>
-		<tycho-version>3.0.0-SNAPSHOT</tycho-version>
+		<tycho-version>4.0.0-SNAPSHOT</tycho-version>
 		<target-platform>https://download.eclipse.org/releases/2022-06/</target-platform>
 	</properties>
 	<repositories>
@@ -35,7 +35,9 @@
 				<version>${tycho-version}</version>
 				<configuration>
 					<baselines>
-						<base>file:///C:/dev/git/org.eclipse.tycho/tycho-its/repositories/api-tools</base>
+						<repository>
+							<url>file:/home/christoph/git/laeubi/tycho/tycho-its/projects/api-tools/api-repo/target/repository</url>
+						</repository>
 					</baselines>
 				</configuration>
 				<executions>
@@ -48,7 +50,7 @@
 					<execution>
 						<id>analyse</id>
 						<goals>
-							<goal>analyse</goal>
+							<goal>verify</goal>
 						</goals>
 					</execution>
 				</executions>
