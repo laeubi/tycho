@@ -147,7 +147,8 @@ public class PluginRealmHelper {
                         }
                     }
                 } else {
-                    Map<String, T> map = plexus.lookupMap(type);
+                    Map<String, T> map = (Map<String, T>) plexus.lookupMap(type.getName());
+                    List<?> lookupList = plexus.lookupList(type.getName());
                     T component = map.get(hint);
                     if (component != null && visited.add(component.getClass().getName())) {
                         return consumer.test(component);

@@ -75,6 +75,9 @@ public class PackageRepositoryMojo extends AbstractMojo {
 	public void execute() throws MojoExecutionException, MojoFailureException {
 		CompletableFuture<File> repository = new CompletableFuture<File>();
 		try {
+			pluginRealmHelper.visitPluginExtensions(project, session, RepositoryGenerator.class, x -> {
+				System.out.println(x);
+			});
 			pluginRealmHelper.visitExtensions(project, session, RepositoryGenerator.class, repositoryType,
 					generator -> {
 						List<MavenProject> projects = session.getProjects().stream().filter(generator::isInteresting)

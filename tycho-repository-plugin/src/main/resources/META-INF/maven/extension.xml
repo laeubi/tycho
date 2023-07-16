@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<extension>
+	<exportedPackages>
+		<exportedPackage>org.eclipse.tycho.packaging</exportedPackage>
+	</exportedPackages>
+
+	<exportedArtifacts>
+		<exportedArtifact>org.eclipse.tycho:tycho-spi</exportedArtifact>
+	</exportedArtifacts>
+</extension>
