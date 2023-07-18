@@ -15,6 +15,8 @@ package org.eclipse.tycho.repository.plugin;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
@@ -33,6 +35,11 @@ import org.codehaus.plexus.archiver.Archiver;
 import org.codehaus.plexus.archiver.zip.ZipArchiver;
 import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.MavenArtifactNamespace;
+import org.eclipse.tycho.MavenRepositoryLocation;
+import org.eclipse.tycho.osgi.framework.EclipseApplication;
+import org.eclipse.tycho.osgi.framework.EclipseFramework;
+import org.eclipse.tycho.osgi.framework.EclipseWorkspaceManager;
+import org.eclipse.tycho.p2.P2ApplicationResolver;
 
 import aQute.bnd.osgi.repository.XMLResourceGenerator;
 import aQute.bnd.osgi.resource.CapReqBuilder;
@@ -85,8 +92,34 @@ public class PackageRepositoryMojo extends AbstractMojo {
 	@Component(role = Archiver.class, hint = "zip")
 	private ZipArchiver zipArchiver;
 
+	@Component
+	private P2ApplicationResolver p2resolve;
+
+	@Component
+	private EclipseWorkspaceManager workspaceManager;
+
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException {
+
+		URI updatesiteUri = URI.create("https://download.eclipse.org/releases/2023-09/");
+		EclipseApplication p2Application = p2resolve.getP2Application(
+				new MavenRepositoryLocation("eclipse", updatesiteUri));
+		try (EclipseFramework framework = p2Application
+				.startFramework(workspaceManager.getWorkspace(updatesiteUri, this),
+				List.of())) {
+			List<File> files = new ArrayList<File>();
+			for (MavenProject project : session.getProjects()) {
+				if (isInteresting(project)) {
+					files.add(project.getArtifact().getFile());
+				}
+			}
+			framework.execute(new P2Runner(files));
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
+
+		// ###############
+
 		XMLResourceGenerator resourceGenerator = new XMLResourceGenerator();
 		resourceGenerator.name(repositoryName);
 		File folder;
@@ -159,5 +192,6 @@ public class PackageRepositoryMojo extends AbstractMojo {
 				|| ArtifactType.TYPE_BUNDLE_FRAGMENT.equals(packaging)
 				|| ArtifactType.TYPE_ECLIPSE_TEST_PLUGIN.equals(packaging);
 	}
+
 
 }
