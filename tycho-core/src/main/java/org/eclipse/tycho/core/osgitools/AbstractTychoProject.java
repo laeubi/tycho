@@ -69,6 +69,11 @@ public abstract class AbstractTychoProject extends AbstractLogEnabled implements
     }
 
     @Override
+    public DependencyArtifacts getTestDependencyArtifacts(ReactorProject project) {
+        return (DependencyArtifacts) project.getContextValue(TychoConstants.CTX_TEST_DEPENDENCY_ARTIFACTS);
+    }
+
+    @Override
     public DependencyArtifacts getDependencyArtifacts(ReactorProject project, TargetEnvironment environment) {
         DependencyArtifacts platform = getDependencyArtifacts(project);
 
