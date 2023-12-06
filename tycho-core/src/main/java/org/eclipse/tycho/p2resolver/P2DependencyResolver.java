@@ -48,6 +48,8 @@ import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationExce
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.metadata.IRequirement;
+import org.eclipse.equinox.p2.repository.artifact.IArtifactRepository;
+import org.eclipse.equinox.p2.repository.metadata.IMetadataRepository;
 import org.eclipse.tycho.ArtifactDescriptor;
 import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.BuildFailureException;
@@ -55,6 +57,7 @@ import org.eclipse.tycho.BuildProperties;
 import org.eclipse.tycho.BuildPropertiesParser;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.DependencyArtifacts;
+import org.eclipse.tycho.DependencyResolutionException;
 import org.eclipse.tycho.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.IDependencyMetadata;
 import org.eclipse.tycho.IDependencyMetadata.DependencyMetadataType;
@@ -62,6 +65,7 @@ import org.eclipse.tycho.IllegalArtifactReferenceException;
 import org.eclipse.tycho.MavenDependencyDescriptor;
 import org.eclipse.tycho.MavenRepositoryLocation;
 import org.eclipse.tycho.OptionalResolutionAction;
+import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.TargetPlatform;
@@ -83,18 +87,23 @@ import org.eclipse.tycho.core.resolver.AdditionalBundleRequirementsInstallableUn
 import org.eclipse.tycho.core.resolver.P2ResolutionResult;
 import org.eclipse.tycho.core.resolver.P2Resolver;
 import org.eclipse.tycho.core.resolver.P2ResolverFactory;
+import org.eclipse.tycho.core.resolver.shared.IncludeSourceMode;
 import org.eclipse.tycho.core.resolver.shared.PomDependencies;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.helper.PluginRealmHelper;
 import org.eclipse.tycho.p2.metadata.DependencyMetadataGenerator;
 import org.eclipse.tycho.p2.metadata.PublisherOptions;
+import org.eclipse.tycho.p2.repository.ImmutableInMemoryMetadataRepository;
 import org.eclipse.tycho.p2.repository.LocalRepositoryP2Indices;
 import org.eclipse.tycho.p2.target.facade.PomDependencyCollector;
 import org.eclipse.tycho.p2.target.facade.TargetPlatformConfigurationStub;
 import org.eclipse.tycho.p2maven.repository.P2ArtifactRepositoryLayout;
 import org.eclipse.tycho.repository.registry.facade.ReactorRepositoryManager;
 import org.eclipse.tycho.resolver.P2MetadataProvider;
+import org.eclipse.tycho.targetplatform.P2TargetPlatform;
 import org.eclipse.tycho.targetplatform.TargetDefinitionFile;
+import org.eclipse.tycho.targetplatform.TargetPlatformArtifactResolver;
+import org.eclipse.tycho.targetplatform.TargetResolveException;
 
 @Component(role = DependencyResolver.class, hint = P2DependencyResolver.ROLE_HINT, instantiationStrategy = "per-lookup")
 public class P2DependencyResolver extends AbstractLogEnabled implements DependencyResolver, Initializable {
@@ -143,22 +152,80 @@ public class P2DependencyResolver extends AbstractLogEnabled implements Dependen
     @Override
     public void setupProjects(final MavenSession session, final MavenProject project,
             final ReactorProject reactorProject) {
-        TargetPlatformConfiguration configuration = projectManager.getTargetPlatformConfiguration(project);
-        List<TargetEnvironment> environments = configuration.getEnvironments();
-        Collection<IDependencyMetadata> metadataMap = getDependencyMetadata(session, project, environments,
-                OptionalResolutionAction.OPTIONAL);
-        Map<DependencyMetadataType, Set<IInstallableUnit>> typeMap = new TreeMap<>();
-        for (DependencyMetadataType type : DependencyMetadataType.values()) {
-            typeMap.put(type, new LinkedHashSet<>());
-        }
-        for (IDependencyMetadata metadata : metadataMap) {
-            typeMap.forEach((key, value) -> value.addAll(metadata.getDependencyMetadata(key)));
-        }
         Set<IInstallableUnit> initial = new HashSet<>();
-        typeMap.forEach((key, value) -> {
-            reactorProject.setDependencyMetadata(key, value);
-            initial.addAll(value);
-        });
+        TargetPlatformConfiguration configuration = projectManager.getTargetPlatformConfiguration(project);
+        if (PackagingType.TYPE_ECLIPSE_TARGET_DEFINITION.equals(reactorProject.getPackaging())) {
+            //TODO make this configurable!
+            TargetDefinitionFile file;
+            try {
+                file = TargetDefinitionFile.read(TargetPlatformArtifactResolver.getMainTargetFile(project));
+            } catch (TargetResolveException e) {
+                //This will give an error in the usual build so we don't have to be too concerned here and can simply do nothing...
+                return;
+            }
+            TargetPlatformConfigurationStub tpConfiguration = new TargetPlatformConfigurationStub();
+            tpConfiguration.addTargetDefinition(file);
+            tpConfiguration.addFilters(configuration.getFilters());
+            tpConfiguration.setIncludeSourceMode(IncludeSourceMode.ignore);
+            tpConfiguration.setIgnoreLocalArtifacts(true);
+            tpConfiguration.setReferencedRepositoryMode(configuration.getReferencedRepositoryMode());
+            ExecutionEnvironmentConfiguration ee = projectManager.getExecutionEnvironmentConfiguration(project);
+            TargetPlatform targetPlatform = reactorRepositoryManager.computePreliminaryTargetPlatform(
+                    DefaultReactorProject.adapt(project), tpConfiguration, ee, List.of());
+            IMetadataRepository repository;
+            if (targetPlatform instanceof P2TargetPlatform p2platform) {
+                Set<IInstallableUnit> units = p2platform.getInstallableUnits();
+                reactorProject.setDependencyMetadata(DependencyMetadataType.INITIAL, units);
+                repository = new ImmutableInMemoryMetadataRepository(units);
+            } else {
+                repository = new ImmutableInMemoryMetadataRepository(Set.of());
+            }
+            project.setContextValue(TargetPlatform.FINAL_TARGET_PLATFORM_KEY, new TargetPlatform() {
+
+                @Override
+                public ArtifactKey resolveArtifact(String type, String id, String versionRef)
+                        throws IllegalArtifactReferenceException, DependencyResolutionException {
+                    return targetPlatform.resolveArtifact(type, id, versionRef);
+                }
+
+                @Override
+                public boolean isFileAlreadyAvailable(ArtifactKey artifactKey) {
+                    return targetPlatform.isFileAlreadyAvailable(artifactKey);
+                }
+
+                @Override
+                public IMetadataRepository getMetadataRepository() {
+                    return repository;
+                }
+
+                @Override
+                public IArtifactRepository getArtifactRepository() {
+                    return targetPlatform.getArtifactRepository();
+                }
+
+                @Override
+                public File getArtifactLocation(ArtifactKey artifact) {
+                    return targetPlatform.getArtifactLocation(artifact);
+                }
+            });
+            return;
+        } else {
+            List<TargetEnvironment> environments = configuration.getEnvironments();
+            Collection<IDependencyMetadata> metadataMap = getDependencyMetadata(session, project, environments,
+                    OptionalResolutionAction.OPTIONAL);
+            Map<DependencyMetadataType, Set<IInstallableUnit>> typeMap = new TreeMap<>();
+            for (DependencyMetadataType type : DependencyMetadataType.values()) {
+                typeMap.put(type, new LinkedHashSet<>());
+            }
+            for (IDependencyMetadata metadata : metadataMap) {
+                typeMap.forEach((key, value) -> value.addAll(metadata.getDependencyMetadata(key)));
+            }
+            typeMap.forEach((key, value) -> {
+                reactorProject.setDependencyMetadata(key, value);
+                initial.addAll(value);
+            });
+        }
+        //TODO this should better be computed when the getter is called maybe via TychoProjectManager instead of getter on Reactor project...
         reactorProject.setDependencyMetadata(DependencyMetadataType.INITIAL, initial);
     }
 
