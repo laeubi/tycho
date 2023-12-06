@@ -29,6 +29,7 @@ import org.eclipse.equinox.p2.metadata.IRequirement;
 import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.DependencyArtifacts;
 import org.eclipse.tycho.OptionalResolutionAction;
+import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.TargetPlatform;
 import org.eclipse.tycho.core.BundleProject;
@@ -71,6 +72,9 @@ public class DefaultTychoResolver implements TychoResolver {
                 reactorProject.setContextValue(SETUP_MARKER, true);
                 //FIXME this should actually happen lazy on first access so we do not require more here than bootstrap the project with a session above 
                 dr.setupProject(session, project);
+                if (PackagingType.TYPE_ECLIPSE_TARGET_DEFINITION.equals(reactorProject.getPackaging())) {
+                    return;
+                }
                 dependencyResolver.setupProjects(session, project, reactorProject);
             }
         }

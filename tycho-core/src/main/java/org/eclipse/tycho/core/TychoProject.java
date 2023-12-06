@@ -40,6 +40,8 @@ public interface TychoProject {
      */
     public DependencyArtifacts getDependencyArtifacts(ReactorProject project);
 
+    public DependencyArtifacts getTestDependencyArtifacts(ReactorProject project);
+
     /**
      * Returns resolved project dependencies resolved for specified runtime environment.
      */
