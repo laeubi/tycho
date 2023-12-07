@@ -41,6 +41,7 @@ import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
+import org.eclipse.equinox.p2.metadata.IRequirement;
 import org.eclipse.osgi.container.namespaces.EclipsePlatformNamespace;
 import org.eclipse.osgi.internal.framework.FilterImpl;
 import org.eclipse.tycho.ArtifactDescriptor;
@@ -52,15 +53,18 @@ import org.eclipse.tycho.ClasspathEntry.AccessRule;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.DependencyArtifacts;
 import org.eclipse.tycho.ExecutionEnvironmentConfiguration;
+import org.eclipse.tycho.OptionalResolutionAction;
 import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.PlatformPropertiesUtils;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.ResolvedArtifactKey;
 import org.eclipse.tycho.TargetEnvironment;
+import org.eclipse.tycho.TargetPlatform;
 import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.ArtifactDependencyVisitor;
 import org.eclipse.tycho.core.ArtifactDependencyWalker;
 import org.eclipse.tycho.core.BundleProject;
+import org.eclipse.tycho.core.DependencyResolverConfiguration;
 import org.eclipse.tycho.core.PluginDescription;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
 import org.eclipse.tycho.core.TychoProject;
@@ -72,7 +76,6 @@ import org.eclipse.tycho.core.osgitools.project.BuildOutputJar;
 import org.eclipse.tycho.core.osgitools.project.EclipsePluginProject;
 import org.eclipse.tycho.core.osgitools.project.EclipsePluginProjectImpl;
 import org.eclipse.tycho.core.resolver.P2ResolverFactory;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.model.Feature;
 import org.eclipse.tycho.model.ProductConfiguration;
 import org.eclipse.tycho.model.UpdateSite;
@@ -677,8 +680,41 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
         }
     }
 
+    @Override
     public DependencyArtifacts getTestDependencyArtifacts(ReactorProject project) {
-        return TychoProjectUtils.getTestDependencyArtifacts(project);
+        return project.computeContextValue(TychoConstants.CTX_TEST_DEPENDENCY_ARTIFACTS, () -> {
+            List<ArtifactKey> testDependencies = getExtraTestRequirements(project);
+            if (testDependencies.isEmpty()) {
+                return null;
+            }
+            TargetPlatformConfiguration configuration = projectManager.getTargetPlatformConfiguration(project);
+            DependencyResolverConfiguration delegate = configuration.getDependencyResolverConfiguration();
+            DependencyResolverConfiguration testResolverConfiguration = new DependencyResolverConfiguration() {
+                @Override
+                public OptionalResolutionAction getOptionalResolutionAction() {
+                    return delegate.getOptionalResolutionAction();
+                }
+
+                @Override
+                public List<ArtifactKey> getAdditionalArtifacts() {
+                    ArrayList<ArtifactKey> res = new ArrayList<>(delegate.getAdditionalArtifacts());
+                    res.addAll(testDependencies);
+                    return res;
+                }
+
+                @Override
+                public Collection<IRequirement> getAdditionalRequirements() {
+                    return delegate.getAdditionalRequirements();
+                }
+            };
+            MavenSession mavenSession = getMavenSession(project);
+            MavenProject mavenProject = getMavenProject(project);
+            List<ReactorProject> reactorProjects = DefaultReactorProject.adapt(mavenSession);
+            TargetPlatform preliminaryTargetPlatform = dependencyResolver.computePreliminaryTargetPlatform(mavenSession,
+                    mavenProject, reactorProjects);
+            return dependencyResolver.resolveDependencies(mavenSession, mavenProject, preliminaryTargetPlatform,
+                    reactorProjects, testResolverConfiguration, configuration.getEnvironments());
+        });
     }
 
     @Override

@@ -15,31 +15,17 @@ package org.eclipse.tycho.repository.registry.facade;
 
 import java.util.List;
 
-import org.eclipse.tycho.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.ReactorProjectIdentities;
 import org.eclipse.tycho.TargetPlatform;
 import org.eclipse.tycho.p2.repository.PublishingRepository;
 import org.eclipse.tycho.p2.target.facade.PomDependencyCollector;
-import org.eclipse.tycho.p2.target.facade.TargetPlatformConfigurationStub;
 
 /**
  * Manages the p2 repositories for the projects' build results ("publishing repository") and the p2
  * repositories with the projects' context artifacts ("target platform").
  */
 public interface ReactorRepositoryManager {
-
-    /**
-     * Computes the target platform with dependency-only p2 metadata and attaches it to the given
-     * project.
-     * 
-     * @param project
-     *            the reactor project to compute the target platform for.
-     * @param resolvedEnvironment
-     */
-    TargetPlatform computePreliminaryTargetPlatform(ReactorProject project,
-            TargetPlatformConfigurationStub tpConfiguration, ExecutionEnvironmentConfiguration eeConfiguration,
-            List<ReactorProject> reactorProjects);
 
     /**
      * Computes the (immutable) target platform with final p2 metadata and attaches it to the given

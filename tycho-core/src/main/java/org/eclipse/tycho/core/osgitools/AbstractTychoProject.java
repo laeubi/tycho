@@ -29,6 +29,7 @@ import org.apache.maven.plugin.LegacySupport;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.AbstractLogEnabled;
+import org.codehaus.plexus.logging.Logger;
 import org.eclipse.aether.collection.DependencyCollectionException;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 import org.eclipse.tycho.DependencyArtifacts;
@@ -36,14 +37,16 @@ import org.eclipse.tycho.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.IArtifactFacade;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.TargetEnvironment;
+import org.eclipse.tycho.TargetPlatform;
 import org.eclipse.tycho.TychoConstants;
+import org.eclipse.tycho.core.DependencyResolver;
+import org.eclipse.tycho.core.DependencyResolverConfiguration;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.TychoProjectManager;
 import org.eclipse.tycho.core.maven.MavenArtifactFacade;
 import org.eclipse.tycho.core.maven.MavenDependenciesResolver;
 import org.eclipse.tycho.core.osgitools.targetplatform.MultiEnvironmentDependencyArtifacts;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.p2resolver.PomReactorProjectFacade;
 import org.eclipse.tycho.targetplatform.TargetDefinition;
 import org.osgi.framework.Filter;
@@ -56,16 +59,43 @@ public abstract class AbstractTychoProject extends AbstractLogEnabled implements
     private static final String CTX_INITIAL_MAVEN_DEPENDENCIES = CTX_OSGI_BUNDLE_BASENAME + "/initialDependencies";
 
     @Requirement
-    MavenDependenciesResolver projectDependenciesResolver;
-    @Requirement
-    LegacySupport legacySupport;
+    protected MavenDependenciesResolver projectDependenciesResolver;
 
     @Requirement
-    TychoProjectManager projectManager;
+    protected TychoProjectManager projectManager;
+
+    @Requirement(hint = "p2")
+    protected DependencyResolver dependencyResolver;
+
+    @Requirement
+    protected Logger logger;
+
+    @Requirement
+    protected LegacySupport legacySupport;
 
     @Override
-    public DependencyArtifacts getDependencyArtifacts(ReactorProject project) {
-        return TychoProjectUtils.getDependencyArtifacts(project);
+    public synchronized DependencyArtifacts getDependencyArtifacts(ReactorProject project) {
+        return project.computeContextValue(TychoConstants.CTX_DEPENDENCY_ARTIFACTS, () -> {
+            MavenSession mavenSession = getMavenSession(project);
+            MavenProject mavenProject = project.adapt(MavenProject.class);
+            List<ReactorProject> reactorProjects = DefaultReactorProject.adapt(mavenSession);
+            TargetPlatformConfiguration configuration = projectManager.getTargetPlatformConfiguration(project);
+            TargetPlatform preliminaryTargetPlatform = dependencyResolver.computePreliminaryTargetPlatform(mavenSession,
+                    mavenProject, reactorProjects);
+            DependencyResolverConfiguration resolverConfiguration = configuration.getDependencyResolverConfiguration();
+            DependencyArtifacts resolvedDependencies = dependencyResolver.resolveDependencies(mavenSession,
+                    mavenProject, preliminaryTargetPlatform, reactorProjects, resolverConfiguration,
+                    configuration.getEnvironments());
+            if (logger.isDebugEnabled() && DebugUtils.isDebugEnabled(mavenSession, mavenProject)) {
+                String threadMarker;
+                threadMarker = "[" + Thread.currentThread().getName().replaceAll("^ForkJoinPool-(\\d+)-", "") + "] ";
+                StringBuilder sb = new StringBuilder(threadMarker);
+                sb.append("Resolved target platform for ").append(project).append("\n");
+                resolvedDependencies.toDebugString(sb, "  ");
+                logger.debug(sb.toString());
+            }
+            return resolvedDependencies;
+        });
     }
 
     @Override
@@ -86,11 +116,6 @@ public abstract class AbstractTychoProject extends AbstractLogEnabled implements
         }
 
         return platform;
-    }
-
-    public void setDependencyArtifacts(MavenSession session, ReactorProject project,
-            DependencyArtifacts dependencyArtifacts) {
-        project.setContextValue(TychoConstants.CTX_DEPENDENCY_ARTIFACTS, dependencyArtifacts);
     }
 
     public void setTestDependencyArtifacts(MavenSession session, ReactorProject project,

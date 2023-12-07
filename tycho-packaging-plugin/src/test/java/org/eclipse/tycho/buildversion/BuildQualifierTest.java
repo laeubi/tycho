@@ -33,9 +33,9 @@ import org.codehaus.plexus.component.configurator.ComponentConfigurationExceptio
 import org.eclipse.tycho.ArtifactDescriptor;
 import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
 import org.eclipse.tycho.core.osgitools.targetplatform.DefaultDependencyArtifacts;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.testing.AbstractTychoMojoTestCase;
 import org.eclipse.tycho.version.TychoVersion;
 
@@ -192,8 +192,8 @@ public class BuildQualifierTest extends AbstractTychoMojoTestCase {
         MavenProject project = getProject(projects, "attachedfeature");
         ReactorProject reactorProject = DefaultReactorProject.adapt(project);
 
-        DefaultDependencyArtifacts dependencyArtifacts = (DefaultDependencyArtifacts) TychoProjectUtils
-                .getDependencyArtifacts(reactorProject);
+		DefaultDependencyArtifacts dependencyArtifacts = (DefaultDependencyArtifacts) reactorProject
+				.getContextValue(TychoConstants.CTX_DEPENDENCY_ARTIFACTS);
 
 		// replace target platform dependencies with fake attached feature and bundle
 		// artifacts

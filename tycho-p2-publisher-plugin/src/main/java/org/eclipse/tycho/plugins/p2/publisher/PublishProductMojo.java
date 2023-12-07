@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.HexFormat;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -52,10 +53,10 @@ import org.eclipse.tycho.PlatformPropertiesUtils;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
+import org.eclipse.tycho.core.TychoProjectManager;
 import org.eclipse.tycho.core.maven.TychoInterpolator;
 import org.eclipse.tycho.core.osgitools.EclipseRepositoryProject;
 import org.eclipse.tycho.core.resolver.shared.DependencySeed;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.model.ProductConfiguration;
 import org.eclipse.tycho.p2.repository.PublishingRepository;
 import org.eclipse.tycho.p2.repository.module.ModuleArtifactRepository;
@@ -94,6 +95,9 @@ public final class PublishProductMojo extends AbstractPublishMojo {
 
     @Component
     private ReactorRepositoryManager reactorRepoManager;
+
+    @Component
+    private TychoProjectManager projectManager;
 
     /**
      * The directory where <code>.product</code> files are located.
@@ -193,10 +197,7 @@ public final class PublishProductMojo extends AbstractPublishMojo {
     }
 
     private File getExpandedLauncherBinaries() throws MojoExecutionException, MojoFailureException {
-        // TODO 364134 take the executable feature from the target platform instead
-        DependencyArtifacts dependencyArtifacts = TychoProjectUtils.getDependencyArtifacts(getReactorProject());
-        ArtifactDescriptor artifact = dependencyArtifacts.getArtifact(ArtifactType.TYPE_ECLIPSE_FEATURE,
-                "org.eclipse.equinox.executable", null);
+        ArtifactDescriptor artifact = getLauncherArtifact();
 
         if (artifact == null) {
             throw new MojoExecutionException(
@@ -225,6 +226,18 @@ public final class PublishProductMojo extends AbstractPublishMojo {
                 throw new MojoFailureException("Unable to unzip the equinox executable feature", e);
             }
         }
+    }
+
+    private ArtifactDescriptor getLauncherArtifact() {
+        Optional<TychoProject> tychoProject = projectManager.getTychoProject(getProject());
+        if (tychoProject.isEmpty()) {
+            return null;
+        }
+        // TODO 364134 take the executable feature from the target platform instead
+        DependencyArtifacts dependencyArtifacts = tychoProject.get().getDependencyArtifacts(getReactorProject());
+        ArtifactDescriptor artifact = dependencyArtifacts.getArtifact(ArtifactType.TYPE_ECLIPSE_FEATURE,
+                "org.eclipse.equinox.executable", null);
+        return artifact;
     }
 
     private void checkMacOSLauncherCompatibility(ArtifactDescriptor executablesFeature) throws MojoExecutionException {
