@@ -76,11 +76,7 @@ public class DefaultTargetPlatformService implements TargetPlatformService {
 
     @Override
     public Optional<TargetPlatform> getTargetPlatform(ReactorProject project) throws DependencyResolutionException {
-        synchronized (project) {
-            Object contextValue = project.getContextValue(TargetPlatform.FINAL_TARGET_PLATFORM_KEY);
-            if (contextValue instanceof TargetPlatform) {
-                return Optional.of((TargetPlatform) contextValue);
-            }
+        return project.computeContextValue(TargetPlatform.FINAL_TARGET_PLATFORM_KEY, () -> {
             MavenSession session = legacySupport.getSession();
             if (repositoryManager == null || session == null) {
                 return Optional.empty();
@@ -91,7 +87,7 @@ public class DefaultTargetPlatformService implements TargetPlatformService {
             TargetPlatform finalTargetPlatform = computeFinalTargetPlatform(project, upstreamProjects,
                     pomDependenciesCollector);
             return Optional.ofNullable(finalTargetPlatform);
-        }
+        });
     }
 
     /**

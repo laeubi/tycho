@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -83,7 +84,6 @@ import org.eclipse.tycho.core.resolver.P2ResolutionResult;
 import org.eclipse.tycho.core.resolver.P2Resolver;
 import org.eclipse.tycho.core.resolver.P2ResolverFactory;
 import org.eclipse.tycho.core.resolver.shared.PomDependencies;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.helper.PluginRealmHelper;
 import org.eclipse.tycho.p2.metadata.DependencyMetadataGenerator;
 import org.eclipse.tycho.p2.metadata.PublisherOptions;
@@ -306,17 +306,9 @@ public class P2DependencyResolver implements DependencyResolver, Initializable {
     public DependencyArtifacts resolveDependencies(final MavenSession session, final MavenProject project,
             TargetPlatform targetPlatform, List<ReactorProject> reactorProjects,
             DependencyResolverConfiguration resolverConfiguration, List<TargetEnvironment> environments) {
-        ReactorProject reactorProject = DefaultReactorProject.adapt(project);
-        if (targetPlatform == null) {
-            targetPlatform = TychoProjectUtils.getTargetPlatform(reactorProject);
-        }
-
-        // TODO 364134 For compatibility reasons, target-platform-configuration includes settings for the dependency resolution
-        // --> split this information logically, e.g. through two distinct interfaces
+        Objects.requireNonNull(targetPlatform);
         TargetPlatformConfiguration configuration = projectManager.getTargetPlatformConfiguration(project);
-
         P2Resolver osgiResolverImpl = resolverFactory.createResolver(environments);
-
         return doResolveDependencies(session, project, reactorProjects, resolverConfiguration, targetPlatform,
                 osgiResolverImpl, configuration);
     }

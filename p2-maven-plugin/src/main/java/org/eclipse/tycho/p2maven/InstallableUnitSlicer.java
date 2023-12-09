@@ -93,6 +93,7 @@ public class InstallableUnitSlicer {
 		}).toList();
 		for (IInstallableUnit iu : avaiableIUs.query(QueryUtil.ALL_UNITS, new NullProgressMonitor()).toSet()) {
 			for (IRequirement requirement : collect) {
+//				requirement.getFilter().isMatch(null, iu);
 				if (iu.satisfies(requirement)) {
 					result.add(iu);
 					// TODO remove the requirement from the set so we only collect exactly one

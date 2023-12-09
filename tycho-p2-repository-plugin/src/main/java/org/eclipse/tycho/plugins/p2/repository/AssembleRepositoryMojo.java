@@ -28,6 +28,7 @@ import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.MatchPattern;
 import org.eclipse.tycho.FileLockService;
@@ -35,6 +36,7 @@ import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.TychoProject;
+import org.eclipse.tycho.core.TychoProjectManager;
 import org.eclipse.tycho.core.osgitools.EclipseRepositoryProject;
 import org.eclipse.tycho.core.resolver.shared.DependencySeed;
 import org.eclipse.tycho.core.utils.TychoProjectUtils;
@@ -317,6 +319,9 @@ public class AssembleRepositoryMojo extends AbstractRepositoryMojo {
     @Component
     private FileLockService fileLockService;
 
+    @Component
+    private TychoProjectManager projectManager;
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         File destination = getAssemblyRepositoryLocation();
@@ -332,9 +337,11 @@ public class AssembleRepositoryMojo extends AbstractRepositoryMojo {
             }
 
             reactorProject.setContextValue(TychoConstants.CTX_METADATA_ARTIFACT_LOCATION, categoriesDirectory);
-            RepositoryReferences sources = repositoryReferenceTool.getVisibleRepositories(getProject(), getSession(),
+            MavenProject project = getProject();
+            RepositoryReferences sources = repositoryReferenceTool.getVisibleRepositories(project, getSession(),
                     RepositoryReferenceTool.REPOSITORIES_INCLUDE_CURRENT_MODULE);
-            sources.setTargetPlatform(TychoProjectUtils.getTargetPlatform(getReactorProject()));
+            sources.setTargetPlatform(projectManager.getTargetPlatform(project)
+                    .orElseThrow(() -> new MojoFailureException(TychoConstants.TYCHO_NOT_CONFIGURED + project)));
 
             List<RepositoryReference> repositoryReferences = getCategories(categoriesDirectory).stream()//
                     .map(Category::getRepositoryReferences)//
@@ -344,14 +351,14 @@ public class AssembleRepositoryMojo extends AbstractRepositoryMojo {
             Predicate<String> autoReferencesFilter = buildRepositoryReferenceLocationFilter();
             List<RepositoryReference> autoRepositoryRefeferences = new ArrayList<>();
             if (addPomRepositoryReferences) {
-                getProject().getRepositories().stream() //
+                project.getRepositories().stream() //
                         .filter(pomRepo -> "p2".equals(pomRepo.getLayout()))
                         .filter(pomRepo -> autoReferencesFilter.test(pomRepo.getUrl()))
                         .map(pomRepo -> new RepositoryReference(pomRepo.getName(), pomRepo.getUrl(), true))
                         .forEach(autoRepositoryRefeferences::add);
             }
             if (addIUTargetRepositoryReferences) {
-                projectManager.getTargetPlatformConfiguration(getProject()).getTargets().stream()
+                projectManager.getTargetPlatformConfiguration(project).getTargets().stream()
                         .flatMap(tpFile -> tpFile.getLocations().stream())
                         .filter(InstallableUnitLocation.class::isInstance).map(InstallableUnitLocation.class::cast)
                         .flatMap(iu -> iu.getRepositories().stream())
