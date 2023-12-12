@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.jar.Attributes;
@@ -44,6 +45,8 @@ import org.apache.maven.project.MavenProject;
 import org.apache.maven.surefire.api.testset.TestListResolver;
 import org.apache.maven.surefire.api.util.DefaultScanResult;
 import org.apache.maven.surefire.api.util.ScanResult;
+import org.apache.maven.surefire.api.util.ScannerFilter;
+import org.apache.maven.surefire.api.util.TestsToRun;
 import org.eclipse.equinox.p2.metadata.IRequirement;
 import org.eclipse.equinox.p2.metadata.MetadataFactory;
 import org.eclipse.equinox.p2.metadata.VersionRange;
@@ -243,8 +246,14 @@ public abstract class AbstractTestMojo extends AbstractMojo {
         List<String> defaultExcludes = getDefaultExclude();
         List<String> includeList;
         List<String> excludeList;
+        String hash = null;
         if (test != null) {
             String test = this.test;
+            int index = test.lastIndexOf('#');
+            if (index > -1) {
+                hash = test.substring(index + 1);
+                test = test.substring(0, index);
+            }
             test = test.replace('.', '/');
             test = test.endsWith(".class") ? test : test + ".class";
             test = test.startsWith("**/") ? test : "**/" + test;
@@ -276,6 +285,9 @@ public abstract class AbstractTestMojo extends AbstractMojo {
         if (classes.isEmpty()) {
             getLog().debug("Nothing matches pattern " + includeList + ", excluding " + excludeList + " in "
                     + getTestClassesDirectory());
+        }
+        if (hash != null) {
+            return new TestScanResult(scanResult, hash);
         }
         return scanResult;
     }
@@ -464,5 +476,46 @@ public abstract class AbstractTestMojo extends AbstractMojo {
     protected abstract File getReportsDirectory();
 
     protected abstract File getTestClassesDirectory();
+
+    protected static class TestScanResult implements ScanResult {
+
+        private ScanResult delegate;
+        private String requestedTest;
+
+        public TestScanResult(ScanResult delegate, String requestedTest) {
+            this.delegate = delegate;
+            this.requestedTest = requestedTest;
+        }
+
+        @Override
+        public int size() {
+            return delegate.size();
+        }
+
+        @Override
+        public String getClassName(int index) {
+            return delegate.getClassName(index);
+        }
+
+        @Override
+        public TestsToRun applyFilter(ScannerFilter scannerFilter, ClassLoader testClassLoader) {
+            return delegate.applyFilter(scannerFilter, testClassLoader);
+        }
+
+        @Override
+        public List<Class<?>> getClassesSkippedByValidation(ScannerFilter scannerFilter, ClassLoader testClassLoader) {
+            return delegate.getClassesSkippedByValidation(scannerFilter, testClassLoader);
+        }
+
+        @Override
+        public void writeTo(Map<String, String> properties) {
+            delegate.writeTo(properties);
+        }
+
+        public String getRequestedTest() {
+            return requestedTest;
+        }
+
+    }
 
 }

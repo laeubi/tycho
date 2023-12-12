@@ -121,16 +121,16 @@ public class OsgiSurefireBooter {
         DirectoryScannerParameters dirScannerParams = new DirectoryScannerParameters(testClassesDir,
                 Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), runOrder);
         ReporterConfiguration reporterConfig = new ReporterConfiguration(reportsDir, trimStackTrace);
-        TestRequest testRequest = new TestRequest(suiteXmlFiles, testClassesDir,
-                TestListResolver.getEmptyTestListResolver(), rerunFailingTestsCount);
+        TestRequest testRequest = new TestRequest(suiteXmlFiles, testClassesDir, getTestListResolver(testProps),
+                rerunFailingTestsCount);
         ProviderConfiguration providerConfiguration = new ProviderConfiguration(dirScannerParams,
                 new RunOrderParameters(runOrder, null), reporterConfig, null, testRequest,
                 extractProviderProperties(testProps), null, false, Collections.emptyList(), skipAfterFailureCount,
                 Shutdown.DEFAULT, 30);
         StartupReportConfiguration startupReportConfig = new StartupReportConfiguration(useFile, printSummary,
-                ConsoleReporter.PLAIN, redirectTestOutputToFile, reportsDir, trimStackTrace, null, new File(reportsDir, "TESTHASH"), false,
-                rerunFailingTestsCount, XSD, StandardCharsets.UTF_8.toString(), false,
-                getSurefireStatelessReporter(provider, disableXmlReport, null),
+                ConsoleReporter.PLAIN, redirectTestOutputToFile, reportsDir, trimStackTrace, null,
+                new File(reportsDir, "TESTHASH"), false, rerunFailingTestsCount, XSD, StandardCharsets.UTF_8.toString(),
+                false, getSurefireStatelessReporter(provider, disableXmlReport, null),
                 getSurefireConsoleOutputReporter(provider), getSurefireStatelessTestsetInfoReporter(provider));
         ReporterFactory reporterFactory = new DefaultReporterFactory(startupReportConfig,
                 new PrintStreamLogger(System.out));
@@ -145,6 +145,16 @@ public class OsgiSurefireBooter {
         }
         // counter-intuitive, but null indicates OK here
         return result.getFailsafeCode() == null ? 0 : result.getFailsafeCode();
+    }
+
+    private static TestListResolver getTestListResolver(Properties testProps) {
+        //Workaround for https://github.com/eclipse-tycho/tycho/issues/3247
+        Object requested = testProps.get(BooterConstants.REQUESTEDTEST);
+        if (requested instanceof String) {
+            String requestedTest = (String) requested;
+            return new TestListResolver(requestedTest);
+        }
+        return TestListResolver.getEmptyTestListResolver();
     }
 
     protected static void printBundleInfos(Properties testProps) {

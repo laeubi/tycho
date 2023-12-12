@@ -893,6 +893,12 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         for (Map.Entry<String, String> entry : providerPropertiesAsMap.entrySet()) {
             wrapper.setProperty("__provider." + entry.getKey(), entry.getValue().toString());
         }
+        if (scanResult instanceof TestScanResult testRequest) {
+            String requestedTest = testRequest.getRequestedTest();
+            if (requestedTest != null) {
+                wrapper.setProperty(BooterConstants.REQUESTEDTEST, requestedTest);
+            }
+        }
         wrapper.setProperty("testprovider", provider.getSurefireProviderClassName());
         getLog().debug("Using test framework provider: " + provider.getClass().getName());
         wrapper.addList(suiteXmlFiles, BooterConstants.TEST_SUITE_XML_FILES);

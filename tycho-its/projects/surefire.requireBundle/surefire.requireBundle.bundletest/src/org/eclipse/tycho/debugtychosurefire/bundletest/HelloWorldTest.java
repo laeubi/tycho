@@ -27,5 +27,13 @@ public class HelloWorldTest
         final HelloWorld hello = new HelloWorld();
         assertEquals("Hello World", hello.test());
     }
+    
+    @Test
+    public void test2()
+    {
+        final HelloWorld hello = new HelloWorld();
+        assertEquals("Hello World", hello.test());
+    }
+
 
 }
