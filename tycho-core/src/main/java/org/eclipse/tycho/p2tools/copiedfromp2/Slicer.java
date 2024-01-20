@@ -223,7 +223,9 @@ public class Slicer {
                     System.out.println("No IU found to satisfy optional dependency of " + iu + " on req " + req); //$NON-NLS-1$//$NON-NLS-2$
                 }
             } else {
-                result.add(Status.warning(NLS.bind(Messages.Planner_Unsatisfied_dependency, iu, req)));
+                if (!iu.satisfies(req)) {
+                    result.add(Status.warning(NLS.bind(Messages.Planner_Unsatisfied_dependency, iu, req)));
+                }
             }
         }
     }

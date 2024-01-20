@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <?pde version="3.5"?>
 
-<product uid="tycho-its-project.issue1052.jaxrs.product" version="1.0.0.qualifier" useFeatures="true" includeLaunchers="false" autoIncludeRequirements="false">
+<product uid="tycho-its-project.issue1052.jaxrs.product" version="1.0.0.qualifier" useFeatures="false" includeLaunchers="false" autoIncludeRequirements="false">
 
    <configIni use="default">
    </configIni>
 
    <launcherArgs>
+      <programArgs>
+      </programArgs>
       <vmArgs>-Declipse.ignoreApp=true -Dosgi.noShutdown=true -Dorg.osgi.service.http.port=8282
       </vmArgs>
       <vmArgsMac>-XstartOnFirstThread -Dorg.eclipse.swt.internal.carbon.smallFonts
@@ -25,10 +27,5 @@
    <plugins>
       <plugin id="org.osgi.service.jaxrs"/>
    </plugins>
-
-   <features>
-      <feature id="gson.feature"/>
-   </features>
-
 
 </product>

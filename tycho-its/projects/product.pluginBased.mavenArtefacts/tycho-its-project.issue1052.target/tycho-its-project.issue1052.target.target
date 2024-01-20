@@ -2,12 +2,14 @@
 <?pde version="3.8"?>
 <target name="tycho-its-project.issue1052.target">
 	<locations>
+		<!-- 
 		<location includeAllPlatforms="false" includeConfigurePhase="true" includeMode="planner" includeSource="true" type="InstallableUnit">
 			<repository location="https://download.eclipse.org/releases/2022-06"/>
 			<unit id="org.eclipse.equinox.compendium.sdk.feature.group" version="3.22.300.v20220503-1634"/>
 			<unit id="org.eclipse.equinox.core.sdk.feature.group" version="3.23.400.v20220516-2155"/>
 		</location>
-		<location includeDependencyDepth="infinite" includeDependencyScopes="compile" includeSource="true" missingManifest="ignore" type="Maven">
+		-->
+		<location includeDependencyDepth="none" includeDependencyScopes="compile" includeSource="true" missingManifest="ignore" type="Maven">
 			<dependencies>
 				<dependency>
 					<groupId>org.osgi</groupId>
@@ -17,5 +19,37 @@
 				</dependency>
 			</dependencies>
 		</location>
+		<!-- 
+		<location includeDependencyDepth="none" includeSource="true" missingManifest="generate" type="Maven">
+			<dependencies>
+				<dependency>
+					<groupId>org.apache.aries.spec</groupId>
+					<artifactId>org.apache.aries.javax.jax.rs-api</artifactId>
+					<version>1.0.4</version>
+					<type>jar</type>
+				</dependency>
+			</dependencies>
+		</location>
+		<location includeDependencyDepth="none" includeSource="true" missingManifest="generate" type="Maven">
+			<dependencies>
+				<dependency>
+					<groupId>javax.xml.bind</groupId>
+					<artifactId>jaxb-api</artifactId>
+					<version>2.3.1</version>
+					<type>jar</type>
+				</dependency>
+			</dependencies>
+		</location>
+		<location includeDependencyDepth="none" includeSource="true" missingManifest="generate" type="Maven">
+			<dependencies>
+				<dependency>
+					<groupId>javax.activation</groupId>
+					<artifactId>activation</artifactId>
+					<version>1.1.1</version>
+					<type>jar</type>
+				</dependency>
+			</dependencies>
+		</location>
+		-->
 	</locations>
 </target>
