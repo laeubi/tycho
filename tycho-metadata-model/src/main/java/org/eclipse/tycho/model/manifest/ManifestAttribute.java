@@ -100,4 +100,9 @@ public class ManifestAttribute {
         }
     }
 
+    @Override
+    public String toString() {
+        return content.toString();
+    }
+
 }
