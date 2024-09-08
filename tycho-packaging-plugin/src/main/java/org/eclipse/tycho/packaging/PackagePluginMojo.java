@@ -278,7 +278,7 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 			File manifest = new File(mavenProject.getBuild().getDirectory(), "MANIFEST.MF");
 			writeManifest(manifest, getManifest());
 			archive.setManifestFile(manifest);
-
+			archive.setAddMavenDescriptor(false);
 			archiver.setOutputFile(pluginFile);
 			if (!archive.isForced()) {
 				// optimized archive creation not supported for now because of build qualifier

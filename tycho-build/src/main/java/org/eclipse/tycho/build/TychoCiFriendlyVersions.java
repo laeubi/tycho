@@ -166,7 +166,7 @@ public class TychoCiFriendlyVersions extends DefaultModelVersionProcessor implem
 		MavenProject project = rawProjectCache.computeIfAbsent(pom, file -> {
 			// at this phase there are no projects, thats all we can offer for now...
 			MavenProject mavenProject = new MavenProject();
-			DefaultModelReader modelReader = new DefaultModelReader();
+			DefaultModelReader modelReader = new DefaultModelReader(null);
 			try {
 				mavenProject.setModel(modelReader.read(pom, Map.of()));
 			} catch (IOException e) {

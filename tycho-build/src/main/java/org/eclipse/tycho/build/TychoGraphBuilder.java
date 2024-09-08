@@ -22,7 +22,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,7 +37,6 @@ import org.apache.maven.execution.MavenSession;
 import org.apache.maven.execution.ProjectDependencyGraph;
 import org.apache.maven.graph.DefaultGraphBuilder;
 import org.apache.maven.graph.DefaultProjectDependencyGraph;
-import org.apache.maven.graph.GraphBuilder;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.building.DefaultModelProblem;
 import org.apache.maven.model.building.ModelProblem;
@@ -46,7 +44,6 @@ import org.apache.maven.model.building.ModelProblem.Severity;
 import org.apache.maven.model.building.Result;
 import org.apache.maven.project.DuplicateProjectException;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.dag.CycleDetectedException;
@@ -58,18 +55,16 @@ import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor;
 import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor.ProjectDependencies;
 import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor.ProjectDependencyClosure;
-import org.eclipse.tycho.pomless.AbstractTychoMapping;
-import org.sonatype.maven.polyglot.mapping.Mapping;
 
-@Component(role = GraphBuilder.class, hint = GraphBuilder.HINT)
+//@Component(role = GraphBuilder.class, hint = GraphBuilder.HINT)
 public class TychoGraphBuilder extends DefaultGraphBuilder {
 
 	private static final boolean DEBUG = Boolean.getBoolean("tycho.graphbuilder.debug");
 	@Requirement
 	private Logger log;
 
-	@Requirement(role = Mapping.class)
-	private Map<String, Mapping> polyglotMappings;
+//	@Requirement(role = Mapping.class)
+//	private Map<String, Mapping> polyglotMappings;
 
 	@Requirement
 	private MavenProjectDependencyProcessor dependencyProcessor;
@@ -78,18 +73,18 @@ public class TychoGraphBuilder extends DefaultGraphBuilder {
 	public Result<ProjectDependencyGraph> build(MavenSession session) {
 		Objects.requireNonNull(session);
 		// Tell the polyglot mappings that we are in extension mode
-		for (Mapping mapping : polyglotMappings.values()) {
-			if (mapping instanceof AbstractTychoMapping tychoMapping) {
-				tychoMapping.setExtensionMode(true);
-				tychoMapping.setMultiModuleProjectDirectory(session.getRequest().getMultiModuleProjectDirectory());
-				Properties properties = session.getRequest().getSystemProperties();
-				if (properties.getProperty(TychoCiFriendlyVersions.PROPERTY_BUILDQUALIFIER_FORMAT) != null
-						|| properties.getProperty(TychoCiFriendlyVersions.PROPERTY_FORCE_QUALIFIER) != null
-						|| properties.getProperty(TychoCiFriendlyVersions.BUILD_QUALIFIER) != null) {
-					tychoMapping.setSnapshotProperty(TychoCiFriendlyVersions.BUILD_QUALIFIER);
-				}
-			}
-		}
+//		for (Mapping mapping : polyglotMappings.values()) {
+//			if (mapping instanceof AbstractTychoMapping tychoMapping) {
+//				tychoMapping.setExtensionMode(true);
+//				tychoMapping.setMultiModuleProjectDirectory(session.getRequest().getMultiModuleProjectDirectory());
+//				Properties properties = session.getRequest().getSystemProperties();
+//				if (properties.getProperty(TychoCiFriendlyVersions.PROPERTY_BUILDQUALIFIER_FORMAT) != null
+//						|| properties.getProperty(TychoCiFriendlyVersions.PROPERTY_FORCE_QUALIFIER) != null
+//						|| properties.getProperty(TychoCiFriendlyVersions.BUILD_QUALIFIER) != null) {
+//					tychoMapping.setSnapshotProperty(TychoCiFriendlyVersions.BUILD_QUALIFIER);
+//				}
+//			}
+//		}
 		MavenExecutionRequest request = session.getRequest();
 		ProjectDependencyGraph dependencyGraph = session.getProjectDependencyGraph();
 		Result<ProjectDependencyGraph> graphResult = super.build(session);

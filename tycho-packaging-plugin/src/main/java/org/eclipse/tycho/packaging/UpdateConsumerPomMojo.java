@@ -110,7 +110,7 @@ public class UpdateConsumerPomMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true")
 	protected boolean replaceTypeWithExtension = true;
 
-	@Parameter
+	@Parameter(property = "tycho.consumer.skipPomGeneration")
 	protected Boolean skipPomGeneration;
 
 	/**

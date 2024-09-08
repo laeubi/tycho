@@ -12,34 +12,27 @@
  *******************************************************************************/
 package org.eclipse.tycho.build.pomless;
 
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.Optional;
-
-import org.apache.maven.api.model.Model;
-import org.apache.maven.api.services.Source;
 import org.apache.maven.api.spi.ModelParser;
-import org.apache.maven.api.spi.ModelParserException;
 
-public class AbstractTychoModelParser implements ModelParser {
+public abstract class AbstractTychoModelParser implements ModelParser {
 
-	@Override
-	public Optional<Source> locate(Path dir) {
-		System.out.println(getClass().getSimpleName() + ".locate(" + dir.getFileName() + ")");
-		return Optional.empty();
-	}
-
-	@Override
-	public Model parse(Source source, Map<String, ?> options) throws ModelParserException {
-		System.out.println(getClass().getSimpleName() + ".parse()");
-		throw new ModelParserException("Test me!");
-	}
-
-	@Override
-	public Optional<Model> locateAndParse(Path dir, Map<String, ?> options) throws ModelParserException {
-		System.out
-				.println(getClass().getSimpleName() + ".locateAndParse(" + dir.getFileName() + " :: " + options + ")");
-		return ModelParser.super.locateAndParse(dir, options);
-	}
+//	@Override
+//	public Optional<Source> locate(Path dir) {
+//		System.out.println(getClass().getSimpleName() + ".locate(" + dir.getFileName() + ")");
+//		return Optional.empty();
+//	}
+//
+//	@Override
+//	public Model parse(Source source, Map<String, ?> options) throws ModelParserException {
+//		System.out.println(getClass().getSimpleName() + ".parse()");
+//		throw new ModelParserException("Test me!");
+//	}
+//
+//	@Override
+//	public Optional<Model> locateAndParse(Path dir, Map<String, ?> options) throws ModelParserException {
+//		System.out
+//				.println(getClass().getSimpleName() + ".locateAndParse(" + dir.getFileName() + " :: " + options + ")");
+//		return ModelParser.super.locateAndParse(dir, options);
+//	}
 
 }

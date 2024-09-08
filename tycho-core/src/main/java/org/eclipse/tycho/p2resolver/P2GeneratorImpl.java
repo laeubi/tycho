@@ -54,7 +54,6 @@ import org.eclipse.equinox.p2.publisher.IPublisherInfo;
 import org.eclipse.equinox.p2.publisher.IPublisherResult;
 import org.eclipse.equinox.p2.publisher.PublisherInfo;
 import org.eclipse.equinox.p2.publisher.actions.IFeatureRootAdvice;
-import org.eclipse.tycho.p2maven.tmp.BundlesAction;
 import org.eclipse.equinox.p2.publisher.eclipse.Feature;
 import org.eclipse.equinox.p2.publisher.eclipse.FeaturesAction;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
@@ -92,6 +91,7 @@ import org.eclipse.tycho.p2.repository.MetadataIO;
 import org.eclipse.tycho.p2maven.actions.CategoryDependenciesAction;
 import org.eclipse.tycho.p2maven.actions.ProductDependenciesAction;
 import org.eclipse.tycho.p2maven.actions.ProductFile2;
+import org.eclipse.tycho.p2maven.tmp.BundlesAction;
 import org.osgi.framework.BundleException;
 
 @Component(role = P2Generator.class)
@@ -441,10 +441,16 @@ public class P2GeneratorImpl extends AbstractMetadataGenerator implements P2Gene
         artifacts.add(projectDefaultArtifact);
 
         for (Artifact attachedArtifact : project.getAttachedArtifacts()) {
-            if (attachedArtifact.getFile() != null && (attachedArtifact.getFile().getName().endsWith(".jar")
-                    || (attachedArtifact.getFile().getName().endsWith(".zip")
-                            && project.getPackaging().equals(ArtifactType.TYPE_INSTALLABLE_UNIT)))) {
-                artifacts.add(new ArtifactFacade(attachedArtifact));
+            try {
+                if (attachedArtifact.getFile() != null && (attachedArtifact.getFile().getName().endsWith(".jar")
+                        || (attachedArtifact.getFile().getName().endsWith(".zip")
+                                && project.getPackaging().equals(ArtifactType.TYPE_INSTALLABLE_UNIT)))) {
+                    if (attachedArtifact.getFile().isFile()) {
+                        artifacts.add(new ArtifactFacade(attachedArtifact));
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println(e);
             }
         }
 
@@ -501,7 +507,11 @@ public class P2GeneratorImpl extends AbstractMetadataGenerator implements P2Gene
             artifacts.put(null, mainArtifact.getFile());
         }
         for (Artifact attachedArtifact : project.getAttachedArtifacts()) {
-            artifacts.put(attachedArtifact.getClassifier(), attachedArtifact.getFile());
+            try {
+                artifacts.put(attachedArtifact.getClassifier(), attachedArtifact.getFile());
+            } catch (Exception e) {
+                System.err.println(e);
+            }
         }
         return artifacts;
     }

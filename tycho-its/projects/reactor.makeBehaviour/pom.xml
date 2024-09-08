@@ -11,15 +11,7 @@
 	</properties>
 
 	<modules>
-		<module>feature1</module>
-		<module>feature2</module>
-		<module>feature3</module>
 		<module>bundle1</module>
-		<module>bundle1a</module>
-		<module>bundle1b</module>
-		<module>bundle2</module>
-		<module>site</module>
-		<module>product</module>
 	</modules>
 
 	<build>
