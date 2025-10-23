@@ -73,6 +73,30 @@ public class BaselinePluginTest extends AbstractTychoIntegrationTest {
 		verifier.verifyErrorFreeLog();
 	}
 
+	/**
+	 * Test that adding a method to a class causes an API break in derived classes through inheritance.
+	 * 
+	 * This test verifies that when class A adds a new method m(), class B which extends A
+	 * now exposes this method too. If package q (containing B) doesn't bump its version,
+	 * this should be flagged as an API break.
+	 */
+	@Test
+	public void testApiBreakWithInheritance() throws Exception {
+		// Build bundle where class A adds method m() but package q version is not bumped
+		// This should fail because B extends A and now exposes the new method
+		Verifier verifier = getBaselineProject("bundle-with-inheritance");
+		verifier.addCliOption("-Dbaseline-url=" + baselineRepo.toURI());
+		
+		try {
+			verifier.executeGoals(List.of("clean", "verify"));
+			verifier.verifyErrorFreeLog();
+			throw new AssertionError("Build should have failed due to API break in inherited method");
+		} catch (VerificationException e) {
+			// Expected - the build should fail
+			verifier.verifyTextInLog("Baseline problems found");
+		}
+	}
+
 
 
 	private File buildBaseRepo() throws Exception, VerificationException {

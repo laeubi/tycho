@@ -14,6 +14,7 @@
 	<modules>
 		<module>bundle</module>
 		<module>bundle-source</module>
+		<module>lib1</module>
 		<module>feature</module>
 		<module>site</module>
 	</modules>
