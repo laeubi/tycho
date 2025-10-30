@@ -13,22 +13,21 @@
 
 package org.eclipse.tycho.surefire.provider.impl;
 
-import static java.util.Collections.singletonList;
-import static org.eclipse.tycho.surefire.provider.impl.ProviderHelper.newDependency;
+import static org.eclipse.tycho.surefire.provider.impl.DefaultProviderHelper.newDependency;
 
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
+import javax.inject.Named;
+
 import org.apache.maven.model.Dependency;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Component;
 import org.eclipse.tycho.ClasspathEntry;
-import org.eclipse.tycho.surefire.provider.spi.TestFrameworkProvider;
 import org.osgi.framework.Version;
 import org.osgi.framework.VersionRange;
 
-@Component(role = TestFrameworkProvider.class, hint = "junit4")
+@Named("junit4")
 public class JUnit4Provider extends AbstractJUnitProvider {
 
     private static final VersionRange JUNIT4_VERSION_RANGE = new VersionRange("[4,5)");
@@ -47,7 +46,7 @@ public class JUnit4Provider extends AbstractJUnitProvider {
 
     @Override
     public List<Dependency> getRequiredArtifacts() {
-        return singletonList(newDependency("org.eclipse.tycho", "org.eclipse.tycho.surefire.junit4"));
+        return List.of(newDependency("org.eclipse.tycho", "org.eclipse.tycho.surefire.junit4"));
     }
 
     @Override

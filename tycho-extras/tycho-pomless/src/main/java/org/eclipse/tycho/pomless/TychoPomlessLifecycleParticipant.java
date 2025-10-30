@@ -17,14 +17,13 @@ package org.eclipse.tycho.pomless;
 import org.apache.maven.AbstractMavenLifecycleParticipant;
 import org.apache.maven.MavenExecutionException;
 import org.apache.maven.execution.MavenSession;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 
-@Component(role = AbstractMavenLifecycleParticipant.class, hint = "TychoPomlessLifecycleParticipant")
+@Named("TychoPomlessLifecycleParticipant")
+@Singleton
 public class TychoPomlessLifecycleParticipant extends AbstractMavenLifecycleParticipant {
 
-    @Requirement
+    @Inject
     protected Logger logger;
 
     @Override

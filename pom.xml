@@ -63,7 +63,7 @@
 		<plexusVersion>2.2.0</plexusVersion>
 		<plexusUtilsVersion>3.5.1</plexusUtilsVersion>
 		<plexusCompilerVersion>2.15.0</plexusCompilerVersion>
-		<pluginToolsVersion>3.15.1</pluginToolsVersion>
+		<pluginToolsVersion>3.15.2</pluginToolsVersion>
 		<jgit-version>7.4.0.202509020913-r</jgit-version>
 		<maven-version>4.0.0-rc-4</maven-version>
 		<sisu-version>0.9.0.M4</sisu-version>
@@ -148,7 +148,7 @@
 			<dependency>
 				<groupId>org.codehaus.plexus</groupId>
 				<artifactId>plexus-archiver</artifactId>
-				<version>4.10.3</version>
+				<version>4.10.0</version>
 			</dependency>
 			<dependency>
 				<groupId>org.codehaus.plexus</groupId>
@@ -222,6 +222,12 @@
 				<groupId>org.junit.jupiter</groupId>
 				<artifactId>junit-jupiter-api</artifactId>
 				<version>${junit5.version}</version>
+				<scope>test</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.codehaus.plexus</groupId>
+				<artifactId>plexus-testing</artifactId>
+				<version>2.0.1</version>
 				<scope>test</scope>
 			</dependency>
 			<dependency>
