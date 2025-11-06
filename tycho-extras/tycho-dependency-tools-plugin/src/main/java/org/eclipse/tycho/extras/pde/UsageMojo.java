@@ -192,6 +192,12 @@ public class UsageMojo extends AbstractMojo {
         Set<IInstallableUnit> toProcess = new HashSet<>(units);
         Set<IInstallableUnit> processed = new HashSet<>();
 
+        // Pre-collect all available IUs from target content for efficient querying
+        Set<IInstallableUnit> allAvailableUnits = new HashSet<>();
+        for (TargetDefinitionContent content : allContent) {
+            allAvailableUnits.addAll(content.query(QueryUtil.ALL_UNITS, null).toSet());
+        }
+
         while (!toProcess.isEmpty()) {
             IInstallableUnit iu = toProcess.iterator().next();
             toProcess.remove(iu);
@@ -201,18 +207,16 @@ public class UsageMojo extends AbstractMojo {
             if (iu.getId().endsWith(".feature.group")) {
                 // Expand its requirements
                 for (IRequirement requirement : iu.getRequirements()) {
-                    // Find IUs that satisfy this requirement in the target content
-                    for (TargetDefinitionContent content : allContent) {
-                        Set<IInstallableUnit> satisfyingUnits = content.query(QueryUtil.ALL_UNITS, null).stream()
-                                .filter(candidate -> candidate.satisfies(requirement))
-                                .collect(Collectors.toSet());
+                    // Find IUs that satisfy this requirement
+                    Set<IInstallableUnit> satisfyingUnits = allAvailableUnits.stream()
+                            .filter(candidate -> candidate.satisfies(requirement))
+                            .collect(Collectors.toSet());
 
-                        for (IInstallableUnit satisfying : satisfyingUnits) {
-                            if (expanded.add(satisfying) && !processed.contains(satisfying)) {
-                                // If this is a new feature, add it to be processed
-                                if (satisfying.getId().endsWith(".feature.group")) {
-                                    toProcess.add(satisfying);
-                                }
+                    for (IInstallableUnit satisfying : satisfyingUnits) {
+                        if (expanded.add(satisfying) && !processed.contains(satisfying)) {
+                            // If this is a new feature, add it to be processed
+                            if (satisfying.getId().endsWith(".feature.group")) {
+                                toProcess.add(satisfying);
                             }
                         }
                     }
