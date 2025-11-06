@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import org.apache.maven.project.MavenProject;
@@ -26,6 +25,7 @@ import org.eclipse.tycho.targetplatform.TargetDefinition.InstallableUnitLocation
 import org.eclipse.tycho.targetplatform.TargetDefinition.Location;
 import org.eclipse.tycho.targetplatform.TargetDefinition.Unit;
 import org.eclipse.tycho.targetplatform.TargetDefinitionContent;
+
 final class UsageReport {
     /**
      * Maximum number of indirect usage examples to show in the report
@@ -253,14 +253,6 @@ final class UsageReport {
         }
 
         return List.of(start, end); // Fallback
-    }
-
-    void generateReport(Consumer<String> reportConsumer) {
-        generateReport(reportConsumer, new TreeUsageReportLayout());
-    }
-
-    void generateReport(Consumer<String> reportConsumer, ReportLayout layout) {
-        layout.generateReport(this, reportConsumer);
     }
 
     void analyzeLocations(TargetDefinition definitionFile, BiConsumer<Location, RuntimeException> exceptionConsumer) {

@@ -19,7 +19,8 @@ interface ReportLayout {
      * Generates and outputs the usage report using this layout.
      * 
      * @param report the usage report data to format
+     * @param verbose TODO
      * @param reportConsumer consumer that receives formatted report lines
      */
-    void generateReport(UsageReport report, Consumer<String> reportConsumer);
+    void generateReport(UsageReport report, boolean verbose, Consumer<String> reportConsumer);
 }

@@ -55,6 +55,9 @@ public class UsageMojo extends AbstractMojo {
     @Parameter(defaultValue = "tree", property = "usage.layout")
     private String layout;
 
+    @Parameter(property = "verbose")
+    private boolean verbose;
+
     @Component
     private TychoProjectManager projectManager;
 
@@ -78,7 +81,8 @@ public class UsageMojo extends AbstractMojo {
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
-        Objects.requireNonNull(layouts.get(layout), "The layout " + layout + " can not be found");
+        ReportLayout reportLayout = Objects.requireNonNull(layouts.get(layout),
+                "The layout " + layout + " can not be found");
         Log log = getLog();
         log.info("Scan reactor for dependencies...");
         List<MavenProject> projects = mavenSession.getProjects();
@@ -111,7 +115,7 @@ public class UsageMojo extends AbstractMojo {
                 }
             }
         }
-        usageReport.generateReport(log::info);
+        reportLayout.generateReport(usageReport, verbose, log::info);
     }
 
 }

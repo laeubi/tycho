@@ -52,7 +52,7 @@ final class TreeUsageReportLayout implements ReportLayout {
     }
 
     @Override
-    public void generateReport(UsageReport report, Consumer<String> reportConsumer) {
+    public void generateReport(UsageReport report, boolean verbose, Consumer<String> reportConsumer) {
         reportConsumer.accept("###### DEPENDENCIES USAGE REPORT #######");
         reportConsumer.accept("Your build uses " + report.usedUnits.size() + " dependencies.");
         reportConsumer.accept("Your build uses " + report.targetFiles.size() + " target file(s).");
