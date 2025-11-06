@@ -1,6 +1,8 @@
 package org.eclipse.tycho.extras.pde;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -15,6 +17,11 @@ import org.eclipse.tycho.targetplatform.TargetDefinitionContent;
 import org.eclipse.tycho.targetplatform.TargetDefinitionFile;
 
 final class UsageReport {
+    /**
+     * Maximum number of indirect usage examples to show in the report
+     */
+    private static final int MAX_INDIRECT_USAGE_EXAMPLES = 3;
+    
     /**
      * Maps a project to the units it uses (or at least is resolved to)
      */
@@ -99,7 +106,7 @@ final class UsageReport {
     List<IInstallableUnit> getShortestPathFromRoot(IInstallableUnit unit) {
         // BFS to find shortest path from any root to this unit
         Set<IInstallableUnit> visited = new HashSet<>();
-        List<List<IInstallableUnit>> queue = new ArrayList<>();
+        Deque<List<IInstallableUnit>> queue = new ArrayDeque<>();
         
         // Start from the unit itself
         List<IInstallableUnit> initialPath = new ArrayList<>();
@@ -110,7 +117,7 @@ final class UsageReport {
         List<IInstallableUnit> shortestPath = null;
         
         while (!queue.isEmpty()) {
-            List<IInstallableUnit> currentPath = queue.remove(0);
+            List<IInstallableUnit> currentPath = queue.poll();
             IInstallableUnit current = currentPath.get(currentPath.size() - 1);
             
             // Check if we've reached a root
@@ -203,7 +210,7 @@ final class UsageReport {
         
         // For each used child, find the shortest path from this unit to it
         return usedChildren.stream()
-                .limit(3) // Show at most 3 examples
+                .limit(MAX_INDIRECT_USAGE_EXAMPLES)
                 .map(usedChild -> {
                     List<IInstallableUnit> path = findPathBetween(unit, usedChild);
                     return path.stream()
@@ -218,7 +225,7 @@ final class UsageReport {
      */
     private List<IInstallableUnit> findPathBetween(IInstallableUnit start, IInstallableUnit end) {
         Set<IInstallableUnit> visited = new HashSet<>();
-        List<List<IInstallableUnit>> queue = new ArrayList<>();
+        Deque<List<IInstallableUnit>> queue = new ArrayDeque<>();
         
         List<IInstallableUnit> initialPath = new ArrayList<>();
         initialPath.add(start);
@@ -226,7 +233,7 @@ final class UsageReport {
         visited.add(start);
         
         while (!queue.isEmpty()) {
-            List<IInstallableUnit> currentPath = queue.remove(0);
+            List<IInstallableUnit> currentPath = queue.poll();
             IInstallableUnit current = currentPath.get(currentPath.size() - 1);
             
             if (current.equals(end)) {
