@@ -26,8 +26,6 @@ import org.eclipse.tycho.targetplatform.TargetDefinition.InstallableUnitLocation
 import org.eclipse.tycho.targetplatform.TargetDefinition.Location;
 import org.eclipse.tycho.targetplatform.TargetDefinition.Unit;
 import org.eclipse.tycho.targetplatform.TargetDefinitionContent;
-import org.eclipse.tycho.targetplatform.TargetDefinitionFile;
-
 final class UsageReport {
     /**
      * Maximum number of indirect usage examples to show in the report
@@ -43,13 +41,13 @@ final class UsageReport {
      */
     final Set<IInstallableUnit> usedUnits = new HashSet<>();
     /**
-     * A collection of all used target files in the reactor
+     * A collection of all used target definitions in the reactor
      */
-    final Set<TargetDefinitionFile> targetFiles = new HashSet<>();
+    final Set<TargetDefinition> targetFiles = new HashSet<>();
     /**
-     * Maps a target file to its actual content
+     * Maps a target definition to its actual content
      */
-    final Map<TargetDefinitionFile, TargetDefinitionContent> targetFileUnits = new HashMap<>();
+    final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
     /**
      * Maps a unit to the set of definition files this unit is defined in
      */
@@ -261,7 +259,7 @@ final class UsageReport {
         reportConsumer.accept("###### DEPENDECIES USAGE REPORT #######");
         reportConsumer.accept("Your build uses " + usedUnits.size() + " dependencies.");
         reportConsumer.accept("Your build uses " + targetFiles.size() + " target file(s).");
-        for (TargetDefinitionFile targetFile : targetFiles) {
+        for (TargetDefinition targetFile : targetFiles) {
             reportConsumer.accept(targetFile.getOrigin() + " contains "
                     + targetFileUnits.get(targetFile).query(QueryUtil.ALL_UNITS, null).toSet().size() + " units from "
                     + targetFile.getLocations().size() + " locations");

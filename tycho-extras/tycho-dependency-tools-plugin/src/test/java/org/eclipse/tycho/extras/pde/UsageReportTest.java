@@ -347,21 +347,17 @@ public class UsageReportTest {
         when(unitB.getRequirements()).thenReturn(Arrays.asList(reqC));
         when(unitC.satisfies(reqC)).thenReturn(true);
         
-        // Create mock target definition file
-        org.eclipse.tycho.targetplatform.TargetDefinitionFile targetFile = 
-                mock(org.eclipse.tycho.targetplatform.TargetDefinitionFile.class);
-        when(targetFile.getOrigin()).thenReturn("target.target");
-        when(targetFile.getLocations()).thenReturn(Arrays.asList());
-        
+        // Create mock target definition
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unitA, unitB, unitC, unitD);
-        report.targetFiles.add(targetFile);
-        report.targetFileUnits.put(targetFile, content);
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
         
         // Report units
-        report.reportProvided(unitA, targetFile, "LocationL", null);
-        report.reportProvided(unitB, targetFile, "LocationL", null);
-        report.reportProvided(unitC, targetFile, "LocationL", unitB);
-        report.reportProvided(unitD, targetFile, "LocationL", null);
+        report.reportProvided(unitA, targetDef, "LocationL", null);
+        report.reportProvided(unitB, targetDef, "LocationL", null);
+        report.reportProvided(unitC, targetDef, "LocationL", unitB);
+        report.reportProvided(unitD, targetDef, "LocationL", null);
         
         // Mark A and C as used
         MavenProject project = createMockProject("project1");
