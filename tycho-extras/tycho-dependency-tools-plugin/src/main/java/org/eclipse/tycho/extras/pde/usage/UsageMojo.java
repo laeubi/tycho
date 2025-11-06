@@ -7,10 +7,12 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.tycho.extras.pde;
+package org.eclipse.tycho.extras.pde.usage;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,6 +25,7 @@ import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
@@ -49,14 +52,14 @@ import org.eclipse.tycho.targetplatform.TargetDefinitionFile;
 @Mojo(name = "usage", defaultPhase = LifecyclePhase.NONE, requiresProject = true, threadSafe = true, requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME, aggregator = true)
 public class UsageMojo extends AbstractMojo {
 
+    @Parameter(defaultValue = "tree", property = "usage.layout")
+    private String layout;
+
     @Component
     private TychoProjectManager projectManager;
 
     @Component
     private MavenSession mavenSession;
-
-//    @Component
-//    private MavenProject mavenProject;
 
     @Component
     private LegacySupport legacySupport;
@@ -70,8 +73,12 @@ public class UsageMojo extends AbstractMojo {
     @Component
     private IProvisioningAgent agent;
 
+    @Component
+    private Map<String, ReportLayout> layouts;
+
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        Objects.requireNonNull(layouts.get(layout), "The layout " + layout + " can not be found");
         Log log = getLog();
         log.info("Scan reactor for dependencies...");
         List<MavenProject> projects = mavenSession.getProjects();

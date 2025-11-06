@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
 
-package org.eclipse.tycho.extras.pde;
+package org.eclipse.tycho.extras.pde.usage;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -28,6 +28,8 @@ import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.equinox.p2.metadata.VersionRange;
 import org.eclipse.equinox.p2.query.IQueryResult;
 import org.eclipse.equinox.p2.query.QueryUtil;
+import org.eclipse.tycho.extras.pde.usage.TreeUsageReportLayout;
+import org.eclipse.tycho.extras.pde.usage.UsageReport;
 import org.eclipse.tycho.targetplatform.TargetDefinition;
 import org.eclipse.tycho.targetplatform.TargetDefinitionContent;
 import org.junit.jupiter.api.Test;

@@ -7,7 +7,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.tycho.extras.pde;
+package org.eclipse.tycho.extras.pde.usage;
 
 import java.util.function.Consumer;
 

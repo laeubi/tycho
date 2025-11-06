@@ -1,4 +1,4 @@
-package org.eclipse.tycho.extras.pde;
+package org.eclipse.tycho.extras.pde.usage;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;

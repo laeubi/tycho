@@ -7,7 +7,7 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  *******************************************************************************/
-package org.eclipse.tycho.extras.pde;
+package org.eclipse.tycho.extras.pde.usage;
 
 import java.util.HashSet;
 import java.util.List;
@@ -15,12 +15,14 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import org.codehaus.plexus.component.annotations.Component;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.query.QueryUtil;
 
 /**
  * Simple one-line-per-unit report layout (original format).
  */
+@Component(role = ReportLayout.class, hint = "simple")
 final class SimpleUsageReportLayout implements ReportLayout {
 
     @Override
@@ -36,8 +38,7 @@ final class SimpleUsageReportLayout implements ReportLayout {
 
         // Only report on root units (defined directly in target files)
         Set<IInstallableUnit> allUnits = report.providedBy.keySet();
-        Set<IInstallableUnit> rootUnits = allUnits.stream().filter(report::isRootUnit)
-                .collect(Collectors.toSet());
+        Set<IInstallableUnit> rootUnits = allUnits.stream().filter(report::isRootUnit).collect(Collectors.toSet());
 
         // Track which units have been covered by reporting their parent
         Set<IInstallableUnit> reportedUnits = new HashSet<>();
