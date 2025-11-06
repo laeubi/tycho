@@ -11,6 +11,7 @@ package org.eclipse.tycho.extras.pde.usage;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -66,6 +67,9 @@ final class TreeUsageReportLayout implements ReportLayout {
 
         // Track which units have been covered by reporting their parent
         Set<IInstallableUnit> reportedUnits = new HashSet<>();
+        
+        // Track shortest paths for each used unit (for deduplication)
+        Map<IInstallableUnit, List<IInstallableUnit>> shortestPaths = computeShortestPaths(report, rootUnits);
 
         // Generate tree output for each target file
         for (TargetDefinition targetFile : targetStructure.keySet().stream()
@@ -77,25 +81,34 @@ final class TreeUsageReportLayout implements ReportLayout {
 
             Map<String, List<UnitInfo>> locations = targetStructure.get(targetFile);
 
-            // Sort locations by name
-            List<String> sortedLocations = new ArrayList<>(locations.keySet());
-            sortedLocations.sort(String::compareTo);
+            // Sort locations by unique project count (highest to lowest)
+            List<String> sortedLocations = sortLocationsByProjectCount(locations, report);
 
             for (String location : sortedLocations) {
                 List<UnitInfo> units = locations.get(location);
 
                 // Filter to only include root units from this location
-                List<UnitInfo> rootUnitsInLocation = units.stream().filter(ui -> rootUnits.contains(ui.unit))
+                List<UnitInfo> rootUnitsInLocation = units.stream()
+                        .filter(ui -> rootUnits.contains(ui.unit))
                         .filter(ui -> !reportedUnits.contains(ui.unit))
-                        .sorted(Comparator.comparing(ui -> ui.unit.toString())).toList();
+                        // Filter out synthetic JRE units
+                        .filter(ui -> !ui.unit.getId().equals("a.jre.javase"))
+                        .toList();
 
                 if (rootUnitsInLocation.isEmpty()) {
                     continue;
                 }
 
-                reportConsumer.accept("  Location: " + wrapLine(location, "    ", lineWrapLimit));
+                // Count unique projects for this location
+                Set<String> locationProjects = countUniqueProjects(rootUnitsInLocation, report);
+                
+                reportConsumer.accept("  Location: " + wrapLine(location, "    ", lineWrapLimit) + 
+                        " (" + locationProjects.size() + " project" + (locationProjects.size() == 1 ? "" : "s") + ")");
 
-                for (UnitInfo unitInfo : rootUnitsInLocation) {
+                // Sort root units by usage count (most used to least used)
+                List<UnitInfo> sortedUnits = sortUnitsByUsage(rootUnitsInLocation, report);
+
+                for (UnitInfo unitInfo : sortedUnits) {
                     IInstallableUnit unit = unitInfo.unit;
 
                     // Skip if already reported
@@ -118,7 +131,7 @@ final class TreeUsageReportLayout implements ReportLayout {
                         reportConsumer.accept(unitLine);
                         
                         // Display indirect usage chain as a tree structure
-                        displayIndirectUsageTree(unit, report, reportConsumer);
+                        displayIndirectUsageTree(unit, report, reportConsumer, reportedUnits, shortestPaths);
                     } else {
                         // UNUSED status
                         String unitLine = "    • " + unit + " [UNUSED]";
@@ -179,24 +192,61 @@ final class TreeUsageReportLayout implements ReportLayout {
     /**
      * Displays the indirect usage chain as a tree structure.
      */
-    private void displayIndirectUsageTree(IInstallableUnit unit, UsageReport report, Consumer<String> reportConsumer) {
+    private void displayIndirectUsageTree(IInstallableUnit unit, UsageReport report, Consumer<String> reportConsumer,
+            Set<IInstallableUnit> reportedUnits, Map<IInstallableUnit, List<IInstallableUnit>> shortestPaths) {
         Set<IInstallableUnit> allChildren = report.getAllChildren(unit);
         Set<IInstallableUnit> usedChildren = allChildren.stream()
                 .filter(report.usedUnits::contains)
+                // Filter out synthetic JRE units
+                .filter(child -> !child.getId().equals("a.jre.javase"))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         
         if (usedChildren.isEmpty()) {
             return;
         }
         
-        // Display the first used child path as a tree (showing one example path)
-        IInstallableUnit usedChild = usedChildren.iterator().next();
-        List<IInstallableUnit> path = report.findPathBetween(unit, usedChild);
+        // Find the shortest path to any used child that hasn't been reported yet
+        IInstallableUnit targetChild = null;
+        List<IInstallableUnit> shortestPath = null;
         
-        // Skip the first element as it's the unit itself
-        for (int i = 1; i < path.size(); i++) {
-            IInstallableUnit pathUnit = path.get(i);
-            boolean isLast = (i == path.size() - 1);
+        for (IInstallableUnit usedChild : usedChildren) {
+            // Skip if already reported
+            if (reportedUnits.contains(usedChild)) {
+                continue;
+            }
+            
+            // Use the pre-computed shortest path if available
+            List<IInstallableUnit> path = shortestPaths.get(usedChild);
+            if (path != null && path.size() > 0 && path.get(0).equals(unit)) {
+                // This path starts from our unit
+                if (shortestPath == null || path.size() < shortestPath.size()) {
+                    shortestPath = path;
+                    targetChild = usedChild;
+                }
+            } else {
+                // Fallback: compute path
+                path = report.findPathBetween(unit, usedChild);
+                if (shortestPath == null || path.size() < shortestPath.size()) {
+                    shortestPath = path;
+                    targetChild = usedChild;
+                }
+            }
+        }
+        
+        if (shortestPath == null || shortestPath.size() <= 1) {
+            return;
+        }
+        
+        // Display the shortest path as a tree (skip first element as it's the unit itself)
+        for (int i = 1; i < shortestPath.size(); i++) {
+            IInstallableUnit pathUnit = shortestPath.get(i);
+            
+            // Skip synthetic JRE units
+            if (pathUnit.getId().equals("a.jre.javase")) {
+                continue;
+            }
+            
+            boolean isLast = (i == shortestPath.size() - 1);
             
             // Create the tree connector with proper indentation
             StringBuilder indentBuilder = new StringBuilder("      ");
@@ -247,6 +297,155 @@ final class TreeUsageReportLayout implements ReportLayout {
         }
 
         return structure;
+    }
+
+    /**
+     * Computes the shortest path from any root unit to each used unit.
+     * This is used to deduplicate units that appear in multiple chains.
+     */
+    private Map<IInstallableUnit, List<IInstallableUnit>> computeShortestPaths(UsageReport report,
+            Set<IInstallableUnit> rootUnits) {
+        Map<IInstallableUnit, List<IInstallableUnit>> shortestPaths = new HashMap<>();
+
+        for (IInstallableUnit usedUnit : report.usedUnits) {
+            // Skip synthetic JRE units
+            if (usedUnit.getId().equals("a.jre.javase")) {
+                continue;
+            }
+
+            // Find shortest path from any root to this used unit
+            List<IInstallableUnit> shortestPath = null;
+
+            for (IInstallableUnit rootUnit : rootUnits) {
+                // Skip synthetic JRE units
+                if (rootUnit.getId().equals("a.jre.javase")) {
+                    continue;
+                }
+
+                // Check if this root can reach the used unit
+                Set<IInstallableUnit> children = report.getAllChildren(rootUnit);
+                if (children.contains(usedUnit) || rootUnit.equals(usedUnit)) {
+                    List<IInstallableUnit> path = report.findPathBetween(rootUnit, usedUnit);
+                    if (shortestPath == null || path.size() < shortestPath.size()) {
+                        shortestPath = path;
+                    }
+                }
+            }
+
+            if (shortestPath != null) {
+                shortestPaths.put(usedUnit, shortestPath);
+            }
+        }
+
+        return shortestPaths;
+    }
+
+    /**
+     * Sorts locations by the number of unique projects using units from that location.
+     * Locations with more projects are listed first.
+     */
+    private List<String> sortLocationsByProjectCount(Map<String, List<UnitInfo>> locations, UsageReport report) {
+        Map<String, Integer> locationProjectCounts = new HashMap<>();
+
+        for (Map.Entry<String, List<UnitInfo>> entry : locations.entrySet()) {
+            String location = entry.getKey();
+            List<UnitInfo> units = entry.getValue();
+
+            Set<String> uniqueProjects = countUniqueProjects(units, report);
+            locationProjectCounts.put(location, uniqueProjects.size());
+        }
+
+        // Sort by project count (descending), then by name
+        return locationProjectCounts.entrySet().stream()
+                .sorted(Comparator.<Map.Entry<String, Integer>>comparingInt(Map.Entry::getValue).reversed()
+                        .thenComparing(Map.Entry::getKey))
+                .map(Map.Entry::getKey)
+                .toList();
+    }
+
+    /**
+     * Counts unique projects that use any of the given units or their transitive dependencies.
+     */
+    private Set<String> countUniqueProjects(List<UnitInfo> units, UsageReport report) {
+        Set<String> uniqueProjects = new HashSet<>();
+
+        for (UnitInfo unitInfo : units) {
+            IInstallableUnit unit = unitInfo.unit;
+
+            // Skip synthetic JRE units
+            if (unit.getId().equals("a.jre.javase")) {
+                continue;
+            }
+
+            // Add projects using this unit
+            if (report.usedUnits.contains(unit)) {
+                report.projectUsage.entrySet().stream()
+                        .filter(entry -> entry.getValue().contains(unit))
+                        .forEach(entry -> uniqueProjects.add(entry.getKey().getId()));
+            }
+
+            // Add projects using any transitive dependency
+            Set<IInstallableUnit> children = report.getAllChildren(unit);
+            for (IInstallableUnit child : children) {
+                if (report.usedUnits.contains(child)) {
+                    report.projectUsage.entrySet().stream()
+                            .filter(entry -> entry.getValue().contains(child))
+                            .forEach(entry -> uniqueProjects.add(entry.getKey().getId()));
+                }
+            }
+        }
+
+        return uniqueProjects;
+    }
+
+    /**
+     * Sorts units by usage count (most used to least used, then unused).
+     */
+    private List<UnitInfo> sortUnitsByUsage(List<UnitInfo> units, UsageReport report) {
+        return units.stream()
+                .sorted((ui1, ui2) -> {
+                    IInstallableUnit u1 = ui1.unit;
+                    IInstallableUnit u2 = ui2.unit;
+
+                    // Get usage counts
+                    int count1 = getUsageCount(u1, report);
+                    int count2 = getUsageCount(u2, report);
+
+                    // Sort by count descending (most used first)
+                    if (count1 != count2) {
+                        return Integer.compare(count2, count1);
+                    }
+
+                    // If counts are equal, sort by unit name
+                    return u1.toString().compareTo(u2.toString());
+                })
+                .toList();
+    }
+
+    /**
+     * Gets the number of projects using this unit (directly or indirectly).
+     */
+    private int getUsageCount(IInstallableUnit unit, UsageReport report) {
+        Set<String> projects = new HashSet<>();
+
+        // Direct usage
+        if (report.usedUnits.contains(unit)) {
+            report.projectUsage.entrySet().stream()
+                    .filter(entry -> entry.getValue().contains(unit))
+                    .forEach(entry -> projects.add(entry.getKey().getId()));
+        }
+
+        // Indirect usage through children
+        Set<IInstallableUnit> children = report.getAllChildren(unit);
+        for (IInstallableUnit child : children) {
+            if (report.usedUnits.contains(child)) {
+                report.projectUsage.entrySet().stream()
+                        .filter(entry -> entry.getValue().contains(child))
+                        .forEach(entry -> projects.add(entry.getKey().getId()));
+            }
+        }
+
+        return projects.size();
     }
 
     private static class UnitInfo {
