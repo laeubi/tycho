@@ -415,7 +415,6 @@ public class UsageReportTest {
         TargetDefinitionContent content = mock(TargetDefinitionContent.class);
         Set<IInstallableUnit> unitSet = new HashSet<>(Arrays.asList(units));
         
-        @SuppressWarnings("unchecked")
         IQueryResult<IInstallableUnit> queryResult = mock(IQueryResult.class);
         when(queryResult.toSet()).thenReturn(unitSet);
         when(content.query(QueryUtil.ALL_UNITS, null)).thenReturn(queryResult);
