@@ -189,35 +189,34 @@ final class TreeUsageReportLayout implements ReportLayout {
             return;
         }
         
-        // For each used child, find the shortest path from this unit to it
-        // We'll display the first path as a tree
-        for (IInstallableUnit usedChild : usedChildren.stream().limit(1).toList()) {
-            List<IInstallableUnit> path = report.findPathBetween(unit, usedChild);
+        // Display the first used child path as a tree (showing one example path)
+        IInstallableUnit usedChild = usedChildren.iterator().next();
+        List<IInstallableUnit> path = report.findPathBetween(unit, usedChild);
+        
+        // Skip the first element as it's the unit itself
+        for (int i = 1; i < path.size(); i++) {
+            IInstallableUnit pathUnit = path.get(i);
+            boolean isLast = (i == path.size() - 1);
             
-            // Skip the first element as it's the unit itself
-            for (int i = 1; i < path.size(); i++) {
-                IInstallableUnit pathUnit = path.get(i);
-                boolean isLast = (i == path.size() - 1);
-                
-                // Create the tree connector
-                String connector = "└─";
-                String indent = "      ";
-                for (int j = 1; j < i; j++) {
-                    indent += "   ";
-                }
-                
-                String line = indent + connector + " " + pathUnit;
-                
-                // If this is the last node and it's used, add project count
-                if (isLast && report.usedUnits.contains(pathUnit)) {
-                    List<String> projects = report.projectUsage.entrySet().stream()
-                            .filter(entry -> entry.getValue().contains(pathUnit))
-                            .map(project -> project.getKey().getId()).toList();
-                    line += " (" + projects.size() + " project" + (projects.size() == 1 ? "" : "s") + ")";
-                }
-                
-                reportConsumer.accept(line);
+            // Create the tree connector with proper indentation
+            StringBuilder indentBuilder = new StringBuilder("      ");
+            for (int j = 1; j < i; j++) {
+                indentBuilder.append("   ");
             }
+            String indent = indentBuilder.toString();
+            String connector = "└─";
+            
+            String line = indent + connector + " " + pathUnit;
+            
+            // If this is the last node and it's used, add project count
+            if (isLast && report.usedUnits.contains(pathUnit)) {
+                List<String> projects = report.projectUsage.entrySet().stream()
+                        .filter(entry -> entry.getValue().contains(pathUnit))
+                        .map(project -> project.getKey().getId()).toList();
+                line += " (" + projects.size() + " project" + (projects.size() == 1 ? "" : "s") + ")";
+            }
+            
+            reportConsumer.accept(line);
         }
     }
 

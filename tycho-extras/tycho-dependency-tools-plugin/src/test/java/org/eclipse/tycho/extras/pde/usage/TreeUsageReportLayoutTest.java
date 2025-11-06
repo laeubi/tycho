@@ -232,9 +232,9 @@ public class TreeUsageReportLayoutTest {
             null);
         
         // Mark unit as used by 29 projects
+        report.usedUnits.add(unit);
         for (int i = 1; i <= 29; i++) {
             MavenProject project = createMockProject("project" + i);
-            report.usedUnits.add(unit);
             report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit);
         }
         
@@ -286,9 +286,9 @@ public class TreeUsageReportLayoutTest {
             unitB);
         
         // Mark unitC as used by 5 projects (makes A and B indirectly used)
+        report.usedUnits.add(unitC);
         for (int i = 1; i <= 5; i++) {
             MavenProject project = createMockProject("project" + i);
-            report.usedUnits.add(unitC);
             report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitC);
         }
         
