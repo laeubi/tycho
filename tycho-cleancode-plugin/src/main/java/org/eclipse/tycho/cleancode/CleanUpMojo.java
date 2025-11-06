@@ -14,14 +14,10 @@ package org.eclipse.tycho.cleancode;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 import org.apache.maven.plugin.MojoFailureException;
@@ -62,8 +58,16 @@ public class CleanUpMojo extends AbstractEclipseBuildMojo<CleanupResult> {
 	 * If enabled, the cleanup profile settings will be written to the project's
 	 * org.eclipse.jdt.ui.prefs file after cleanup
 	 */
-	@Parameter(property = "updateProjectSettings")
-	private boolean updateProjectSettings;
+	@Parameter(property = "updateProjectCleanupProfile")
+	private boolean updateProjectCleanupProfile;
+
+	/**
+	 * If enabled, the save action cleanup settings will be written to the project's
+	 * org.eclipse.jdt.ui.prefs file after cleanup. Only updates if
+	 * sp_cleanup.on_save_use_additional_actions=true is set in the file.
+	 */
+	@Parameter(property = "updateProjectSaveActions")
+	private boolean updateProjectSaveActions;
 
 	@Override
 	protected String[] getRequireBundles() {
@@ -102,9 +106,33 @@ public class CleanUpMojo extends AbstractEclipseBuildMojo<CleanupResult> {
 		builder.newLine();
 		builder.newLine();
 		builder.write();
-		if (updateProjectSettings) {
+		if (updateProjectCleanupProfile || updateProjectSaveActions) {
+			Path settingsDir = project.getBasedir().toPath().resolve(".settings");
+			Path prefsFile = settingsDir.resolve("org.eclipse.jdt.ui.prefs");
 			try {
-				updateProjectSettingsFile();
+				if (Files.isRegularFile(prefsFile)) {
+					try (CleanupPreferencesUpdater updater = new CleanupPreferencesUpdater(prefsFile, cleanUpProfile)) {
+						if (updateProjectCleanupProfile) {
+							if (updateProjectCleanupProfile) {
+								if (updater.hasCleanupProfile()) {
+									updater.updateProjectCleanupProfile();
+								} else {
+									getLog().info(
+											"Project does not specify a cleanup profile in the settings, profile update is skipped.");
+								}
+							}
+							if (updateProjectSaveActions) {
+								if (updater.hasSaveActions()) {
+									updater.updateSaveActions();
+								} else {
+									getLog().info("Project has disabled additional save actions, update skipped.");
+								}
+							}
+						}
+					}
+				} else {
+					getLog().info("No project settings found, update is skipped!");
+				}
 			} catch (IOException e) {
 				getLog().warn("Can't update project settings", e);
 			}
@@ -115,55 +143,6 @@ public class CleanUpMojo extends AbstractEclipseBuildMojo<CleanupResult> {
 	protected boolean isValid(EclipseProject eclipseProject) {
 		// Cleanups can only be applied to java projects
 		return eclipseProject.hasNature("org.eclipse.jdt.core.javanature");
-	}
-
-	/**
-	 * Updates the org.eclipse.jdt.ui.prefs file with the cleanup profile settings
-	 * 
-	 * @throws IOException
-	 */
-	private void updateProjectSettingsFile() throws IOException {
-
-		Path settingsDir = project.getBasedir().toPath().resolve(".settings");
-		Path prefsFile = settingsDir.resolve("org.eclipse.jdt.ui.prefs");
-
-		if (!Files.isRegularFile(prefsFile)) {
-			return;
-		}
-
-		// Read all lines from the file with explicit charset
-		List<String> lines = Files.readAllLines(prefsFile, StandardCharsets.UTF_8);
-		List<String> updatedLines = new ArrayList<>();
-		Set<String> missingKeys = new HashSet<>(cleanUpProfile.keySet());
-
-		// Process existing lines
-		for (String line : lines) {
-			boolean updated = false;
-			// Skip comments and empty lines - keep them as-is
-			if (!line.startsWith("cleanup.")) {
-				updatedLines.add(line);
-				continue;
-			}
-			String[] kv = line.split("=", 2);
-			if (kv.length != 2) {
-				updatedLines.add(line);
-				continue;
-			}
-			String key = kv[0].trim();
-			// Check if this line matches any key in the cleanup profile
-			if (missingKeys.remove(key)) {
-				updatedLines.add(key + "=" + cleanUpProfile.get(key));
-			} else {
-				updatedLines.add(line);
-			}
-		}
-		// Add any keys from the profile that weren't found in the file
-		for (String key : missingKeys) {
-			updatedLines.add(key + "=" + cleanUpProfile.get(key));
-		}
-
-		// Write the updated content back to the file with explicit charset
-		Files.write(prefsFile, updatedLines, StandardCharsets.UTF_8);
 	}
 
 }
