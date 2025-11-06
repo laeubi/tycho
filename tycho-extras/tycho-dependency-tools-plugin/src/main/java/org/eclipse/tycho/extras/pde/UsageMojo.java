@@ -133,17 +133,52 @@ public class UsageMojo extends AbstractMojo {
                     + usageReport.targetFileUnits.get(targetFile).query(QueryUtil.ALL_UNITS, null).toSet().size()
                     + " units from " + targetFile.getLocations().size() + " locations");
         }
-        Set<IInstallableUnit> providedRoots = usageReport.providedBy.keySet();
-        for (IInstallableUnit unit : providedRoots) {
+        
+        // Only report on root units (defined directly in target files)
+        Set<IInstallableUnit> allUnits = usageReport.providedBy.keySet();
+        Set<IInstallableUnit> rootUnits = allUnits.stream()
+                .filter(usageReport::isRootUnit)
+                .collect(Collectors.toSet());
+        
+        // Track which units have been covered by reporting their parent
+        Set<IInstallableUnit> reportedUnits = new HashSet<>();
+        
+        for (IInstallableUnit unit : rootUnits) {
+            // Skip if this unit was already covered by a parent report
+            if (reportedUnits.contains(unit)) {
+                continue;
+            }
+            
             String by = usageReport.getProvidedBy(unit);
+            
             if (usageReport.usedUnits.contains(unit)) {
+                // Unit is directly used - report it and mark all its children as reported
                 List<String> list = usageReport.projectUsage.entrySet().stream()
                         .filter(entry -> entry.getValue().contains(unit)).map(project -> project.getKey().getId())
                         .toList();
                 log.info("The unit " + unit + " is used by " + list.size() + " projects and currently provided by "
                         + by);
+                
+                // Mark this unit and all its transitive dependencies as reported
+                reportedUnits.add(unit);
+                reportedUnits.addAll(usageReport.getAllChildren(unit));
+            } else if (usageReport.isUsedIndirectly(unit)) {
+                // Unit is indirectly used (one of its dependencies is used but not the unit itself)
+                String chain = usageReport.getIndirectUsageChain(unit);
+                log.info("The unit " + unit + " is INDIRECTLY used through: " + chain 
+                        + " and currently provided by " + by);
+                
+                // Mark this unit and all its transitive dependencies as reported
+                reportedUnits.add(unit);
+                reportedUnits.addAll(usageReport.getAllChildren(unit));
             } else {
+                // Unit and all its dependencies are unused
                 log.info("The unit " + unit + " is UNUSED and currently provided by " + by);
+                
+                // Mark this unit and all its transitive dependencies as reported
+                // (so we don't report them separately as unused)
+                reportedUnits.add(unit);
+                reportedUnits.addAll(usageReport.getAllChildren(unit));
             }
         }
     }
