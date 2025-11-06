@@ -1,0 +1,259 @@
+/*******************************************************************************
+ * Copyright (c) 2025 Christoph Läubrich and others.
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *******************************************************************************/
+
+package org.eclipse.tycho.extras.pde;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import org.apache.maven.project.MavenProject;
+import org.eclipse.equinox.p2.metadata.IInstallableUnit;
+import org.eclipse.equinox.p2.metadata.IRequirement;
+import org.eclipse.equinox.p2.metadata.MetadataFactory;
+import org.eclipse.equinox.p2.metadata.Version;
+import org.eclipse.equinox.p2.metadata.VersionRange;
+import org.eclipse.equinox.p2.query.IQueryResult;
+import org.eclipse.equinox.p2.query.QueryUtil;
+import org.eclipse.tycho.targetplatform.TargetDefinition;
+import org.eclipse.tycho.targetplatform.TargetDefinitionContent;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Tests for the TreeUsageReportLayout implementation.
+ */
+public class TreeUsageReportLayoutTest {
+
+    /**
+     * Tests that the tree layout generates structured output with proper indentation.
+     */
+    @Test
+    void testTreeStructure() {
+        UsageReport report = new UsageReport();
+        
+        // Create mock units
+        IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
+        IInstallableUnit unitB = createMockUnit("unitB", "1.0.0");
+        
+        // Create mock target definition
+        TargetDefinition targetDef = createMockTargetDefinition("my-target.target");
+        TargetDefinitionContent content = createMockContent(unitA, unitB);
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        // Report units
+        report.reportProvided(unitA, targetDef, "LocationL1", null);
+        report.reportProvided(unitB, targetDef, "LocationL2", null);
+        
+        // Mark A as used
+        MavenProject project = createMockProject("project1");
+        report.usedUnits.add(unitA);
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitA);
+        
+        // Collect report output using TreeLayout
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        // Verify structure
+        String fullReport = String.join("\n", reportLines);
+        
+        // Check for header
+        assertTrue(fullReport.contains("DEPENDENCIES USAGE REPORT"), "Should contain corrected header");
+        
+        // Check for tree structure
+        assertTrue(fullReport.contains("Target: my-target.target"), "Should contain target name");
+        assertTrue(fullReport.contains("Location: LocationL1"), "Should contain location L1");
+        assertTrue(fullReport.contains("Location: LocationL2"), "Should contain location L2");
+        
+        // Check for unit status indicators
+        assertTrue(fullReport.contains("[USED]"), "Should show USED status");
+        assertTrue(fullReport.contains("[UNUSED]"), "Should show UNUSED status");
+        
+        // Check for indentation (units should be indented under locations)
+        assertTrue(fullReport.contains("    • unitA"), "Units should be indented with bullet");
+    }
+    
+    /**
+     * Tests that the tree layout correctly identifies and displays indirect usage.
+     */
+    @Test
+    void testTreeIndirectUsage() {
+        UsageReport report = new UsageReport();
+        
+        // Create mock units
+        IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
+        IInstallableUnit unitB = createMockUnit("unitB", "1.0.0");
+        
+        // Set up requirements: A requires B
+        IRequirement reqB = createRequirement("unitB", "1.0.0");
+        when(unitA.getRequirements()).thenReturn(Arrays.asList(reqB));
+        when(unitB.satisfies(reqB)).thenReturn(true);
+        
+        // Create mock target definition
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unitA, unitB);
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        // Report units
+        report.reportProvided(unitA, targetDef, "LocationL", null);
+        report.reportProvided(unitB, targetDef, "LocationL", unitA);
+        
+        // Mark only B as used
+        report.usedUnits.add(unitB);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitB);
+        
+        // Collect report output using TreeLayout
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        // Verify indirect usage is shown
+        String fullReport = String.join("\n", reportLines);
+        assertTrue(fullReport.contains("[INDIRECTLY USED]"), "Should show INDIRECTLY USED status");
+        assertTrue(fullReport.contains("Via:"), "Should show indirect usage chain");
+    }
+    
+    /**
+     * Tests that line wrapping works correctly for long lines.
+     */
+    @Test
+    void testLineWrapping() {
+        UsageReport report = new UsageReport();
+        
+        // Create a unit with a very long repository location
+        IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
+        
+        // Create target with a long location name
+        String longLocation = "https://download.eclipse.org/releases/2024-09/202409111000/plugins/repository";
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unitA);
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(unitA, targetDef, longLocation, null);
+        report.usedUnits.add(unitA);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitA);
+        
+        // Use a small line wrap limit to test wrapping
+        TreeUsageReportLayout layout = new TreeUsageReportLayout(80);
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, layout);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify report was generated (basic check)
+        assertTrue(fullReport.contains("unitA"), "Should contain unit A");
+        assertTrue(fullReport.contains("[USED]"), "Should show USED status");
+    }
+    
+    /**
+     * Tests that multiple target files are properly separated in the output.
+     */
+    @Test
+    void testMultipleTargetFiles() {
+        UsageReport report = new UsageReport();
+        
+        // Create mock units for two different targets
+        IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
+        IInstallableUnit unitB = createMockUnit("unitB", "1.0.0");
+        
+        // Create two target definitions
+        TargetDefinition targetDef1 = createMockTargetDefinition("target1.target");
+        TargetDefinition targetDef2 = createMockTargetDefinition("target2.target");
+        
+        TargetDefinitionContent content1 = createMockContent(unitA);
+        TargetDefinitionContent content2 = createMockContent(unitB);
+        
+        report.targetFiles.add(targetDef1);
+        report.targetFiles.add(targetDef2);
+        report.targetFileUnits.put(targetDef1, content1);
+        report.targetFileUnits.put(targetDef2, content2);
+        
+        // Report units from different targets
+        report.reportProvided(unitA, targetDef1, "Location1", null);
+        report.reportProvided(unitB, targetDef2, "Location2", null);
+        
+        // Mark both as used
+        MavenProject project = createMockProject("project1");
+        report.usedUnits.add(unitA);
+        report.usedUnits.add(unitB);
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitA);
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitB);
+        
+        // Collect report
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify both targets are shown
+        assertTrue(fullReport.contains("Target: target1.target"), "Should contain target1");
+        assertTrue(fullReport.contains("Target: target2.target"), "Should contain target2");
+        assertTrue(fullReport.contains("Location: Location1"), "Should contain Location1");
+        assertTrue(fullReport.contains("Location: Location2"), "Should contain Location2");
+    }
+
+    // Helper methods for creating mock objects
+
+    private IInstallableUnit createMockUnit(String id, String version) {
+        IInstallableUnit unit = mock(IInstallableUnit.class);
+        when(unit.getId()).thenReturn(id);
+        when(unit.getVersion()).thenReturn(Version.create(version));
+        when(unit.toString()).thenReturn(id + "/" + version);
+        when(unit.getRequirements()).thenReturn(Arrays.asList());
+        return unit;
+    }
+
+    private IRequirement createRequirement(String id, String version) {
+        return MetadataFactory.createRequirement(
+                IInstallableUnit.NAMESPACE_IU_ID,
+                id,
+                new VersionRange(Version.create(version), true, Version.create(version), true),
+                null,
+                false,
+                false,
+                true
+        );
+    }
+
+    private TargetDefinition createMockTargetDefinition(String origin) {
+        TargetDefinition targetDef = mock(TargetDefinition.class);
+        when(targetDef.getOrigin()).thenReturn(origin);
+        when(targetDef.getLocations()).thenReturn(Arrays.asList());
+        return targetDef;
+    }
+
+    private TargetDefinitionContent createMockContent(IInstallableUnit... units) {
+        TargetDefinitionContent content = mock(TargetDefinitionContent.class);
+        Set<IInstallableUnit> unitSet = new HashSet<>(Arrays.asList(units));
+        
+        IQueryResult<IInstallableUnit> queryResult = mock(IQueryResult.class);
+        when(queryResult.toSet()).thenReturn(unitSet);
+        when(content.query(QueryUtil.ALL_UNITS, null)).thenReturn(queryResult);
+        
+        return content;
+    }
+
+    private MavenProject createMockProject(String id) {
+        MavenProject project = mock(MavenProject.class);
+        when(project.getId()).thenReturn(id);
+        return project;
+    }
+}

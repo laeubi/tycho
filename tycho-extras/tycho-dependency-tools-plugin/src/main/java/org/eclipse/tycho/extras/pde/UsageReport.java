@@ -256,59 +256,11 @@ final class UsageReport {
     }
 
     void generateReport(Consumer<String> reportConsumer) {
-        reportConsumer.accept("###### DEPENDECIES USAGE REPORT #######");
-        reportConsumer.accept("Your build uses " + usedUnits.size() + " dependencies.");
-        reportConsumer.accept("Your build uses " + targetFiles.size() + " target file(s).");
-        for (TargetDefinition targetFile : targetFiles) {
-            reportConsumer.accept(targetFile.getOrigin() + " contains "
-                    + targetFileUnits.get(targetFile).query(QueryUtil.ALL_UNITS, null).toSet().size() + " units from "
-                    + targetFile.getLocations().size() + " locations");
-        }
+        generateReport(reportConsumer, new TreeUsageReportLayout());
+    }
 
-        // Only report on root units (defined directly in target files)
-        Set<IInstallableUnit> allUnits = providedBy.keySet();
-        Set<IInstallableUnit> rootUnits = allUnits.stream().filter(this::isRootUnit).collect(Collectors.toSet());
-
-        // Track which units have been covered by reporting their parent
-        Set<IInstallableUnit> reportedUnits = new HashSet<>();
-
-        for (IInstallableUnit unit : rootUnits) {
-            // Skip if this unit was already covered by a parent report
-            if (reportedUnits.contains(unit)) {
-                continue;
-            }
-
-            String by = getProvidedBy(unit);
-
-            if (usedUnits.contains(unit)) {
-                // Unit is directly used - report it and mark all its children as reported
-                List<String> list = projectUsage.entrySet().stream().filter(entry -> entry.getValue().contains(unit))
-                        .map(project -> project.getKey().getId()).toList();
-                reportConsumer.accept("The unit " + unit + " is used by " + list.size()
-                        + " projects and currently provided by " + by);
-
-                // Mark this unit and all its transitive dependencies as reported
-                reportedUnits.add(unit);
-                reportedUnits.addAll(getAllChildren(unit));
-            } else if (isUsedIndirectly(unit)) {
-                // Unit is indirectly used (one of its dependencies is used but not the unit itself)
-                String chain = getIndirectUsageChain(unit);
-                reportConsumer.accept("The unit " + unit + " is INDIRECTLY used through: " + chain
-                        + " and currently provided by " + by);
-
-                // Mark this unit and all its transitive dependencies as reported
-                reportedUnits.add(unit);
-                reportedUnits.addAll(getAllChildren(unit));
-            } else {
-                // Unit and all its dependencies are unused
-                reportConsumer.accept("The unit " + unit + " is UNUSED and currently provided by " + by);
-
-                // Mark this unit and all its transitive dependencies as reported
-                // (so we don't report them separately as unused)
-                reportedUnits.add(unit);
-                reportedUnits.addAll(getAllChildren(unit));
-            }
-        }
+    void generateReport(Consumer<String> reportConsumer, ReportLayout layout) {
+        layout.generateReport(this, reportConsumer);
     }
 
     void analyzeLocations(TargetDefinition definitionFile, BiConsumer<Location, RuntimeException> exceptionConsumer) {

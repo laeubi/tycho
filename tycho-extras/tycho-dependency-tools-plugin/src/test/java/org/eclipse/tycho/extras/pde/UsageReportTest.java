@@ -368,7 +368,7 @@ public class UsageReportTest {
         
         // Collect report output
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add);
+        report.generateReport(reportLines::add, new SimpleUsageReportLayout());
         
         // Verify report contains expected elements
         String fullReport = String.join("\n", reportLines);
@@ -464,7 +464,7 @@ public class UsageReportTest {
         
         // Collect report output
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add);
+        report.generateReport(reportLines::add, new SimpleUsageReportLayout());
         
         // Verify report contains expected elements
         String fullReport = String.join("\n", reportLines);
