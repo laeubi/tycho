@@ -203,7 +203,7 @@ final class TreeUsageReportLayout implements ReportLayout {
                         k -> new LinkedHashMap<>());
                 List<UnitInfo> units = locations.computeIfAbsent(location, k -> new ArrayList<>());
                 
-                // Only add root units (parent == null)
+                // Only add root units (those with no parent in the dependency tree)
                 if (ref.parent() == null) {
                     units.add(new UnitInfo(unit, ref.parent()));
                 }
