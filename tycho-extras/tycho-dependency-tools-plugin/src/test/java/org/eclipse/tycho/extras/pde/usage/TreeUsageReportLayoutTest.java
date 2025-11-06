@@ -304,6 +304,274 @@ public class TreeUsageReportLayoutTest {
         assertFalse(fullReport.contains("Via:"), "Should not use old 'Via:' format");
     }
 
+    /**
+     * Tests that duplicate units are not reported multiple times.
+     * A unit should only appear once even if it's in multiple dependency chains.
+     */
+    @Test
+    void testNoDuplicateUnits() {
+        UsageReport report = new UsageReport();
+        
+        // Create three root units that all lead to the same used unit
+        IInstallableUnit root1 = createMockUnit("root1", "1.0.0");
+        IInstallableUnit root2 = createMockUnit("root2", "1.0.0");
+        IInstallableUnit intermediate1 = createMockUnit("intermediate1", "1.0.0");
+        IInstallableUnit intermediate2 = createMockUnit("intermediate2", "1.0.0");
+        IInstallableUnit sharedUnit = createMockUnit("ch.qos.logback.classic", "1.5.18");
+        
+        // Set up requirements
+        IRequirement reqInt1 = createRequirement("intermediate1", "1.0.0");
+        IRequirement reqInt2 = createRequirement("intermediate2", "1.0.0");
+        IRequirement reqShared = createRequirement("ch.qos.logback.classic", "1.5.18");
+        
+        when(root1.getRequirements()).thenReturn(Arrays.asList(reqInt1));
+        when(root2.getRequirements()).thenReturn(Arrays.asList(reqInt2));
+        when(intermediate1.getRequirements()).thenReturn(Arrays.asList(reqShared));
+        when(intermediate2.getRequirements()).thenReturn(Arrays.asList(reqShared));
+        when(intermediate1.satisfies(reqInt1)).thenReturn(true);
+        when(intermediate2.satisfies(reqInt2)).thenReturn(true);
+        when(sharedUnit.satisfies(reqShared)).thenReturn(true);
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(root1, root2, intermediate1, intermediate2, sharedUnit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        // Report the dependency chains
+        report.reportProvided(root1, targetDef, "Location1", null);
+        report.reportProvided(intermediate1, targetDef, "Location1", root1);
+        report.reportProvided(sharedUnit, targetDef, "Location1", intermediate1);
+        
+        report.reportProvided(root2, targetDef, "Location2", null);
+        report.reportProvided(intermediate2, targetDef, "Location2", root2);
+        report.reportProvided(sharedUnit, targetDef, "Location2", intermediate2);
+        
+        // Mark the shared unit as used
+        report.usedUnits.add(sharedUnit);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(sharedUnit);
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Count occurrences of the shared unit
+        long sharedUnitCount = reportLines.stream()
+                .filter(line -> line.contains("ch.qos.logback.classic"))
+                .count();
+        
+        // The shared unit should appear only once (in the shortest path)
+        assertTrue(sharedUnitCount == 1, 
+            "ch.qos.logback.classic should appear only once, but appeared " + sharedUnitCount + " times");
+    }
+
+    /**
+     * Tests that synthetic JRE units (a.jre.javase) are filtered out.
+     */
+    @Test
+    void testSyntheticJreUnitsFiltered() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit rootUnit = createMockUnit("org.eclipse.equinox.launcher", "1.7.0.v20250519-0528");
+        IInstallableUnit jreUnit = createMockUnit("a.jre.javase", "21.0.0");
+        IInstallableUnit realUnit = createMockUnit("org.eclipse.core.runtime", "3.29.0");
+        
+        // Set up requirements
+        IRequirement reqJre = createRequirement("a.jre.javase", "21.0.0");
+        IRequirement reqReal = createRequirement("org.eclipse.core.runtime", "3.29.0");
+        
+        when(rootUnit.getRequirements()).thenReturn(Arrays.asList(reqJre, reqReal));
+        when(jreUnit.satisfies(reqJre)).thenReturn(true);
+        when(realUnit.satisfies(reqReal)).thenReturn(true);
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(rootUnit, jreUnit, realUnit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(rootUnit, targetDef, "Location1", null);
+        report.reportProvided(jreUnit, targetDef, "Location1", rootUnit);
+        report.reportProvided(realUnit, targetDef, "Location1", rootUnit);
+        
+        // Mark both as used
+        report.usedUnits.add(jreUnit);
+        report.usedUnits.add(realUnit);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(jreUnit);
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(realUnit);
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // JRE units should not appear in the report
+        assertFalse(fullReport.contains("a.jre.javase"), 
+            "Synthetic JRE unit a.jre.javase should be filtered out");
+        assertTrue(fullReport.contains("org.eclipse.core.runtime"), 
+            "Real unit should still appear in report");
+    }
+
+    /**
+     * Tests that locations are sorted by project count (highest to lowest).
+     */
+    @Test
+    void testLocationsSortedByProjectCount() {
+        UsageReport report = new UsageReport();
+        
+        // Create units in different locations with different usage counts
+        IInstallableUnit unit1 = createMockUnit("unit1", "1.0.0");
+        IInstallableUnit unit2 = createMockUnit("unit2", "1.0.0");
+        IInstallableUnit unit3 = createMockUnit("unit3", "1.0.0");
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unit1, unit2, unit3);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        // LocationA: 2 projects use unit1
+        report.reportProvided(unit1, targetDef, "LocationA", null);
+        report.usedUnits.add(unit1);
+        for (int i = 1; i <= 2; i++) {
+            MavenProject project = createMockProject("projectA" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit1);
+        }
+        
+        // LocationB: 5 projects use unit2
+        report.reportProvided(unit2, targetDef, "LocationB", null);
+        report.usedUnits.add(unit2);
+        for (int i = 1; i <= 5; i++) {
+            MavenProject project = createMockProject("projectB" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit2);
+        }
+        
+        // LocationC: 3 projects use unit3
+        report.reportProvided(unit3, targetDef, "LocationC", null);
+        report.usedUnits.add(unit3);
+        for (int i = 1; i <= 3; i++) {
+            MavenProject project = createMockProject("projectC" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit3);
+        }
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        // Find the order of locations in the output
+        int indexB = -1, indexC = -1, indexA = -1;
+        for (int i = 0; i < reportLines.size(); i++) {
+            String line = reportLines.get(i);
+            if (line.contains("Location: LocationB")) indexB = i;
+            if (line.contains("Location: LocationC")) indexC = i;
+            if (line.contains("Location: LocationA")) indexA = i;
+        }
+        
+        // LocationB (5 projects) should come before LocationC (3 projects)
+        // LocationC (3 projects) should come before LocationA (2 projects)
+        assertTrue(indexB > 0 && indexC > 0 && indexA > 0, "All locations should be present");
+        assertTrue(indexB < indexC, "LocationB (5 projects) should come before LocationC (3 projects)");
+        assertTrue(indexC < indexA, "LocationC (3 projects) should come before LocationA (2 projects)");
+    }
+
+    /**
+     * Tests that root units within a location are sorted by usage count.
+     */
+    @Test
+    void testUnitsSortedByUsageCount() {
+        UsageReport report = new UsageReport();
+        
+        // Create units with different usage counts
+        IInstallableUnit unit1 = createMockUnit("unitAlpha", "1.0.0");
+        IInstallableUnit unit2 = createMockUnit("unitBeta", "1.0.0");
+        IInstallableUnit unit3 = createMockUnit("unitGamma", "1.0.0");
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unit1, unit2, unit3);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        String location = "LocationX";
+        
+        // unitAlpha: used by 3 projects
+        report.reportProvided(unit1, targetDef, location, null);
+        report.usedUnits.add(unit1);
+        for (int i = 1; i <= 3; i++) {
+            MavenProject project = createMockProject("projectAlpha" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit1);
+        }
+        
+        // unitBeta: used by 7 projects
+        report.reportProvided(unit2, targetDef, location, null);
+        report.usedUnits.add(unit2);
+        for (int i = 1; i <= 7; i++) {
+            MavenProject project = createMockProject("projectBeta" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit2);
+        }
+        
+        // unitGamma: used by 1 project
+        report.reportProvided(unit3, targetDef, location, null);
+        report.usedUnits.add(unit3);
+        MavenProject project = createMockProject("projectGamma1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit3);
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        // Find the order of units in the output
+        int indexAlpha = -1, indexBeta = -1, indexGamma = -1;
+        for (int i = 0; i < reportLines.size(); i++) {
+            String line = reportLines.get(i);
+            if (line.contains("unitAlpha")) indexAlpha = i;
+            if (line.contains("unitBeta")) indexBeta = i;
+            if (line.contains("unitGamma")) indexGamma = i;
+        }
+        
+        // unitBeta (7 projects) should come first
+        // unitAlpha (3 projects) should come second
+        // unitGamma (1 project) should come last
+        assertTrue(indexAlpha > 0 && indexBeta > 0 && indexGamma > 0, "All units should be present");
+        assertTrue(indexBeta < indexAlpha, "unitBeta (7 projects) should come before unitAlpha (3 projects)");
+        assertTrue(indexAlpha < indexGamma, "unitAlpha (3 projects) should come before unitGamma (1 project)");
+    }
+
+    /**
+     * Tests that location includes project count in the output.
+     */
+    @Test
+    void testLocationShowsProjectCount() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit unit = createMockUnit("test.unit", "1.0.0");
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(unit, targetDef, "TestLocation", null);
+        report.usedUnits.add(unit);
+        
+        // Add 3 projects using this unit
+        for (int i = 1; i <= 3; i++) {
+            MavenProject project = createMockProject("project" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit);
+        }
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify location shows project count
+        assertTrue(fullReport.contains("Location: TestLocation (3 projects)"), 
+            "Location should show project count");
+    }
+
     // Helper methods for creating mock objects
 
     private IInstallableUnit createMockUnit(String id, String version) {
