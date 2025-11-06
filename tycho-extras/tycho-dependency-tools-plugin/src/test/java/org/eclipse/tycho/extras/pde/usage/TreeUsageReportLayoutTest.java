@@ -10,6 +10,7 @@
 
 package org.eclipse.tycho.extras.pde.usage;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -81,7 +82,7 @@ public class TreeUsageReportLayoutTest {
         assertTrue(fullReport.contains("Location: LocationL2"), "Should contain location L2");
         
         // Check for unit status indicators
-        assertTrue(fullReport.contains("[USED]"), "Should show USED status");
+        assertTrue(fullReport.contains("[USED (1 project)]"), "Should show USED status with project count");
         assertTrue(fullReport.contains("[UNUSED]"), "Should show UNUSED status");
         
         // Check for indentation (units should be indented under locations)
@@ -126,7 +127,7 @@ public class TreeUsageReportLayoutTest {
         // Verify indirect usage is shown
         String fullReport = String.join("\n", reportLines);
         assertTrue(fullReport.contains("[INDIRECTLY USED]"), "Should show INDIRECTLY USED status");
-        assertTrue(fullReport.contains("Via:"), "Should show indirect usage chain");
+        assertTrue(fullReport.contains("└─"), "Should show tree structure for indirect usage chain");
     }
     
     /**
@@ -162,7 +163,7 @@ public class TreeUsageReportLayoutTest {
         
         // Verify report was generated (basic check)
         assertTrue(fullReport.contains("unitA"), "Should contain unit A");
-        assertTrue(fullReport.contains("[USED]"), "Should show USED status");
+        assertTrue(fullReport.contains("[USED (1 project)]"), "Should show USED status with project count");
     }
     
     /**
@@ -210,6 +211,97 @@ public class TreeUsageReportLayoutTest {
         assertTrue(fullReport.contains("Target: target2.target"), "Should contain target2");
         assertTrue(fullReport.contains("Location: Location1"), "Should contain Location1");
         assertTrue(fullReport.contains("Location: Location2"), "Should contain Location2");
+    }
+    
+    /**
+     * Tests the new format for USED status with project count in brackets.
+     */
+    @Test
+    void testUsedFormatWithProjectCount() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit unit = createMockUnit("org.eclipse.wst.common.emf", "1.2.800.v202508180220");
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unit);
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(unit, targetDef, 
+            "https://download.eclipse.org/webtools/downloads/drops/R3.39.0/R-3.39.0-20250902093744/repository/", 
+            null);
+        
+        // Mark unit as used by 29 projects
+        for (int i = 1; i <= 29; i++) {
+            MavenProject project = createMockProject("project" + i);
+            report.usedUnits.add(unit);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit);
+        }
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify the new format: [USED (29 projects)] instead of [USED]\n      Used by 29 project(s)
+        assertTrue(fullReport.contains("[USED (29 projects)]"), 
+            "Should show project count in brackets on same line as status");
+        assertFalse(fullReport.contains("Used by 29 project(s)"), 
+            "Should not show old format on separate line");
+    }
+    
+    /**
+     * Tests the new tree format for INDIRECTLY USED status.
+     */
+    @Test
+    void testIndirectlyUsedTreeFormat() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit unitA = createMockUnit("org.eclipse.emf.ecore.edit.feature.group", "2.17.0.v20240604-0832");
+        IInstallableUnit unitB = createMockUnit("org.eclipse.emf.edit", "2.23.0.v20250330-0741");
+        IInstallableUnit unitC = createMockUnit("org.eclipse.emf.ecore.change", "2.17.0.v20240604-0832");
+        
+        // Set up requirements: A > B > C
+        IRequirement reqB = createRequirement("org.eclipse.emf.edit", "2.23.0.v20250330-0741");
+        IRequirement reqC = createRequirement("org.eclipse.emf.ecore.change", "2.17.0.v20240604-0832");
+        when(unitA.getRequirements()).thenReturn(Arrays.asList(reqB));
+        when(unitB.getRequirements()).thenReturn(Arrays.asList(reqC));
+        when(unitB.satisfies(reqB)).thenReturn(true);
+        when(unitC.satisfies(reqC)).thenReturn(true);
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unitA, unitB, unitC);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(unitA, targetDef, 
+            "https://download.eclipse.org/modeling/emf/emf/builds/release/2.43.0", 
+            null);
+        report.reportProvided(unitB, targetDef, 
+            "https://download.eclipse.org/modeling/emf/emf/builds/release/2.43.0", 
+            unitA);
+        report.reportProvided(unitC, targetDef, 
+            "https://download.eclipse.org/modeling/emf/emf/builds/release/2.43.0", 
+            unitB);
+        
+        // Mark unitC as used by 5 projects (makes A and B indirectly used)
+        for (int i = 1; i <= 5; i++) {
+            MavenProject project = createMockProject("project" + i);
+            report.usedUnits.add(unitC);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitC);
+        }
+        
+        List<String> reportLines = new ArrayList<>();
+        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify the new tree format with └─ connectors
+        assertTrue(fullReport.contains("[INDIRECTLY USED]"), "Should show INDIRECTLY USED status");
+        assertTrue(fullReport.contains("└─"), "Should use tree connector");
+        assertTrue(fullReport.contains("(5 projects)"), "Should show project count on final node");
+        assertFalse(fullReport.contains("Via:"), "Should not use old 'Via:' format");
     }
 
     // Helper methods for creating mock objects

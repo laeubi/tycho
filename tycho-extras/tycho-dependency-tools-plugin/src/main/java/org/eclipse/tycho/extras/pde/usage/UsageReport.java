@@ -222,7 +222,7 @@ final class UsageReport {
     /**
      * Finds shortest path between two units using BFS
      */
-    private List<IInstallableUnit> findPathBetween(IInstallableUnit start, IInstallableUnit end) {
+    List<IInstallableUnit> findPathBetween(IInstallableUnit start, IInstallableUnit end) {
         Set<IInstallableUnit> visited = new HashSet<>();
         Deque<List<IInstallableUnit>> queue = new ArrayDeque<>();
 
