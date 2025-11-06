@@ -33,6 +33,11 @@ import org.eclipse.tycho.targetplatform.TargetDefinition;
 final class TreeUsageReportLayout implements ReportLayout {
 
     private final int lineWrapLimit;
+    
+    /**
+     * Synthetic JRE unit ID that should be filtered from reports
+     */
+    private static final String SYNTHETIC_JRE_UNIT_ID = "a.jre.javase";
 
     /**
      * Creates a tree layout with the specified line wrap limit.
@@ -92,7 +97,7 @@ final class TreeUsageReportLayout implements ReportLayout {
                         .filter(ui -> rootUnits.contains(ui.unit))
                         .filter(ui -> !reportedUnits.contains(ui.unit))
                         // Filter out synthetic JRE units
-                        .filter(ui -> !ui.unit.getId().equals("a.jre.javase"))
+                        .filter(ui -> !ui.unit.getId().equals(SYNTHETIC_JRE_UNIT_ID))
                         .toList();
 
                 if (rootUnitsInLocation.isEmpty()) {
@@ -123,18 +128,32 @@ final class TreeUsageReportLayout implements ReportLayout {
                                 .filter(entry -> entry.getValue().contains(unit))
                                 .map(project -> project.getKey().getId()).toList();
                         String status = "USED (" + projects.size() + " project" + (projects.size() == 1 ? "" : "s") + ")";
-                        String unitLine = "    • " + unit + " [" + status + "]";
+                        String unitLine = "    • " + formatUnit(unit) + " [" + status + "]";
                         reportConsumer.accept(unitLine);
-                    } else if (report.isUsedIndirectly(unit)) {
+                        
+                        // If verbose, display the project IDs
+                        if (verbose) {
+                            displayProjectList(projects, reportConsumer, "      ");
+                        }
+                    } else if (hasUsedChildrenExcludingJRE(unit, report)) {
                         // INDIRECTLY USED status - show as tree
-                        String unitLine = "    • " + unit + " [INDIRECTLY USED]";
+                        // Note: We use hasUsedChildrenExcludingJRE instead of report.isUsedIndirectly
+                        // because we need to filter out synthetic JRE dependencies. Units that only
+                        // depend on JRE units should show as UNUSED, not INDIRECTLY USED.
+                        
+                        // Special handling for features
+                        boolean isFeature = unit.getId().endsWith(".feature.group");
+                        boolean pathContainsFeature = pathToUsedChildContainsFeature(unit, report, shortestPaths);
+                        
+                        String status = (isFeature && !pathContainsFeature) ? "USED" : "INDIRECTLY USED";
+                        String unitLine = "    • " + formatUnit(unit) + " [" + status + "]";
                         reportConsumer.accept(unitLine);
                         
                         // Display indirect usage chain as a tree structure
-                        displayIndirectUsageTree(unit, report, reportConsumer, reportedUnits, shortestPaths);
+                        displayIndirectUsageTree(unit, report, reportConsumer, reportedUnits, shortestPaths, verbose);
                     } else {
                         // UNUSED status
-                        String unitLine = "    • " + unit + " [UNUSED]";
+                        String unitLine = "    • " + formatUnit(unit) + " [UNUSED]";
                         reportConsumer.accept(unitLine);
                         reportConsumer.accept("      Can potentially be removed");
                     }
@@ -190,15 +209,93 @@ final class TreeUsageReportLayout implements ReportLayout {
     }
 
     /**
+     * Formats a unit for display, handling special cases like feature groups.
+     */
+    private String formatUnit(IInstallableUnit unit) {
+        String id = unit.getId();
+        String version = unit.getVersion().toString();
+        
+        if (id.endsWith(".feature.group")) {
+            // Remove .feature.group suffix and add (feature) label
+            String baseId = id.substring(0, id.length() - ".feature.group".length());
+            return baseId + " " + version + " (feature)";
+        }
+        
+        return id + " " + version;
+    }
+    
+    /**
+     * Checks if a unit has used children (excluding JRE units).
+     */
+    private boolean hasUsedChildrenExcludingJRE(IInstallableUnit unit, UsageReport report) {
+        Set<IInstallableUnit> allChildren = report.getAllChildren(unit);
+        return allChildren.stream()
+                .filter(report.usedUnits::contains)
+                .anyMatch(child -> !child.getId().equals(SYNTHETIC_JRE_UNIT_ID));
+    }
+    
+    /**
+     * Checks if the path from this unit to any used child contains another feature.
+     */
+    private boolean pathToUsedChildContainsFeature(IInstallableUnit unit, UsageReport report,
+            Map<IInstallableUnit, List<IInstallableUnit>> shortestPaths) {
+        Set<IInstallableUnit> allChildren = report.getAllChildren(unit);
+        Set<IInstallableUnit> usedChildren = allChildren.stream()
+                .filter(report.usedUnits::contains)
+                .filter(child -> !child.getId().equals(SYNTHETIC_JRE_UNIT_ID))
+                .collect(Collectors.toSet());
+        
+        for (IInstallableUnit usedChild : usedChildren) {
+            List<IInstallableUnit> path = shortestPaths.get(usedChild);
+            if (path != null && path.size() > 0 && path.get(0).equals(unit)) {
+                // Check if any intermediate node in the path is a feature
+                for (int i = 1; i < path.size() - 1; i++) {
+                    if (path.get(i).getId().endsWith(".feature.group")) {
+                        return true;
+                    }
+                }
+            } else {
+                // Fallback: compute path
+                path = report.findPathBetween(unit, usedChild);
+                for (int i = 1; i < path.size() - 1; i++) {
+                    if (path.get(i).getId().endsWith(".feature.group")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Displays a list of projects with optional limit.
+     */
+    private void displayProjectList(List<String> projects, Consumer<String> reportConsumer, String indent) {
+        int maxProjects = 5;
+        int displayCount = Math.min(projects.size(), maxProjects);
+        
+        for (int i = 0; i < displayCount; i++) {
+            reportConsumer.accept(indent + "└─ " + projects.get(i));
+        }
+        
+        if (projects.size() > maxProjects) {
+            int remaining = projects.size() - maxProjects;
+            reportConsumer.accept(indent + "└─ ... and " + remaining + " more ...");
+        }
+    }
+
+    /**
      * Displays the indirect usage chain as a tree structure.
      */
     private void displayIndirectUsageTree(IInstallableUnit unit, UsageReport report, Consumer<String> reportConsumer,
-            Set<IInstallableUnit> reportedUnits, Map<IInstallableUnit, List<IInstallableUnit>> shortestPaths) {
+            Set<IInstallableUnit> reportedUnits, Map<IInstallableUnit, List<IInstallableUnit>> shortestPaths, 
+            boolean verbose) {
         Set<IInstallableUnit> allChildren = report.getAllChildren(unit);
         Set<IInstallableUnit> usedChildren = allChildren.stream()
                 .filter(report.usedUnits::contains)
                 // Filter out synthetic JRE units
-                .filter(child -> !child.getId().equals("a.jre.javase"))
+                .filter(child -> !child.getId().equals(SYNTHETIC_JRE_UNIT_ID))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         
         if (usedChildren.isEmpty()) {
@@ -242,7 +339,7 @@ final class TreeUsageReportLayout implements ReportLayout {
             IInstallableUnit pathUnit = shortestPath.get(i);
             
             // Skip synthetic JRE units
-            if (pathUnit.getId().equals("a.jre.javase")) {
+            if (pathUnit.getId().equals(SYNTHETIC_JRE_UNIT_ID)) {
                 continue;
             }
             
@@ -256,7 +353,7 @@ final class TreeUsageReportLayout implements ReportLayout {
             String indent = indentBuilder.toString();
             String connector = "└─";
             
-            String line = indent + connector + " " + pathUnit;
+            String line = indent + connector + " " + formatUnit(pathUnit);
             
             // If this is the last node and it's used, add project count
             if (isLast && report.usedUnits.contains(pathUnit)) {
@@ -264,9 +361,16 @@ final class TreeUsageReportLayout implements ReportLayout {
                         .filter(entry -> entry.getValue().contains(pathUnit))
                         .map(project -> project.getKey().getId()).toList();
                 line += " (" + projects.size() + " project" + (projects.size() == 1 ? "" : "s") + ")";
+                reportConsumer.accept(line);
+                
+                // If verbose, display the project IDs
+                if (verbose) {
+                    String projectIndent = indent + "   ";
+                    displayProjectList(projects, reportConsumer, projectIndent);
+                }
+            } else {
+                reportConsumer.accept(line);
             }
-            
-            reportConsumer.accept(line);
         }
     }
 
@@ -309,7 +413,7 @@ final class TreeUsageReportLayout implements ReportLayout {
 
         for (IInstallableUnit usedUnit : report.usedUnits) {
             // Skip synthetic JRE units
-            if (usedUnit.getId().equals("a.jre.javase")) {
+            if (usedUnit.getId().equals(SYNTHETIC_JRE_UNIT_ID)) {
                 continue;
             }
 
@@ -318,7 +422,7 @@ final class TreeUsageReportLayout implements ReportLayout {
 
             for (IInstallableUnit rootUnit : rootUnits) {
                 // Skip synthetic JRE units
-                if (rootUnit.getId().equals("a.jre.javase")) {
+                if (rootUnit.getId().equals(SYNTHETIC_JRE_UNIT_ID)) {
                     continue;
                 }
 
@@ -373,7 +477,7 @@ final class TreeUsageReportLayout implements ReportLayout {
             IInstallableUnit unit = unitInfo.unit;
 
             // Skip synthetic JRE units
-            if (unit.getId().equals("a.jre.javase")) {
+            if (unit.getId().equals(SYNTHETIC_JRE_UNIT_ID)) {
                 continue;
             }
 

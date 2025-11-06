@@ -68,7 +68,7 @@ public class TreeUsageReportLayoutTest {
         
         // Collect report output using TreeLayout
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Verify structure
         String fullReport = String.join("\n", reportLines);
@@ -122,7 +122,7 @@ public class TreeUsageReportLayoutTest {
         
         // Collect report output using TreeLayout
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Verify indirect usage is shown
         String fullReport = String.join("\n", reportLines);
@@ -157,7 +157,7 @@ public class TreeUsageReportLayoutTest {
         TreeUsageReportLayout layout = new TreeUsageReportLayout(80);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, layout);
+        layout.generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -202,7 +202,7 @@ public class TreeUsageReportLayoutTest {
         
         // Collect report
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -239,7 +239,7 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -293,15 +293,17 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
-        // Verify the new tree format with └─ connectors
-        assertTrue(fullReport.contains("[INDIRECTLY USED]"), "Should show INDIRECTLY USED status");
+        // Note: Feature A shows as USED (not INDIRECTLY USED) because there's no other feature in the path
+        // This is the new behavior per requirements
+        assertTrue(fullReport.contains("[USED]"), "Should show USED status for feature without another feature in path");
         assertTrue(fullReport.contains("└─"), "Should use tree connector");
         assertTrue(fullReport.contains("(5 projects)"), "Should show project count on final node");
         assertFalse(fullReport.contains("Via:"), "Should not use old 'Via:' format");
+        assertTrue(fullReport.contains("(feature)"), "Should show (feature) label for feature.group units");
     }
 
     /**
@@ -353,7 +355,7 @@ public class TreeUsageReportLayoutTest {
         report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(sharedUnit);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -404,7 +406,7 @@ public class TreeUsageReportLayoutTest {
         report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(realUnit);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -458,7 +460,7 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Find the order of locations in the output
         int indexB = -1, indexC = -1, indexA = -1;
@@ -519,7 +521,7 @@ public class TreeUsageReportLayoutTest {
         report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit3);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Find the order of units in the output
         int indexAlpha = -1, indexBeta = -1, indexGamma = -1;
@@ -563,13 +565,248 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
         // Verify location shows project count
         assertTrue(fullReport.contains("Location: TestLocation (3 projects)"), 
             "Location should show project count");
+    }
+
+    /**
+     * Tests that feature.group units are formatted with (feature) suffix.
+     */
+    @Test
+    void testFeatureGroupFormatting() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit featureUnit = createMockUnit("org.eclipse.equinox.p2.discovery.feature.feature.group", 
+                "1.3.900.v20250616-0711");
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(featureUnit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(featureUnit, targetDef, "Location1", null);
+        report.usedUnits.add(featureUnit);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(featureUnit);
+        
+        List<String> reportLines = new ArrayList<>();
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify feature group formatting: suffix removed and (feature) added
+        assertTrue(fullReport.contains("org.eclipse.equinox.p2.discovery.feature 1.3.900.v20250616-0711 (feature)"), 
+            "Feature group should be formatted without .feature.group suffix and with (feature) label");
+        assertFalse(fullReport.contains(".feature.group"), 
+            "Should not contain .feature.group in the output");
+    }
+
+    /**
+     * Tests that indirectly used features show as [USED] when no other feature is in the path.
+     */
+    @Test
+    void testFeatureShowsAsUsedWhenIndirect() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit featureUnit = createMockUnit("org.eclipse.emf.ecore.edit.feature.group", "2.17.0.v20240604-0832");
+        IInstallableUnit bundleUnit = createMockUnit("org.eclipse.emf.ecore.edit", "2.15.0.v20240604-0832");
+        
+        // Set up requirements: feature > bundle
+        IRequirement reqBundle = createRequirement("org.eclipse.emf.ecore.edit", "2.15.0.v20240604-0832");
+        when(featureUnit.getRequirements()).thenReturn(Arrays.asList(reqBundle));
+        when(bundleUnit.satisfies(reqBundle)).thenReturn(true);
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(featureUnit, bundleUnit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(featureUnit, targetDef, "Location1", null);
+        report.reportProvided(bundleUnit, targetDef, "Location1", featureUnit);
+        
+        // Mark only bundle as used
+        report.usedUnits.add(bundleUnit);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(bundleUnit);
+        
+        List<String> reportLines = new ArrayList<>();
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Feature should show as USED (not INDIRECTLY USED) since there's no other feature in the path
+        assertTrue(fullReport.contains("org.eclipse.emf.ecore.edit 2.17.0.v20240604-0832 (feature) [USED]"), 
+            "Feature should show as [USED] when indirectly used without another feature in path");
+        assertFalse(fullReport.contains("[INDIRECTLY USED]"), 
+            "Should not show INDIRECTLY USED for feature without another feature in path");
+    }
+
+    /**
+     * Tests that features show as [INDIRECTLY USED] when another feature is in the path.
+     */
+    @Test
+    void testFeatureShowsAsIndirectlyUsedWithFeatureInPath() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit feature1 = createMockUnit("org.eclipse.swtbot.eclipse.feature.group", "4.3.0.202506021445");
+        IInstallableUnit feature2 = createMockUnit("org.eclipse.swtbot.feature.group", "4.3.0.202506021445");
+        IInstallableUnit bundleUnit = createMockUnit("org.hamcrest.library", "2.2.0.v20230809-1000");
+        
+        // Set up requirements: feature1 > feature2 > bundle
+        IRequirement reqFeature2 = createRequirement("org.eclipse.swtbot.feature.group", "4.3.0.202506021445");
+        IRequirement reqBundle = createRequirement("org.hamcrest.library", "2.2.0.v20230809-1000");
+        when(feature1.getRequirements()).thenReturn(Arrays.asList(reqFeature2));
+        when(feature2.getRequirements()).thenReturn(Arrays.asList(reqBundle));
+        when(feature2.satisfies(reqFeature2)).thenReturn(true);
+        when(bundleUnit.satisfies(reqBundle)).thenReturn(true);
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(feature1, feature2, bundleUnit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(feature1, targetDef, "Location1", null);
+        report.reportProvided(feature2, targetDef, "Location1", feature1);
+        report.reportProvided(bundleUnit, targetDef, "Location1", feature2);
+        
+        // Mark only bundle as used
+        report.usedUnits.add(bundleUnit);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(bundleUnit);
+        
+        List<String> reportLines = new ArrayList<>();
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Feature should show as INDIRECTLY USED since another feature is in the path
+        assertTrue(fullReport.contains("org.eclipse.swtbot.eclipse 4.3.0.202506021445 (feature) [INDIRECTLY USED]"), 
+            "Feature should show as [INDIRECTLY USED] when another feature is in path");
+    }
+
+    /**
+     * Tests verbose mode shows project IDs under used units.
+     */
+    @Test
+    void testVerboseModeShowsProjectIds() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit unit = createMockUnit("org.jdom2", "2.0.6.v20230720-0727");
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(unit, targetDef, "Location1", null);
+        report.usedUnits.add(unit);
+        
+        // Add 3 projects
+        for (int i = 1; i <= 3; i++) {
+            MavenProject project = createMockProject("project" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit);
+        }
+        
+        List<String> reportLines = new ArrayList<>();
+        new TreeUsageReportLayout().generateReport(report, true, reportLines::add);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify project IDs are shown in verbose mode
+        assertTrue(fullReport.contains("└─ project1"), "Should show project1 in verbose mode");
+        assertTrue(fullReport.contains("└─ project2"), "Should show project2 in verbose mode");
+        assertTrue(fullReport.contains("└─ project3"), "Should show project3 in verbose mode");
+    }
+
+    /**
+     * Tests verbose mode limits project display to 5 with "and X more" message.
+     */
+    @Test
+    void testVerboseModeLimitsProjectDisplay() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit unit = createMockUnit("org.jdom2", "2.0.6.v20230720-0727");
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(unit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(unit, targetDef, "Location1", null);
+        report.usedUnits.add(unit);
+        
+        // Add 28 projects
+        for (int i = 1; i <= 28; i++) {
+            MavenProject project = createMockProject("project" + i);
+            report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit);
+        }
+        
+        List<String> reportLines = new ArrayList<>();
+        new TreeUsageReportLayout().generateReport(report, true, reportLines::add);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify only 5 projects are shown with "and 23 more" message
+        // Count how many project lines are shown
+        long projectLineCount = reportLines.stream()
+                .filter(line -> line.contains("└─ project"))
+                .filter(line -> !line.contains("more"))
+                .count();
+        
+        assertTrue(projectLineCount == 5, "Should show exactly 5 project lines, but got " + projectLineCount);
+        assertTrue(fullReport.contains("└─ ... and 23 more ..."), "Should show 'and 23 more' message");
+    }
+
+    /**
+     * Tests that units with only JRE dependencies show as UNUSED not INDIRECTLY USED.
+     */
+    @Test
+    void testUnitWithOnlyJreDependenciesShowsAsUnused() {
+        UsageReport report = new UsageReport();
+        
+        IInstallableUnit rootUnit = createMockUnit("org.eclipse.equinox.executable.feature.group", 
+                "3.8.3000.v20250801-0854");
+        IInstallableUnit jreUnit = createMockUnit("a.jre.javase", "21.0.0");
+        
+        // Set up requirements: root > jre only
+        IRequirement reqJre = createRequirement("a.jre.javase", "21.0.0");
+        when(rootUnit.getRequirements()).thenReturn(Arrays.asList(reqJre));
+        when(jreUnit.satisfies(reqJre)).thenReturn(true);
+        
+        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        TargetDefinitionContent content = createMockContent(rootUnit, jreUnit);
+        
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
+        
+        report.reportProvided(rootUnit, targetDef, "Location1", null);
+        report.reportProvided(jreUnit, targetDef, "Location1", rootUnit);
+        
+        // Mark JRE unit as used (but it will be filtered)
+        report.usedUnits.add(jreUnit);
+        MavenProject project = createMockProject("project1");
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(jreUnit);
+        
+        List<String> reportLines = new ArrayList<>();
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Root unit should show as UNUSED since its only child (JRE) is filtered out
+        assertTrue(fullReport.contains("org.eclipse.equinox.executable 3.8.3000.v20250801-0854 (feature) [UNUSED]"), 
+            "Unit with only JRE dependencies should show as UNUSED");
+        assertFalse(fullReport.contains("[INDIRECTLY USED]"), 
+            "Should not show INDIRECTLY USED when only JRE units are children");
     }
 
     // Helper methods for creating mock objects
