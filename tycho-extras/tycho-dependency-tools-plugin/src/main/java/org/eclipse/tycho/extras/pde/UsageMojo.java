@@ -31,6 +31,7 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
+import org.eclipse.equinox.p2.metadata.IRequirement;
 import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.equinox.p2.metadata.VersionRange;
 import org.eclipse.equinox.p2.query.QueryUtil;
@@ -122,6 +123,11 @@ public class UsageMojo extends AbstractMojo {
                 }
             }
         }
+        // Expand feature requirements to include all bundles they require
+        Set<IInstallableUnit> expandedUnits = expandFeatureRequirements(usageReport.usedUnits,
+                usageReport.targetFileUnits.values());
+        usageReport.usedUnits.clear();
+        usageReport.usedUnits.addAll(expandedUnits);
         log.info("###### DEPENDECIES USAGE REPORT #######");
         log.info("Your build uses " + usageReport.usedUnits.size() + " dependencies.");
         log.info("Your build uses " + usageReport.targetFiles.size() + " target file(s).");
@@ -169,6 +175,52 @@ public class UsageMojo extends AbstractMojo {
             }
             found.ifPresent(iu -> usageReport.reportProvided(iu, file, location));
         }
+    }
+
+    /**
+     * Expands feature IUs to find their bundle requirements recursively.
+     * When a feature.group IU is encountered, this method collects all bundles
+     * that the feature requires, either directly or through nested features.
+     *
+     * @param units the set of IUs to expand (may include feature.group IUs)
+     * @param allContent all available target content to query for requirements
+     * @return expanded set of IUs including all transitively required bundles
+     */
+    private Set<IInstallableUnit> expandFeatureRequirements(Set<IInstallableUnit> units,
+            Collection<TargetDefinitionContent> allContent) {
+        Set<IInstallableUnit> expanded = new HashSet<>(units);
+        Set<IInstallableUnit> toProcess = new HashSet<>(units);
+        Set<IInstallableUnit> processed = new HashSet<>();
+
+        while (!toProcess.isEmpty()) {
+            IInstallableUnit iu = toProcess.iterator().next();
+            toProcess.remove(iu);
+            processed.add(iu);
+
+            // Check if this is a feature.group IU
+            if (iu.getId().endsWith(".feature.group")) {
+                // Expand its requirements
+                for (IRequirement requirement : iu.getRequirements()) {
+                    // Find IUs that satisfy this requirement in the target content
+                    for (TargetDefinitionContent content : allContent) {
+                        Set<IInstallableUnit> satisfyingUnits = content.query(QueryUtil.ALL_UNITS, null).stream()
+                                .filter(candidate -> candidate.satisfies(requirement))
+                                .collect(Collectors.toSet());
+
+                        for (IInstallableUnit satisfying : satisfyingUnits) {
+                            if (expanded.add(satisfying) && !processed.contains(satisfying)) {
+                                // If this is a new feature, add it to be processed
+                                if (satisfying.getId().endsWith(".feature.group")) {
+                                    toProcess.add(satisfying);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return expanded;
     }
 
     private static final class UsageReport {
