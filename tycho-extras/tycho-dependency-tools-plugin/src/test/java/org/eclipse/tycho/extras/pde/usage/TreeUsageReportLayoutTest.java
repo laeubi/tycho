@@ -68,7 +68,7 @@ public class TreeUsageReportLayoutTest {
         
         // Collect report output using TreeLayout
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Verify structure
         String fullReport = String.join("\n", reportLines);
@@ -122,7 +122,7 @@ public class TreeUsageReportLayoutTest {
         
         // Collect report output using TreeLayout
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Verify indirect usage is shown
         String fullReport = String.join("\n", reportLines);
@@ -157,7 +157,7 @@ public class TreeUsageReportLayoutTest {
         TreeUsageReportLayout layout = new TreeUsageReportLayout(80);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, layout);
+        layout.generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -202,7 +202,7 @@ public class TreeUsageReportLayoutTest {
         
         // Collect report
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -239,7 +239,7 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -293,7 +293,7 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -353,7 +353,7 @@ public class TreeUsageReportLayoutTest {
         report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(sharedUnit);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -404,7 +404,7 @@ public class TreeUsageReportLayoutTest {
         report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(realUnit);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
@@ -458,7 +458,7 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Find the order of locations in the output
         int indexB = -1, indexC = -1, indexA = -1;
@@ -519,7 +519,7 @@ public class TreeUsageReportLayoutTest {
         report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unit3);
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         // Find the order of units in the output
         int indexAlpha = -1, indexBeta = -1, indexGamma = -1;
@@ -563,7 +563,7 @@ public class TreeUsageReportLayoutTest {
         }
         
         List<String> reportLines = new ArrayList<>();
-        report.generateReport(reportLines::add, new TreeUsageReportLayout());
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
         
