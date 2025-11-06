@@ -372,7 +372,7 @@ public class UsageReportTest {
         
         // Verify report contains expected elements
         String fullReport = String.join("\n", reportLines);
-        assertTrue(fullReport.contains("DEPENDECIES USAGE REPORT"), "Should contain report header");
+        assertTrue(fullReport.contains("DEPENDENCIES USAGE REPORT"), "Should contain report header");
         assertTrue(fullReport.contains("unitA") && fullReport.contains("is used by"), 
                 "Should report unitA as used");
         assertTrue(fullReport.contains("unitB") && fullReport.contains("INDIRECTLY used"), 

@@ -25,7 +25,7 @@ final class SimpleUsageReportLayout implements ReportLayout {
 
     @Override
     public void generateReport(UsageReport report, Consumer<String> reportConsumer) {
-        reportConsumer.accept("###### DEPENDECIES USAGE REPORT #######");
+        reportConsumer.accept("###### DEPENDENCIES USAGE REPORT #######");
         reportConsumer.accept("Your build uses " + report.usedUnits.size() + " dependencies.");
         reportConsumer.accept("Your build uses " + report.targetFiles.size() + " target file(s).");
         report.targetFiles.forEach(targetFile -> {
