@@ -30,7 +30,19 @@ import org.eclipse.tycho.eclipsebuild.AbstractEclipseBuildMojo;
 import org.eclipse.tycho.model.project.EclipseProject;
 
 /**
- * This mojo allows to perform eclipse cleanup action
+ * Applies Eclipse JDT code cleanup actions to Java source files in the project.
+ * <p>
+ * This mojo performs automated code cleanup operations on Java files using Eclipse's cleanup
+ * engine. It can apply a custom cleanup profile or use the project's existing cleanup settings.
+ * The cleanup operations may include formatting, organizing imports, removing unused code,
+ * adding missing annotations, and other code quality improvements.
+ * </p>
+ * <p>
+ * The mojo can optionally update the project's cleanup profile and save action settings in the
+ * {@code .settings/org.eclipse.jdt.ui.prefs} file after cleanup is performed.
+ * </p>
+ * 
+ * @see CleanupPreferencesUpdater
  */
 @Mojo(name = "cleanup", defaultPhase = LifecyclePhase.PROCESS_SOURCES, threadSafe = true, requiresDependencyCollection = ResolutionScope.COMPILE_PLUS_RUNTIME)
 public class CleanUpMojo extends AbstractEclipseBuildMojo<CleanupResult> {
@@ -101,7 +113,7 @@ public class CleanUpMojo extends AbstractEclipseBuildMojo<CleanupResult> {
 		builder.h3("The following cleanups were applied:");
 		result.cleanups().forEach(cleanup -> {
 			builder.addListItem(cleanup);
-			getLog().info("CleanUp: " + cleanup);
+			getLog().info("Applied cleanup: " + cleanup);
 		});
 		builder.newLine();
 		builder.newLine();
@@ -113,28 +125,28 @@ public class CleanUpMojo extends AbstractEclipseBuildMojo<CleanupResult> {
 				if (Files.isRegularFile(prefsFile)) {
 					try (CleanupPreferencesUpdater updater = new CleanupPreferencesUpdater(prefsFile, cleanUpProfile)) {
 						if (updateProjectCleanupProfile) {
-							if (updateProjectCleanupProfile) {
-								if (updater.hasCleanupProfile()) {
-									updater.updateProjectCleanupProfile();
-								} else {
-									getLog().info(
-											"Project does not specify a cleanup profile in the settings, profile update is skipped.");
-								}
+							if (updater.hasCleanupProfile()) {
+								updater.updateProjectCleanupProfile();
+								getLog().info("Updated cleanup profile settings in project preferences");
+							} else {
+								getLog().info(
+										"Project preferences do not specify a cleanup profile, skipping profile update");
 							}
-							if (updateProjectSaveActions) {
-								if (updater.hasSaveActions()) {
-									updater.updateSaveActions();
-								} else {
-									getLog().info("Project has disabled additional save actions, update skipped.");
-								}
+						}
+						if (updateProjectSaveActions) {
+							if (updater.hasSaveActions()) {
+								updater.updateSaveActions();
+								getLog().info("Updated save action settings in project preferences");
+							} else {
+								getLog().info("Project has disabled additional save actions, skipping save action update");
 							}
 						}
 					}
 				} else {
-					getLog().info("No project settings found, update is skipped!");
+					getLog().info("Project preferences file not found, skipping settings update");
 				}
 			} catch (IOException e) {
-				getLog().warn("Can't update project settings", e);
+				getLog().warn("Failed to update project preferences", e);
 			}
 		}
 	}

@@ -22,6 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Updates Eclipse JDT cleanup preferences in the org.eclipse.jdt.ui.prefs file.
+ * <p>
+ * This class manages updates to cleanup profile settings and save actions in Eclipse project
+ * preferences. It supports updating both the main cleanup profile settings and the save action
+ * settings (prefixed with "sp_"). Changes are written back to the file only when {@link #close()}
+ * is called and updates have been made.
+ * </p>
+ */
 public class CleanupPreferencesUpdater implements AutoCloseable {
 
 	private Path prefsFile;
@@ -29,12 +38,29 @@ public class CleanupPreferencesUpdater implements AutoCloseable {
 	private List<String> lines;
 	private Map<String, String> cleanUpProfile;
 
+	/**
+	 * Creates a new updater for the specified preferences file.
+	 * 
+	 * @param prefsFile
+	 *            the path to the org.eclipse.jdt.ui.prefs file
+	 * @param cleanUpProfile
+	 *            the cleanup profile settings to apply (key-value pairs)
+	 * @throws IOException
+	 *             if the file cannot be read
+	 */
 	public CleanupPreferencesUpdater(Path prefsFile, Map<String, String> cleanUpProfile) throws IOException {
 		this.prefsFile = prefsFile;
 		this.cleanUpProfile = cleanUpProfile;
 		this.lines = Files.readAllLines(prefsFile, StandardCharsets.UTF_8);
 	}
 
+	/**
+	 * Updates the project cleanup profile settings in the preferences file.
+	 * <p>
+	 * This method updates existing cleanup.* keys and adds any new keys from the cleanup profile.
+	 * Changes are marked for writing when {@link #close()} is called.
+	 * </p>
+	 */
 	public synchronized void updateProjectCleanupProfile() {
 		List<String> newLines = updateProjectSettingsFile(null, lines);
 		if (!newLines.equals(lines)) {
@@ -43,6 +69,14 @@ public class CleanupPreferencesUpdater implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Updates the save action settings in the preferences file.
+	 * <p>
+	 * This method updates existing sp_cleanup.* keys and adds any new keys from the cleanup
+	 * profile (prefixed with "sp_"). Changes are marked for writing when {@link #close()} is
+	 * called.
+	 * </p>
+	 */
 	public synchronized void updateSaveActions() {
 		List<String> newLines = updateProjectSettingsFile("sp_", lines);
 		if (!newLines.equals(lines)) {
@@ -51,6 +85,11 @@ public class CleanupPreferencesUpdater implements AutoCloseable {
 		}
 	}
 
+	/**
+	 * Checks if the preferences file contains a cleanup profile definition.
+	 * 
+	 * @return true if a cleanup_profile key is present, false otherwise
+	 */
 	public synchronized boolean hasCleanupProfile() {
 		for (String line : lines) {
 			KV kv = parseLine(line);
@@ -61,6 +100,11 @@ public class CleanupPreferencesUpdater implements AutoCloseable {
 		return false;
 	}
 
+	/**
+	 * Checks if the preferences file has save actions enabled.
+	 * 
+	 * @return true if sp_cleanup.on_save_use_additional_actions is set to true, false otherwise
+	 */
 	public synchronized boolean hasSaveActions() {
 		for (String line : lines) {
 			KV kv = parseLine(line);
@@ -96,6 +140,17 @@ public class CleanupPreferencesUpdater implements AutoCloseable {
 		return updatedLines;
 	}
 
+	/**
+	 * Writes any updates back to the preferences file if changes were made.
+	 * <p>
+	 * This method is called automatically when using try-with-resources. Only writes to the file
+	 * if {@link #updateProjectCleanupProfile()} or {@link #updateSaveActions()} were called and
+	 * resulted in changes.
+	 * </p>
+	 * 
+	 * @throws IOException
+	 *             if the file cannot be written
+	 */
 	@Override
 	public synchronized void close() throws IOException {
 		if (updated) {
@@ -116,6 +171,10 @@ public class CleanupPreferencesUpdater implements AutoCloseable {
 
 		public boolean matches(String prefix) {
 			if (value == null) {
+				return false;
+			}
+			// For prefixed updates, only match keys that actually have the prefix
+			if (prefix != null && !key.startsWith(prefix)) {
 				return false;
 			}
 			return key(prefix).startsWith("cleanup.");
