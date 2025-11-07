@@ -509,7 +509,7 @@ public class UsageReportTest {
         // Add IU location for unitA
         TargetDefinition.InstallableUnitLocation iuLocation = mock(TargetDefinition.InstallableUnitLocation.class);
         
-        // Store values before stubbing to avoid nested stubbing issues.
+        // Store values before stubbing to avoid Mockito UnfinishedStubbingException.
         // Calling getId() and getVersion() on mocks during when() statements creates
         // nested mock invocations that Mockito cannot handle properly.
         String unitAId = unitA.getId();
