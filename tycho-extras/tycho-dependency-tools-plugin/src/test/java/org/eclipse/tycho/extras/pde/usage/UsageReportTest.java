@@ -509,7 +509,9 @@ public class UsageReportTest {
         // Add IU location for unitA
         TargetDefinition.InstallableUnitLocation iuLocation = mock(TargetDefinition.InstallableUnitLocation.class);
         
-        // Store values before stubbing to avoid nested stubbing issues
+        // Store values before stubbing to avoid nested stubbing issues.
+        // Calling getId() and getVersion() on mocks during when() statements creates
+        // nested mock invocations that Mockito cannot handle properly.
         String unitAId = unitA.getId();
         String unitAVersion = unitA.getVersion().toString();
         
@@ -577,9 +579,7 @@ public class UsageReportTest {
     }
 
     /**
-     * Tests that a unit providing already-available transitive dependencies
-     * is reported as UNUSED when those dependencies are already provided by
-     * another used unit.
+     * Tests reporting of units with shared transitive dependencies.
      * 
      * <pre>
      * Location L1
@@ -595,11 +595,12 @@ public class UsageReportTest {
      *      └─ Requires Y (used by project)
      * </pre>
      * 
-     * In this case Q should be reported as UNUSED because Y is already
-     * provided transitively through A (which is indirectly used), making Q redundant.
+     * In this scenario, both A and Q are reported as INDIRECTLY used because they
+     * each have children (X and Y for A, Y for Q) that are used by the project.
+     * The fact that Y is provided by both units doesn't affect the indirect usage status.
      */
     @Test
-    void testRedundantUnitWithSharedTransitiveDependency() {
+    void testSharedTransitiveDependency() {
         UsageReport report = new UsageReport();
         
         // Create mock units for Location L1
@@ -662,15 +663,16 @@ public class UsageReportTest {
         assertTrue(fullReport.contains("unitA") && fullReport.contains("INDIRECTLY used"), 
                 "Unit A should be indirectly used through X and Y");
         
-        // Q should also be INDIRECTLY used because Y (one of its dependencies) is used
-        // Even though Y is also provided through A, Q is still indirectly used
+        // Q should also be INDIRECTLY used because Y is used. Any unit with used
+        // children is marked as indirectly used, regardless of whether those children
+        // are also available through other units.
         assertTrue(fullReport.contains("unitQ") && fullReport.contains("INDIRECTLY used"), 
                 "Unit Q should be reported as INDIRECTLY used because Y is used");
         
         // Verify Q is a root unit
         assertTrue(report.isRootUnit(unitQ), "Unit Q should be a root unit");
         
-        // Verify Q is indirectly used since Y is used
+        // Verify Q is indirectly used since Y (its child) is used
         assertTrue(report.isUsedIndirectly(unitQ), 
                 "Unit Q should be indirectly used since Y (its child) is used");
     }
