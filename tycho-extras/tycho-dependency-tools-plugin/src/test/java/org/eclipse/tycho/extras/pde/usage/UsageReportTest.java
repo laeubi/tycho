@@ -494,7 +494,7 @@ public class UsageReportTest {
         when(iuLocation.getUnits()).thenReturn((List) Arrays.asList(unitADef));
         TargetDefinition.Repository repo = mock(TargetDefinition.Repository.class);
         when(repo.getLocation()).thenReturn("LocationL1");
-        when(iuLocation.getRepositories()).thenReturn(Arrays.asList(repo));
+        when(iuLocation.getRepositories()).thenReturn((List) Arrays.asList(repo));
         
         List<TargetDefinition.Location> locationsA = new ArrayList<>();
         locationsA.add(refLocation);
@@ -702,9 +702,13 @@ public class UsageReportTest {
             // Create Unit mocks
             List<TargetDefinition.Unit> unitList = new ArrayList<>();
             for (IInstallableUnit iu : units) {
+                // Store values before stubbing to avoid nested stubbing issues
+                String unitId = iu.getId();
+                String unitVersion = iu.getVersion().toString();
+                
                 TargetDefinition.Unit unit = mock(TargetDefinition.Unit.class);
-                when(unit.getId()).thenReturn(iu.getId());
-                when(unit.getVersion()).thenReturn(iu.getVersion().toString());
+                when(unit.getId()).thenReturn(unitId);
+                when(unit.getVersion()).thenReturn(unitVersion);
                 unitList.add(unit);
             }
             when(iuLocation.getUnits()).thenReturn((List) unitList);
