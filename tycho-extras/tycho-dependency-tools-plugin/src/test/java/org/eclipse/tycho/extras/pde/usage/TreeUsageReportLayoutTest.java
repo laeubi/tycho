@@ -54,8 +54,7 @@ public class TreeUsageReportLayoutTest {
         // Create mock target definition
         TargetDefinition targetDef = createMockTargetDefinition("my-target.target");
         TargetDefinitionContent content = createMockContent(unitA, unitB);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         // Report units
         report.reportProvided(unitA, targetDef, "LocationL1", null);
@@ -108,8 +107,7 @@ public class TreeUsageReportLayoutTest {
         // Create mock target definition
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unitA, unitB);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         // Report units
         report.reportProvided(unitA, targetDef, "LocationL", null);
@@ -145,8 +143,7 @@ public class TreeUsageReportLayoutTest {
         
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unitA);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(unitA, targetDef, longLocation, null);
         report.usedUnits.add(unitA);
@@ -184,10 +181,8 @@ public class TreeUsageReportLayoutTest {
         TargetDefinitionContent content1 = createMockContent(unitA);
         TargetDefinitionContent content2 = createMockContent(unitB);
         
-        report.targetFiles.add(targetDef1);
-        report.targetFiles.add(targetDef2);
-        report.targetFileUnits.put(targetDef1, content1);
-        report.targetFileUnits.put(targetDef2, content2);
+        report.registerTargetForTesting(targetDef1, content1);
+        report.registerTargetForTesting(targetDef2, content2);
         
         // Report units from different targets
         report.reportProvided(unitA, targetDef1, "Location1", null);
@@ -224,8 +219,7 @@ public class TreeUsageReportLayoutTest {
         
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unit);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(unit, targetDef, 
             "https://download.eclipse.org/webtools/downloads/drops/R3.39.0/R-3.39.0-20250902093744/repository/", 
@@ -272,8 +266,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unitA, unitB, unitC);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(unitA, targetDef, 
             "https://download.eclipse.org/modeling/emf/emf/builds/release/2.43.0", 
@@ -337,8 +330,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(root1, root2, intermediate1, intermediate2, sharedUnit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         // Report the dependency chains
         report.reportProvided(root1, targetDef, "Location1", null);
@@ -391,8 +383,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(rootUnit, jreUnit, realUnit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(rootUnit, targetDef, "Location1", null);
         report.reportProvided(jreUnit, targetDef, "Location1", rootUnit);
@@ -432,8 +423,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unit1, unit2, unit3);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         // LocationA: 2 projects use unit1
         report.reportProvided(unit1, targetDef, "LocationA", null);
@@ -493,8 +483,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unit1, unit2, unit3);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         String location = "LocationX";
         
@@ -552,8 +541,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(unit, targetDef, "TestLocation", null);
         report.usedUnits.add(unit);
@@ -587,8 +575,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(featureUnit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(featureUnit, targetDef, "Location1", null);
         report.usedUnits.add(featureUnit);
@@ -625,8 +612,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(featureUnit, bundleUnit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(featureUnit, targetDef, "Location1", null);
         report.reportProvided(bundleUnit, targetDef, "Location1", featureUnit);
@@ -670,8 +656,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(feature1, feature2, bundleUnit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(feature1, targetDef, "Location1", null);
         report.reportProvided(feature2, targetDef, "Location1", feature1);
@@ -704,8 +689,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(unit, targetDef, "Location1", null);
         report.usedUnits.add(unit);
@@ -739,8 +723,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(unit, targetDef, "Location1", null);
         report.usedUnits.add(unit);
@@ -786,8 +769,7 @@ public class TreeUsageReportLayoutTest {
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(rootUnit, jreUnit);
         
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        report.registerTargetForTesting(targetDef, content);
         
         report.reportProvided(rootUnit, targetDef, "Location1", null);
         report.reportProvided(jreUnit, targetDef, "Location1", rootUnit);

@@ -45,7 +45,7 @@ final class UsageReport {
     /**
      * A collection of all used target definitions in the reactor
      */
-    final Set<TargetDefinition> targetFiles = new HashSet<>();
+    private final Set<TargetDefinition> targetFiles = new HashSet<>();
 
     /**
      * Maps a target definition to a list of other targets where it is referenced
@@ -54,7 +54,7 @@ final class UsageReport {
     /**
      * Maps a target definition to its actual content
      */
-    final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
+    private final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
     /**
      * Maps a unit to the set of definition files this unit is defined in
      */
@@ -364,6 +364,46 @@ final class UsageReport {
             }
         }
         return false;
+    }
+
+    /**
+     * Returns an unmodifiable set of all target files analyzed by this report.
+     * 
+     * @return unmodifiable set of target definitions
+     */
+    Set<TargetDefinition> getTargetFiles() {
+        return Set.copyOf(targetFiles);
+    }
+
+    /**
+     * Returns the number of target files analyzed by this report.
+     * 
+     * @return the count of target files
+     */
+    int getTargetFilesCount() {
+        return targetFiles.size();
+    }
+
+    /**
+     * Returns the target definition content for the specified target definition.
+     * 
+     * @param targetDefinition the target definition to get content for
+     * @return the target definition content, or null if not found
+     */
+    TargetDefinitionContent getTargetDefinitionContent(TargetDefinition targetDefinition) {
+        return targetFileUnits.get(targetDefinition);
+    }
+
+    /**
+     * Helper method for tests to register a target definition and its content.
+     * Package-private for testing purposes only.
+     * 
+     * @param targetDefinition the target definition to register
+     * @param content the content of the target definition
+     */
+    void registerTargetForTesting(TargetDefinition targetDefinition, TargetDefinitionContent content) {
+        targetFiles.add(targetDefinition);
+        targetFileUnits.put(targetDefinition, content);
     }
 
 }
