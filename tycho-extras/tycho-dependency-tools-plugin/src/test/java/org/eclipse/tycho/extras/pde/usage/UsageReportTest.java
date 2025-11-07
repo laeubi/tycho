@@ -13,6 +13,7 @@ package org.eclipse.tycho.extras.pde.usage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -770,22 +771,40 @@ public class UsageReportTest {
         return targetDef;
     }
 
+    @SuppressWarnings("unchecked")
     private TargetDefinitionContent createMockContent(IInstallableUnit... units) {
         TargetDefinitionContent content = mock(TargetDefinitionContent.class);
         Set<IInstallableUnit> unitSet = new HashSet<>(Arrays.asList(units));
         
-        IQueryResult<IInstallableUnit> queryResult = mock(IQueryResult.class);
-        when(queryResult.toSet()).thenReturn(unitSet);
-        when(queryResult.stream()).thenReturn(unitSet.stream());
-        when(content.query(QueryUtil.ALL_UNITS, null)).thenReturn(queryResult);
+        IQueryResult<IInstallableUnit> allUnitsResult = mock(IQueryResult.class);
+        when(allUnitsResult.toSet()).thenReturn(unitSet);
+        when(allUnitsResult.stream()).thenReturn(unitSet.stream());
         
-        // Also support specific IU queries
-        for (IInstallableUnit unit : units) {
-            IQueryResult<IInstallableUnit> singleResult = mock(IQueryResult.class);
-            when(singleResult.stream()).thenReturn(Stream.of(unit));
-            when(singleResult.toSet()).thenReturn(Set.of(unit));
-            when(content.query(QueryUtil.createIUQuery(unit.getId(), unit.getVersion()), null)).thenReturn(singleResult);
-        }
+        // Handle queries by matching against the IInstallableUnits
+        when(content.query(any(), any())).thenAnswer(invocation -> {
+            Object queryArg = invocation.getArgument(0);
+            
+            // Special case for ALL_UNITS query
+            if (queryArg == QueryUtil.ALL_UNITS) {
+                return allUnitsResult;
+            }
+            
+            // For IU queries, perform the query on our unit set
+            Set<IInstallableUnit> matchingUnits = new HashSet<>();
+            if (queryArg instanceof org.eclipse.equinox.p2.query.IQuery) {
+                org.eclipse.equinox.p2.query.IQuery<IInstallableUnit> query = 
+                    (org.eclipse.equinox.p2.query.IQuery<IInstallableUnit>) queryArg;
+                
+                // Perform the query on our unit set
+                IQueryResult<IInstallableUnit> queryResult = query.perform(unitSet.iterator());
+                matchingUnits = queryResult.toSet();
+            }
+            
+            IQueryResult<IInstallableUnit> result = mock(IQueryResult.class);
+            when(result.toSet()).thenReturn(matchingUnits);
+            when(result.stream()).thenReturn(matchingUnits.stream());
+            return result;
+        });
         
         return content;
     }
