@@ -54,15 +54,17 @@ public class TreeUsageReportLayoutTest {
         IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
         IInstallableUnit unitB = createMockUnit("unitB", "1.0.0");
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("my-target.target");
+        // Create target definition with units in different locations
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL1", Arrays.asList(unitA),
+            "LocationL2", Arrays.asList(unitB)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("my-target.target", locationUnits);
         TargetDefinitionContent content = createMockContent(unitA, unitB);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report units
-        report.reportProvided(unitA, targetDef, "LocationL1", null);
-        report.reportProvided(unitB, targetDef, "LocationL2", null);
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Mark A as used
         MavenProject project = createMockProject("project1");
@@ -108,15 +110,17 @@ public class TreeUsageReportLayoutTest {
         when(unitA.getRequirements()).thenReturn(Arrays.asList(reqB));
         when(unitB.satisfies(reqB)).thenReturn(true);
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with unitA in LocationL
+        // analyzeLocations will discover unitB as a dependency of unitA
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
         TargetDefinitionContent content = createMockContent(unitA, unitB);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report units
-        report.reportProvided(unitA, targetDef, "LocationL", null);
-        report.reportProvided(unitB, targetDef, "LocationL", unitA);
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Mark only B as used
         report.usedUnits.add(unitB);
@@ -146,12 +150,16 @@ public class TreeUsageReportLayoutTest {
         // Create target with a long location name
         String longLocation = "https://download.eclipse.org/releases/2024-09/202409111000/plugins/repository";
         
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            longLocation, Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
         TargetDefinitionContent content = createMockContent(unitA);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        report.reportProvided(unitA, targetDef, longLocation, null);
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
+        
         report.usedUnits.add(unitA);
         MavenProject project = createMockProject("project1");
         report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitA);
@@ -181,20 +189,23 @@ public class TreeUsageReportLayoutTest {
         IInstallableUnit unitB = createMockUnit("unitB", "1.0.0");
         
         // Create two target definitions
-        TargetDefinition targetDef1 = createMockTargetDefinition("target1.target");
-        TargetDefinition targetDef2 = createMockTargetDefinition("target2.target");
-        
+        Map<String, List<IInstallableUnit>> locationUnits1 = Map.of(
+            "Location1", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef1 = createMockTargetDefinitionWithIULocations("target1.target", locationUnits1);
         TargetDefinitionContent content1 = createMockContent(unitA);
+        TargetDefinitionResolver resolver1 = createMockResolver(targetDef1, content1);
+        
+        Map<String, List<IInstallableUnit>> locationUnits2 = Map.of(
+            "Location2", Arrays.asList(unitB)
+        );
+        TargetDefinition targetDef2 = createMockTargetDefinitionWithIULocations("target2.target", locationUnits2);
         TargetDefinitionContent content2 = createMockContent(unitB);
+        TargetDefinitionResolver resolver2 = createMockResolver(targetDef2, content2);
         
-        report.targetFiles.add(targetDef1);
-        report.targetFileUnits.put(targetDef1, content1);
-        report.targetFiles.add(targetDef2);
-        report.targetFileUnits.put(targetDef2, content2);
-        
-        // Report units from different targets
-        report.reportProvided(unitA, targetDef1, "Location1", null);
-        report.reportProvided(unitB, targetDef2, "Location2", null);
+        // Analyze both targets using the proper API
+        report.analyzeLocations(targetDef1, resolver1, (l, e) -> {});
+        report.analyzeLocations(targetDef2, resolver2, (l, e) -> {});
         
         // Mark both as used
         MavenProject project = createMockProject("project1");
@@ -858,9 +869,13 @@ public class TreeUsageReportLayoutTest {
             // Create Unit mocks
             List<TargetDefinition.Unit> unitList = new ArrayList<>();
             for (IInstallableUnit iu : units) {
+                // Store values before stubbing to avoid nested stubbing issues
+                String unitId = iu.getId();
+                String unitVersion = iu.getVersion().toString();
+                
                 TargetDefinition.Unit unit = mock(TargetDefinition.Unit.class);
-                when(unit.getId()).thenReturn(iu.getId());
-                when(unit.getVersion()).thenReturn(iu.getVersion().toString());
+                when(unit.getId()).thenReturn(unitId);
+                when(unit.getVersion()).thenReturn(unitVersion);
                 unitList.add(unit);
             }
             when(iuLocation.getUnits()).thenReturn((List) unitList);
