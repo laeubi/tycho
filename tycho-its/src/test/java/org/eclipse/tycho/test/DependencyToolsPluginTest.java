@@ -10,14 +10,13 @@
  * Contributors:
  *     Christoph Läubrich - initial API and implementation
  *******************************************************************************/
-package org.eclipse.tycho.test.dependencytools;
+package org.eclipse.tycho.test;
 
 import org.apache.maven.it.Verifier;
-import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.version.TychoVersion;
 import org.junit.Test;
 
-public class UsageMojoTest extends AbstractTychoIntegrationTest {
+public class DependencyToolsPluginTest extends AbstractTychoIntegrationTest {
 
     @Test
     public void testUsage() throws Exception {

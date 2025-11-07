@@ -9,6 +9,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.extras.pde.usage;
 
+import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,7 @@ import org.eclipse.tycho.core.resolver.shared.IncludeSourceMode;
 import org.eclipse.tycho.core.resolver.shared.ReferencedRepositoryMode;
 import org.eclipse.tycho.p2maven.repository.P2RepositoryManager;
 import org.eclipse.tycho.p2resolver.TargetDefinitionResolverService;
+import org.eclipse.tycho.targetplatform.TargetDefinition;
 import org.eclipse.tycho.targetplatform.TargetDefinitionContent;
 import org.eclipse.tycho.targetplatform.TargetDefinitionFile;
 
@@ -104,15 +106,23 @@ public class UsageMojo extends AbstractMojo {
             List<TargetDefinitionFile> targets = tpconfig.getTargets();
             ExecutionEnvironment specification = projectManager.getExecutionEnvironmentConfiguration(project)
                     .getFullSpecification();
-            for (TargetDefinitionFile definitionFile : targets) {
-                if (usageReport.targetFiles.add(definitionFile)) {
-                    TargetDefinitionContent content = definitionResolverService.getTargetDefinitionContent(
-                            definitionFile, List.of(TargetEnvironment.getRunningEnvironment()),
+            TargetDefinitionResolver targetDefinitionResolver = new TargetDefinitionResolver() {
+                @Override
+                public TargetDefinition getTargetDefinition(URI uri) {
+                    return TargetDefinitionFile.read(uri);
+                }
+
+                @Override
+                public TargetDefinitionContent fetchContent(TargetDefinition definition) {
+                    return definitionResolverService.getTargetDefinitionContent(definition,
+                            List.of(TargetEnvironment.getRunningEnvironment()),
                             new StandardEEResolutionHints(specification), IncludeSourceMode.ignore,
                             ReferencedRepositoryMode.include, agent);
-                    usageReport.targetFileUnits.put(definitionFile, content);
-                    usageReport.analyzeLocations(definitionFile, (l, e) -> log.warn("Can't analyze location " + l, e));
                 }
+            };
+            for (TargetDefinitionFile definitionFile : targets) {
+                usageReport.analyzeLocations(definitionFile, targetDefinitionResolver,
+                        (l, e) -> log.warn("Can't analyze location " + l, e));
             }
         }
         reportLayout.generateReport(usageReport, verbose, log::info);

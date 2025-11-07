@@ -1,5 +1,6 @@
 package org.eclipse.tycho.extras.pde.usage;
 
+import java.net.URI;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -23,6 +24,7 @@ import org.eclipse.equinox.p2.query.QueryUtil;
 import org.eclipse.tycho.targetplatform.TargetDefinition;
 import org.eclipse.tycho.targetplatform.TargetDefinition.InstallableUnitLocation;
 import org.eclipse.tycho.targetplatform.TargetDefinition.Location;
+import org.eclipse.tycho.targetplatform.TargetDefinition.TargetReferenceLocation;
 import org.eclipse.tycho.targetplatform.TargetDefinition.Unit;
 import org.eclipse.tycho.targetplatform.TargetDefinitionContent;
 
@@ -44,6 +46,11 @@ final class UsageReport {
      * A collection of all used target definitions in the reactor
      */
     final Set<TargetDefinition> targetFiles = new HashSet<>();
+
+    /**
+     * Maps a target definition to a list of other targets where it is referenced
+     */
+    final Map<TargetDefinition, List<TargetDefinition>> targetReferences = new HashMap<>();
     /**
      * Maps a target definition to its actual content
      */
@@ -255,14 +262,24 @@ final class UsageReport {
         return List.of(start, end); // Fallback
     }
 
-    void analyzeLocations(TargetDefinition definitionFile, BiConsumer<Location, RuntimeException> exceptionConsumer) {
-        for (Location location : definitionFile.getLocations()) {
-            try {
-                if (location instanceof InstallableUnitLocation iu) {
-                    analyzeIULocation(definitionFile, iu);
+    void analyzeLocations(TargetDefinition definitionFile, TargetDefinitionResolver targetResolver,
+            BiConsumer<Location, RuntimeException> exceptionConsumer) {
+        if (targetFiles.add(definitionFile)) {
+            targetFileUnits.put(definitionFile, targetResolver.fetchContent(definitionFile));
+            for (Location location : definitionFile.getLocations()) {
+                try {
+                    if (location instanceof InstallableUnitLocation iu) {
+                        analyzeIULocation(definitionFile, iu);
+                    } else if (location instanceof TargetReferenceLocation ref) {
+                        TargetDefinition referenceTargetDefinition = targetResolver
+                                .getTargetDefinition(URI.create(ref.getUri()));
+                        targetReferences.computeIfAbsent(referenceTargetDefinition, nil -> new ArrayList<>())
+                                .add(definitionFile);
+                        analyzeLocations(referenceTargetDefinition, targetResolver, exceptionConsumer);
+                    }
+                } catch (RuntimeException e) {
+                    exceptionConsumer.accept(location, e);
                 }
-            } catch (RuntimeException e) {
-                exceptionConsumer.accept(location, e);
             }
         }
     }
