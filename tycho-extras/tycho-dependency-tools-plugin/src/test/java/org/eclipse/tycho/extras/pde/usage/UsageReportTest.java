@@ -16,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -384,6 +385,145 @@ public class UsageReportTest {
     }
 
     /**
+     * Tests that analyzeLocations correctly handles target definitions with references
+     * to other target files.
+     * 
+     * <pre>
+     * TargetA.target
+     *   ├─ References TargetB.target
+     *   
+     * TargetB.target
+     *   ├─ Location L
+     *      └─ Unit X (used by project)
+     * </pre>
+     */
+    @Test
+    void testTargetReferences() throws Exception {
+        UsageReport report = new UsageReport();
+        
+        // Create units
+        IInstallableUnit unitX = createMockUnit("unitX", "1.0.0");
+        
+        // Create target definitions
+        TargetDefinition targetA = createMockTargetDefinitionWithReference("targetA.target", "file:///targetB.target");
+        TargetDefinition targetB = createMockTargetDefinition("targetB.target");
+        
+        // Create content for targetB
+        TargetDefinitionContent contentB = createMockContent(unitX);
+        
+        // Create mock resolver
+        TargetDefinitionResolver resolver = new TargetDefinitionResolver() {
+            @Override
+            public TargetDefinition getTargetDefinition(URI uri) {
+                if (uri.toString().equals("file:///targetB.target")) {
+                    return targetB;
+                }
+                return null;
+            }
+            
+            @Override
+            public TargetDefinitionContent fetchContent(TargetDefinition definition) {
+                if (definition == targetB) {
+                    return contentB;
+                }
+                return createMockContent();
+            }
+        };
+        
+        // Analyze targetA which references targetB
+        report.analyzeLocations(targetA, resolver, (l, e) -> {});
+        
+        // Verify that targetB is tracked as referenced by targetA
+        assertTrue(report.targetReferences.containsKey(targetB), 
+                "targetB should be in targetReferences map");
+        assertTrue(report.targetReferences.get(targetB).contains(targetA),
+                "targetB should be referenced by targetA");
+        
+        // Verify both targets are in the targetFiles set
+        assertTrue(report.targetFiles.contains(targetA), "targetA should be in targetFiles");
+        assertTrue(report.targetFiles.contains(targetB), "targetB should be in targetFiles");
+    }
+    
+    /**
+     * Tests that the TreeUsageReportLayout correctly displays referenced target information.
+     * 
+     * <pre>
+     * TargetA.target
+     *   ├─ References TargetB.target
+     *   ├─ Location L1
+     *      └─ Unit A (used)
+     *   
+     * TargetB.target
+     *   ├─ Location L2
+     *      └─ Unit B (used)
+     * </pre>
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void testReportWithTargetReferences() throws Exception {
+        UsageReport report = new UsageReport();
+        
+        // Create units
+        IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
+        IInstallableUnit unitB = createMockUnit("unitB", "1.0.0");
+        
+        // Create target definitions
+        // TargetA has both a reference location and an IU location
+        TargetDefinition targetA = mock(TargetDefinition.class);
+        when(targetA.getOrigin()).thenReturn("targetA.target");
+        
+        TargetDefinition.TargetReferenceLocation refLocation = mock(TargetDefinition.TargetReferenceLocation.class);
+        when(refLocation.getUri()).thenReturn("file:///targetB.target");
+        
+        TargetDefinition.InstallableUnitLocation iuLocation = mock(TargetDefinition.InstallableUnitLocation.class);
+        
+        List<TargetDefinition.Location> locationsA = new ArrayList<>();
+        locationsA.add(refLocation);
+        locationsA.add(iuLocation);
+        when(targetA.getLocations()).thenReturn((List) locationsA);
+        
+        TargetDefinition targetB = createMockTargetDefinition("targetB.target");
+        
+        // Create content
+        TargetDefinitionContent contentA = createMockContent(unitA);
+        TargetDefinitionContent contentB = createMockContent(unitB);
+        
+        report.targetFiles.add(targetA);
+        report.targetFiles.add(targetB);
+        report.targetFileUnits.put(targetA, contentA);
+        report.targetFileUnits.put(targetB, contentB);
+        
+        // Set up the reference relationship
+        report.targetReferences.computeIfAbsent(targetB, k -> new ArrayList<>()).add(targetA);
+        
+        // Report units
+        report.reportProvided(unitA, targetA, "LocationL1", null);
+        report.reportProvided(unitB, targetB, "LocationL2", null);
+        
+        // Mark both units as used
+        MavenProject project = createMockProject("project1");
+        report.usedUnits.add(unitA);
+        report.usedUnits.add(unitB);
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitA);
+        report.projectUsage.computeIfAbsent(project, k -> new HashSet<>()).add(unitB);
+        
+        // Generate report using TreeLayout
+        List<String> reportLines = new ArrayList<>();
+        new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
+        
+        String fullReport = String.join("\n", reportLines);
+        
+        // Verify targetB shows it's referenced by targetA
+        assertTrue(fullReport.contains("Referenced in: targetA.target"), 
+                "targetB should show it's referenced by targetA");
+        
+        // Verify targetA shows it references targetB with USED status
+        // Note: targetB is USED because unitB is used
+        assertTrue(fullReport.contains("References: file:///targetB.target [USED]"), 
+                "targetA should show it references targetB with USED status");
+    }
+
+    /**
      * Tests that a unit providing already-available transitive dependencies
      * is reported as UNUSED when those dependencies are already provided by
      * another used unit.
@@ -515,6 +655,20 @@ public class UsageReportTest {
         TargetDefinition targetDef = mock(TargetDefinition.class);
         when(targetDef.getOrigin()).thenReturn(origin);
         when(targetDef.getLocations()).thenReturn(Arrays.asList());
+        return targetDef;
+    }
+    
+    @SuppressWarnings("unchecked")
+    private TargetDefinition createMockTargetDefinitionWithReference(String origin, String refUri) {
+        TargetDefinition targetDef = mock(TargetDefinition.class);
+        when(targetDef.getOrigin()).thenReturn(origin);
+        
+        TargetDefinition.TargetReferenceLocation refLocation = mock(TargetDefinition.TargetReferenceLocation.class);
+        when(refLocation.getUri()).thenReturn(refUri);
+        
+        List<TargetDefinition.Location> locations = new ArrayList<>();
+        locations.add(refLocation);
+        when(targetDef.getLocations()).thenReturn((List) locations);
         return targetDef;
     }
 

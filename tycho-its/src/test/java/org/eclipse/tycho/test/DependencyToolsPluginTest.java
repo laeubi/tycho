@@ -32,5 +32,10 @@ public class DependencyToolsPluginTest extends AbstractTychoIntegrationTest {
         
         // Verify the log contains expected output
         verifier.verifyTextInLog("Scan reactor for dependencies...");
+        verifier.verifyTextInLog("DEPENDENCIES USAGE REPORT");
+        verifier.verifyTextInLog("Target:");
+        
+        // Verify that unit status is shown
+        verifier.verifyTextInLog("USED");
     }
 }

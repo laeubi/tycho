@@ -324,5 +324,46 @@ final class UsageReport {
             }
         }
     }
+    
+    /**
+     * Checks if any unit from a referenced target is used in any project.
+     * 
+     * @param refUri the URI of the referenced target
+     * @return true if any unit from the referenced target is used, false otherwise
+     */
+    boolean isReferencedTargetUsed(String refUri) {
+        // Find the target definition by URI
+        // The refUri might be a full file:// URI or a relative path
+        // We need to match it against the origin which might be just a filename
+        for (TargetDefinition target : targetFileUnits.keySet()) {
+            String origin = target.getOrigin();
+            
+            // Check for exact match or if one ends with the other
+            if (origin.equals(refUri) || 
+                origin.endsWith(refUri) || 
+                refUri.endsWith(origin) ||
+                refUri.endsWith("/" + origin)) {
+                
+                // Check if any unit from this target is used
+                Set<IInstallableUnit> targetUnits = providedBy.entrySet().stream()
+                        .filter(entry -> entry.getValue().stream()
+                                .anyMatch(ref -> ref.file().equals(target)))
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.toSet());
+                
+                // Check if any of these units (or their children) are used
+                for (IInstallableUnit unit : targetUnits) {
+                    if (usedUnits.contains(unit)) {
+                        return true;
+                    }
+                    Set<IInstallableUnit> children = getAllChildren(unit);
+                    if (children.stream().anyMatch(usedUnits::contains)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
 
 }
