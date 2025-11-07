@@ -44,20 +44,18 @@ final class UsageReport {
      */
     final Set<IInstallableUnit> usedUnits = new HashSet<>();
     /**
-     * A collection of all used target definitions in the reactor.
-     * Package-private for test setup.
+     * A collection of all used target definitions in the reactor
      */
-    final Set<TargetDefinition> targetFiles = new HashSet<>();
+    private final Set<TargetDefinition> targetFiles = new HashSet<>();
 
     /**
      * Maps a target definition to a list of other targets where it is referenced
      */
     final Map<TargetDefinition, List<TargetDefinition>> targetReferences = new HashMap<>();
     /**
-     * Maps a target definition to its actual content.
-     * Package-private for test setup.
+     * Maps a target definition to its actual content
      */
-    final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
+    private final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
     /**
      * Maps a unit to the set of definition files this unit is defined in
      */
@@ -67,11 +65,7 @@ final class UsageReport {
 
     private final Map<IInstallableUnit, Set<IInstallableUnit>> childMap = new HashMap<>();
 
-    /**
-     * Reports that a unit is provided by a target definition location.
-     * Package-private for test setup.
-     */
-    void reportProvided(IInstallableUnit iu, TargetDefinition file, String location, IInstallableUnit parent) {
+    private void reportProvided(IInstallableUnit iu, TargetDefinition file, String location, IInstallableUnit parent) {
         if (parent != null) {
             parentMap.computeIfAbsent(iu, nil -> new HashSet<>()).add(parent);
             childMap.computeIfAbsent(parent, nil -> new HashSet<>()).add(iu);

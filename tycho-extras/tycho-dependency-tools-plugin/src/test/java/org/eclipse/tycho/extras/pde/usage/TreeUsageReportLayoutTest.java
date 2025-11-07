@@ -15,11 +15,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.maven.project.MavenProject;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
@@ -839,13 +842,75 @@ public class TreeUsageReportLayoutTest {
         return targetDef;
     }
 
+    @SuppressWarnings("unchecked")
+    private TargetDefinition createMockTargetDefinitionWithIULocations(String origin, 
+            Map<String, List<IInstallableUnit>> locationUnits) {
+        TargetDefinition targetDef = mock(TargetDefinition.class);
+        when(targetDef.getOrigin()).thenReturn(origin);
+        
+        List<TargetDefinition.Location> locations = new ArrayList<>();
+        for (Map.Entry<String, List<IInstallableUnit>> entry : locationUnits.entrySet()) {
+            String locationName = entry.getKey();
+            List<IInstallableUnit> units = entry.getValue();
+            
+            TargetDefinition.InstallableUnitLocation iuLocation = mock(TargetDefinition.InstallableUnitLocation.class);
+            
+            // Create Unit mocks
+            List<TargetDefinition.Unit> unitList = new ArrayList<>();
+            for (IInstallableUnit iu : units) {
+                TargetDefinition.Unit unit = mock(TargetDefinition.Unit.class);
+                when(unit.getId()).thenReturn(iu.getId());
+                when(unit.getVersion()).thenReturn(iu.getVersion().toString());
+                unitList.add(unit);
+            }
+            when(iuLocation.getUnits()).thenReturn((List) unitList);
+            
+            // Create repository mock
+            TargetDefinition.Repository repo = mock(TargetDefinition.Repository.class);
+            when(repo.getLocation()).thenReturn(locationName);
+            List<TargetDefinition.Repository> repos = Arrays.asList(repo);
+            when(iuLocation.getRepositories()).thenReturn((List) repos);
+            
+            locations.add(iuLocation);
+        }
+        
+        when(targetDef.getLocations()).thenReturn((List) locations);
+        return targetDef;
+    }
+    
+    private TargetDefinitionResolver createMockResolver(TargetDefinition target, TargetDefinitionContent content) {
+        return new TargetDefinitionResolver() {
+            @Override
+            public TargetDefinition getTargetDefinition(URI uri) {
+                return null;
+            }
+            
+            @Override
+            public TargetDefinitionContent fetchContent(TargetDefinition definition) {
+                if (definition == target) {
+                    return content;
+                }
+                return createMockContent();
+            }
+        };
+    }
+
     private TargetDefinitionContent createMockContent(IInstallableUnit... units) {
         TargetDefinitionContent content = mock(TargetDefinitionContent.class);
         Set<IInstallableUnit> unitSet = new HashSet<>(Arrays.asList(units));
         
         IQueryResult<IInstallableUnit> queryResult = mock(IQueryResult.class);
         when(queryResult.toSet()).thenReturn(unitSet);
+        when(queryResult.stream()).thenReturn(unitSet.stream());
         when(content.query(QueryUtil.ALL_UNITS, null)).thenReturn(queryResult);
+        
+        // Also support specific IU queries
+        for (IInstallableUnit unit : units) {
+            IQueryResult<IInstallableUnit> singleResult = mock(IQueryResult.class);
+            when(singleResult.stream()).thenReturn(Stream.of(unit));
+            when(singleResult.toSet()).thenReturn(Set.of(unit));
+            when(content.query(QueryUtil.createIUQuery(unit.getId(), unit.getVersion()), null)).thenReturn(singleResult);
+        }
         
         return content;
     }
