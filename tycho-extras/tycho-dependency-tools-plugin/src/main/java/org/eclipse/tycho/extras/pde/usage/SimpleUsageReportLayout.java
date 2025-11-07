@@ -51,7 +51,7 @@ final class SimpleUsageReportLayout implements ReportLayout {
                 if (location instanceof TargetDefinition.TargetReferenceLocation refLoc) {
                     String refUri = refLoc.getUri();
                     // Determine if the referenced target is used
-                    boolean isUsed = isReferencedTargetUsed(refUri, report);
+                    boolean isUsed = report.isReferencedTargetUsed(refUri);
                     String status = isUsed ? "USED" : "UNUSED";
                     reportConsumer.accept("  References: " + refUri + " [" + status + "]");
                 }
@@ -103,43 +103,5 @@ final class SimpleUsageReportLayout implements ReportLayout {
                 reportedUnits.addAll(report.getAllChildren(unit));
             }
         }
-    }
-    
-    /**
-     * Checks if any unit from a referenced target is used in any project.
-     */
-    private boolean isReferencedTargetUsed(String refUri, UsageReport report) {
-        // Find the target definition by URI
-        // The refUri might be a full file:// URI or a relative path
-        // We need to match it against the origin which might be just a filename
-        for (TargetDefinition target : report.targetFileUnits.keySet()) {
-            String origin = target.getOrigin();
-            
-            // Check for exact match or if one ends with the other
-            if (origin.equals(refUri) || 
-                origin.endsWith(refUri) || 
-                refUri.endsWith(origin) ||
-                refUri.endsWith("/" + origin)) {
-                
-                // Check if any unit from this target is used
-                Set<IInstallableUnit> targetUnits = report.providedBy.entrySet().stream()
-                        .filter(entry -> entry.getValue().stream()
-                                .anyMatch(ref -> ref.file().equals(target)))
-                        .map(Map.Entry::getKey)
-                        .collect(Collectors.toSet());
-                
-                // Check if any of these units (or their children) are used
-                for (IInstallableUnit unit : targetUnits) {
-                    if (report.usedUnits.contains(unit)) {
-                        return true;
-                    }
-                    Set<IInstallableUnit> children = report.getAllChildren(unit);
-                    if (children.stream().anyMatch(report.usedUnits::contains)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
     }
 }
