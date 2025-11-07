@@ -335,7 +335,7 @@ final class UsageReport {
         // Find the target definition by URI
         // The refUri might be a full file:// URI or a relative path
         // We need to match it against the origin which might be just a filename
-        for (TargetDefinition target : targetFileUnits.keySet()) {
+        for (TargetDefinition target : targetFiles) {
             String origin = target.getOrigin();
             
             // Check for exact match or if one ends with the other
