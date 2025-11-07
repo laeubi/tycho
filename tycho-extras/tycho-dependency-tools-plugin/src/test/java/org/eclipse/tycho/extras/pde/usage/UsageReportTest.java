@@ -459,6 +459,7 @@ public class UsageReportTest {
      * </pre>
      */
     @Test
+    @SuppressWarnings("unchecked")
     void testReportWithTargetReferences() throws Exception {
         UsageReport report = new UsageReport();
         
@@ -511,11 +512,6 @@ public class UsageReportTest {
         new TreeUsageReportLayout().generateReport(report, false, reportLines::add);
         
         String fullReport = String.join("\n", reportLines);
-        
-        // Debug: print the report
-        System.out.println("=== Generated Report ===");
-        System.out.println(fullReport);
-        System.out.println("======================");
         
         // Verify targetB shows it's referenced by targetA
         assertTrue(fullReport.contains("Referenced in: targetA.target"), 
