@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.maven.project.MavenProject;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
@@ -45,7 +46,7 @@ final class UsageReport {
     /**
      * A collection of all used target definitions in the reactor
      */
-    final Set<TargetDefinition> targetFiles = new HashSet<>();
+    private final Set<TargetDefinition> targetFiles = new HashSet<>();
 
     /**
      * Maps a target definition to a list of other targets where it is referenced
@@ -54,7 +55,7 @@ final class UsageReport {
     /**
      * Maps a target definition to its actual content
      */
-    final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
+    private final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
     /**
      * Maps a unit to the set of definition files this unit is defined in
      */
@@ -64,7 +65,7 @@ final class UsageReport {
 
     private final Map<IInstallableUnit, Set<IInstallableUnit>> childMap = new HashMap<>();
 
-    void reportProvided(IInstallableUnit iu, TargetDefinition file, String location, IInstallableUnit parent) {
+    private void reportProvided(IInstallableUnit iu, TargetDefinition file, String location, IInstallableUnit parent) {
         if (parent != null) {
             parentMap.computeIfAbsent(iu, nil -> new HashSet<>()).add(parent);
             childMap.computeIfAbsent(parent, nil -> new HashSet<>()).add(iu);
@@ -335,7 +336,7 @@ final class UsageReport {
         // Find the target definition by URI
         // The refUri might be a full file:// URI or a relative path
         // We need to match it against the origin which might be just a filename
-        for (TargetDefinition target : targetFileUnits.keySet()) {
+        for (TargetDefinition target : targetFiles) {
             String origin = target.getOrigin();
             
             // Check for exact match or if one ends with the other
@@ -364,6 +365,34 @@ final class UsageReport {
             }
         }
         return false;
+    }
+
+    /**
+     * Returns a stream of all target files analyzed by this report.
+     * 
+     * @return stream of target definitions
+     */
+    Stream<TargetDefinition> getTargetFiles() {
+        return targetFiles.stream();
+    }
+
+    /**
+     * Returns the number of target files analyzed by this report.
+     * 
+     * @return the count of target files
+     */
+    int getTargetFilesCount() {
+        return targetFiles.size();
+    }
+
+    /**
+     * Returns the target definition content for the specified target definition.
+     * 
+     * @param targetDefinition the target definition to get content for
+     * @return the target definition content, or null if not found
+     */
+    TargetDefinitionContent getTargetDefinitionContent(TargetDefinition targetDefinition) {
+        return targetFileUnits.get(targetDefinition);
     }
 
 }

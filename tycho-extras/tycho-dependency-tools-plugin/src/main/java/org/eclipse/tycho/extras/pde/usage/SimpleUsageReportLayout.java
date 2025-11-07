@@ -31,10 +31,10 @@ final class SimpleUsageReportLayout implements ReportLayout {
     public void generateReport(UsageReport report, boolean verbose, Consumer<String> reportConsumer) {
         reportConsumer.accept("###### DEPENDENCIES USAGE REPORT #######");
         reportConsumer.accept("Your build uses " + report.usedUnits.size() + " dependencies.");
-        reportConsumer.accept("Your build uses " + report.targetFiles.size() + " target file(s).");
-        report.targetFiles.forEach(targetFile -> {
+        reportConsumer.accept("Your build uses " + report.getTargetFilesCount() + " target file(s).");
+        report.getTargetFiles().forEach(targetFile -> {
             reportConsumer.accept(targetFile.getOrigin() + " contains "
-                    + report.targetFileUnits.get(targetFile).query(QueryUtil.ALL_UNITS, null).toSet().size()
+                    + report.getTargetDefinitionContent(targetFile).query(QueryUtil.ALL_UNITS, null).toSet().size()
                     + " units from " + targetFile.getLocations().size() + " locations");
             
             // Show if this target is referenced by other targets

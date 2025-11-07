@@ -22,7 +22,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.maven.project.MavenProject;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
@@ -62,12 +64,16 @@ public class UsageReportTest {
         // Create mock units
         IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with unitA in LocationL
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
         TargetDefinitionContent content = createMockContent(unitA);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report unit A as provided by location L
-        report.reportProvided(unitA, targetDef, "LocationL", null);
+        // Analyze the target
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Mark unit A as used
         MavenProject project = createMockProject("project1");
@@ -350,17 +356,16 @@ public class UsageReportTest {
         when(unitB.getRequirements()).thenReturn(Arrays.asList(reqC));
         when(unitC.satisfies(reqC)).thenReturn(true);
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with all units in LocationL
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA, unitB, unitC, unitD)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
         TargetDefinitionContent content = createMockContent(unitA, unitB, unitC, unitD);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report units
-        report.reportProvided(unitA, targetDef, "LocationL", null);
-        report.reportProvided(unitB, targetDef, "LocationL", null);
-        report.reportProvided(unitC, targetDef, "LocationL", unitB);
-        report.reportProvided(unitD, targetDef, "LocationL", null);
+        // Analyze the target
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Mark A and C as used
         MavenProject project = createMockProject("project1");
@@ -440,8 +445,8 @@ public class UsageReportTest {
                 "targetB should be referenced by targetA");
         
         // Verify both targets are in the targetFiles set
-        assertTrue(report.targetFiles.contains(targetA), "targetA should be in targetFiles");
-        assertTrue(report.targetFiles.contains(targetB), "targetB should be in targetFiles");
+        assertTrue(report.getTargetFiles().anyMatch(t -> t.equals(targetA)), "targetA should be in targetFiles");
+        assertTrue(report.getTargetFiles().anyMatch(t -> t.equals(targetB)), "targetB should be in targetFiles");
     }
     
     /**
@@ -467,38 +472,61 @@ public class UsageReportTest {
         IInstallableUnit unitA = createMockUnit("unitA", "1.0.0");
         IInstallableUnit unitB = createMockUnit("unitB", "1.0.0");
         
-        // Create target definitions
-        // TargetA has both a reference location and an IU location
+        // Create targetB with IU location
+        Map<String, List<IInstallableUnit>> locationUnitsB = Map.of(
+            "LocationL2", Arrays.asList(unitB)
+        );
+        TargetDefinition targetB = createMockTargetDefinitionWithIULocations("targetB.target", locationUnitsB);
+        TargetDefinitionContent contentB = createMockContent(unitB);
+        
+        // Create targetA with both reference to targetB and its own IU location
         TargetDefinition targetA = mock(TargetDefinition.class);
         when(targetA.getOrigin()).thenReturn("targetA.target");
         
         TargetDefinition.TargetReferenceLocation refLocation = mock(TargetDefinition.TargetReferenceLocation.class);
         when(refLocation.getUri()).thenReturn("file:///targetB.target");
         
+        // Add IU location for unitA
         TargetDefinition.InstallableUnitLocation iuLocation = mock(TargetDefinition.InstallableUnitLocation.class);
+        TargetDefinition.Unit unitADef = mock(TargetDefinition.Unit.class);
+        when(unitADef.getId()).thenReturn(unitA.getId());
+        when(unitADef.getVersion()).thenReturn(unitA.getVersion().toString());
+        when(iuLocation.getUnits()).thenReturn((List) Arrays.asList(unitADef));
+        TargetDefinition.Repository repo = mock(TargetDefinition.Repository.class);
+        when(repo.getLocation()).thenReturn("LocationL1");
+        when(iuLocation.getRepositories()).thenReturn(Arrays.asList(repo));
         
         List<TargetDefinition.Location> locationsA = new ArrayList<>();
         locationsA.add(refLocation);
         locationsA.add(iuLocation);
         when(targetA.getLocations()).thenReturn((List) locationsA);
         
-        TargetDefinition targetB = createMockTargetDefinition("targetB.target");
-        
-        // Create content
+        // Create content for targetA
         TargetDefinitionContent contentA = createMockContent(unitA);
-        TargetDefinitionContent contentB = createMockContent(unitB);
         
-        report.targetFiles.add(targetA);
-        report.targetFiles.add(targetB);
-        report.targetFileUnits.put(targetA, contentA);
-        report.targetFileUnits.put(targetB, contentB);
+        // Create resolver that handles both targets
+        TargetDefinitionResolver resolver = new TargetDefinitionResolver() {
+            @Override
+            public TargetDefinition getTargetDefinition(URI uri) {
+                if (uri.toString().equals("file:///targetB.target")) {
+                    return targetB;
+                }
+                return null;
+            }
+            
+            @Override
+            public TargetDefinitionContent fetchContent(TargetDefinition definition) {
+                if (definition == targetA) {
+                    return contentA;
+                } else if (definition == targetB) {
+                    return contentB;
+                }
+                return createMockContent();
+            }
+        };
         
-        // Set up the reference relationship
-        report.targetReferences.computeIfAbsent(targetB, k -> new ArrayList<>()).add(targetA);
-        
-        // Report units
-        report.reportProvided(unitA, targetA, "LocationL1", null);
-        report.reportProvided(unitB, targetB, "LocationL2", null);
+        // Analyze targetA which will also analyze targetB
+        report.analyzeLocations(targetA, resolver, (l, e) -> {});
         
         // Mark both units as used
         MavenProject project = createMockProject("project1");
@@ -659,6 +687,59 @@ public class UsageReportTest {
     }
     
     @SuppressWarnings("unchecked")
+    private TargetDefinition createMockTargetDefinitionWithIULocations(String origin, 
+            Map<String, List<IInstallableUnit>> locationUnits) {
+        TargetDefinition targetDef = mock(TargetDefinition.class);
+        when(targetDef.getOrigin()).thenReturn(origin);
+        
+        List<TargetDefinition.Location> locations = new ArrayList<>();
+        for (Map.Entry<String, List<IInstallableUnit>> entry : locationUnits.entrySet()) {
+            String locationName = entry.getKey();
+            List<IInstallableUnit> units = entry.getValue();
+            
+            TargetDefinition.InstallableUnitLocation iuLocation = mock(TargetDefinition.InstallableUnitLocation.class);
+            
+            // Create Unit mocks
+            List<TargetDefinition.Unit> unitList = new ArrayList<>();
+            for (IInstallableUnit iu : units) {
+                TargetDefinition.Unit unit = mock(TargetDefinition.Unit.class);
+                when(unit.getId()).thenReturn(iu.getId());
+                when(unit.getVersion()).thenReturn(iu.getVersion().toString());
+                unitList.add(unit);
+            }
+            when(iuLocation.getUnits()).thenReturn((List) unitList);
+            
+            // Create repository mock
+            TargetDefinition.Repository repo = mock(TargetDefinition.Repository.class);
+            when(repo.getLocation()).thenReturn(locationName);
+            List<TargetDefinition.Repository> repos = Arrays.asList(repo);
+            when(iuLocation.getRepositories()).thenReturn((List) repos);
+            
+            locations.add(iuLocation);
+        }
+        
+        when(targetDef.getLocations()).thenReturn((List) locations);
+        return targetDef;
+    }
+    
+    private TargetDefinitionResolver createMockResolver(TargetDefinition target, TargetDefinitionContent content) {
+        return new TargetDefinitionResolver() {
+            @Override
+            public TargetDefinition getTargetDefinition(URI uri) {
+                return null;
+            }
+            
+            @Override
+            public TargetDefinitionContent fetchContent(TargetDefinition definition) {
+                if (definition == target) {
+                    return content;
+                }
+                return createMockContent();
+            }
+        };
+    }
+    
+    @SuppressWarnings("unchecked")
     private TargetDefinition createMockTargetDefinitionWithReference(String origin, String refUri) {
         TargetDefinition targetDef = mock(TargetDefinition.class);
         when(targetDef.getOrigin()).thenReturn(origin);
@@ -678,7 +759,16 @@ public class UsageReportTest {
         
         IQueryResult<IInstallableUnit> queryResult = mock(IQueryResult.class);
         when(queryResult.toSet()).thenReturn(unitSet);
+        when(queryResult.stream()).thenReturn(unitSet.stream());
         when(content.query(QueryUtil.ALL_UNITS, null)).thenReturn(queryResult);
+        
+        // Also support specific IU queries
+        for (IInstallableUnit unit : units) {
+            IQueryResult<IInstallableUnit> singleResult = mock(IQueryResult.class);
+            when(singleResult.stream()).thenReturn(Stream.of(unit));
+            when(singleResult.toSet()).thenReturn(Set.of(unit));
+            when(content.query(QueryUtil.createIUQuery(unit.getId(), unit.getVersion()), null)).thenReturn(singleResult);
+        }
         
         return content;
     }

@@ -60,7 +60,7 @@ final class TreeUsageReportLayout implements ReportLayout {
     public void generateReport(UsageReport report, boolean verbose, Consumer<String> reportConsumer) {
         reportConsumer.accept("###### DEPENDENCIES USAGE REPORT #######");
         reportConsumer.accept("Your build uses " + report.usedUnits.size() + " dependencies.");
-        reportConsumer.accept("Your build uses " + report.targetFiles.size() + " target file(s).");
+        reportConsumer.accept("Your build uses " + report.getTargetFilesCount() + " target file(s).");
         reportConsumer.accept("");
 
         // Group units by target file and location
@@ -80,7 +80,7 @@ final class TreeUsageReportLayout implements ReportLayout {
         for (TargetDefinition targetFile : targetStructure.keySet().stream()
                 .sorted(Comparator.comparing(TargetDefinition::getOrigin)).toList()) {
             reportConsumer.accept("Target: " + targetFile.getOrigin());
-            int totalUnits = report.targetFileUnits.get(targetFile).query(QueryUtil.ALL_UNITS, null).toSet().size();
+            int totalUnits = report.getTargetDefinitionContent(targetFile).query(QueryUtil.ALL_UNITS, null).toSet().size();
             reportConsumer.accept(
                     "  Total units: " + totalUnits + " from " + targetFile.getLocations().size() + " locations");
             
