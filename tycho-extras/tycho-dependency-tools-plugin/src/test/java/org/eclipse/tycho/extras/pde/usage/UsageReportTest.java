@@ -353,7 +353,8 @@ public class UsageReportTest {
         // Create mock target definition
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unitA, unitB, unitC, unitD);
-        report.registerTargetForTesting(targetDef, content);
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
         
         // Report units
         report.reportProvided(unitA, targetDef, "LocationL", null);
@@ -439,8 +440,8 @@ public class UsageReportTest {
                 "targetB should be referenced by targetA");
         
         // Verify both targets are in the targetFiles set
-        assertTrue(report.getTargetFiles().contains(targetA), "targetA should be in targetFiles");
-        assertTrue(report.getTargetFiles().contains(targetB), "targetB should be in targetFiles");
+        assertTrue(report.getTargetFiles().anyMatch(t -> t.equals(targetA)), "targetA should be in targetFiles");
+        assertTrue(report.getTargetFiles().anyMatch(t -> t.equals(targetB)), "targetB should be in targetFiles");
     }
     
     /**
@@ -487,8 +488,10 @@ public class UsageReportTest {
         TargetDefinitionContent contentA = createMockContent(unitA);
         TargetDefinitionContent contentB = createMockContent(unitB);
         
-        report.registerTargetForTesting(targetA, contentA);
-        report.registerTargetForTesting(targetB, contentB);
+        report.targetFiles.add(targetA);
+        report.targetFileUnits.put(targetA, contentA);
+        report.targetFiles.add(targetB);
+        report.targetFileUnits.put(targetB, contentB);
         
         // Set up the reference relationship
         report.targetReferences.computeIfAbsent(targetB, k -> new ArrayList<>()).add(targetA);
@@ -579,7 +582,8 @@ public class UsageReportTest {
         // Create mock target definitions for two locations
         TargetDefinition targetDef = createMockTargetDefinition("target.target");
         TargetDefinitionContent content = createMockContent(unitA, unitB, unitX, unitY, unitZ, unitQ, unitP);
-        report.registerTargetForTesting(targetDef, content);
+        report.targetFiles.add(targetDef);
+        report.targetFileUnits.put(targetDef, content);
         
         // Report units from Location L1
         report.reportProvided(unitA, targetDef, "LocationL1", null);

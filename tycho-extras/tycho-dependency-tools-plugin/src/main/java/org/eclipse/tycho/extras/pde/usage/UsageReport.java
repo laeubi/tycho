@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.maven.project.MavenProject;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
@@ -43,18 +44,20 @@ final class UsageReport {
      */
     final Set<IInstallableUnit> usedUnits = new HashSet<>();
     /**
-     * A collection of all used target definitions in the reactor
+     * A collection of all used target definitions in the reactor.
+     * Package-private for test setup.
      */
-    private final Set<TargetDefinition> targetFiles = new HashSet<>();
+    final Set<TargetDefinition> targetFiles = new HashSet<>();
 
     /**
      * Maps a target definition to a list of other targets where it is referenced
      */
     final Map<TargetDefinition, List<TargetDefinition>> targetReferences = new HashMap<>();
     /**
-     * Maps a target definition to its actual content
+     * Maps a target definition to its actual content.
+     * Package-private for test setup.
      */
-    private final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
+    final Map<TargetDefinition, TargetDefinitionContent> targetFileUnits = new HashMap<>();
     /**
      * Maps a unit to the set of definition files this unit is defined in
      */
@@ -64,6 +67,10 @@ final class UsageReport {
 
     private final Map<IInstallableUnit, Set<IInstallableUnit>> childMap = new HashMap<>();
 
+    /**
+     * Reports that a unit is provided by a target definition location.
+     * Package-private for test setup.
+     */
     void reportProvided(IInstallableUnit iu, TargetDefinition file, String location, IInstallableUnit parent) {
         if (parent != null) {
             parentMap.computeIfAbsent(iu, nil -> new HashSet<>()).add(parent);
@@ -367,12 +374,12 @@ final class UsageReport {
     }
 
     /**
-     * Returns an unmodifiable set of all target files analyzed by this report.
+     * Returns a stream of all target files analyzed by this report.
      * 
-     * @return unmodifiable set of target definitions
+     * @return stream of target definitions
      */
-    Set<TargetDefinition> getTargetFiles() {
-        return Set.copyOf(targetFiles);
+    Stream<TargetDefinition> getTargetFiles() {
+        return targetFiles.stream();
     }
 
     /**
@@ -392,18 +399,6 @@ final class UsageReport {
      */
     TargetDefinitionContent getTargetDefinitionContent(TargetDefinition targetDefinition) {
         return targetFileUnits.get(targetDefinition);
-    }
-
-    /**
-     * Helper method for tests to register a target definition and its content.
-     * Package-private for testing purposes only.
-     * 
-     * @param targetDefinition the target definition to register
-     * @param content the content of the target definition
-     */
-    void registerTargetForTesting(TargetDefinition targetDefinition, TargetDefinitionContent content) {
-        targetFiles.add(targetDefinition);
-        targetFileUnits.put(targetDefinition, content);
     }
 
 }
