@@ -111,13 +111,17 @@ public class UsageReportTest {
         when(unitA.getRequirements()).thenReturn(Arrays.asList(reqY));
         when(unitY.satisfies(reqY)).thenReturn(true);
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with unitA in LocationL
+        // analyzeLocations will discover unitY as a dependency of unitA
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
         TargetDefinitionContent content = createMockContent(unitA, unitY);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report A as root unit and Y as child of A
-        report.reportProvided(unitA, targetDef, "LocationL", null);
-        report.reportProvided(unitY, targetDef, "LocationL", unitA);
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Mark only Y as used (not A)
         report.usedUnits.add(unitY);
@@ -166,14 +170,17 @@ public class UsageReportTest {
         when(unitY.satisfies(reqY)).thenReturn(true);
         when(unitZ.satisfies(reqZ)).thenReturn(true);
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with unitA in LocationL
+        // analyzeLocations will discover X, Y, Z as dependencies of unitA
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
+        TargetDefinitionContent content = createMockContent(unitA, unitX, unitY, unitZ);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report A as root unit and X, Y, Z as children
-        report.reportProvided(unitA, targetDef, "LocationL", null);
-        report.reportProvided(unitX, targetDef, "LocationL", unitA);
-        report.reportProvided(unitY, targetDef, "LocationL", unitA);
-        report.reportProvided(unitZ, targetDef, "LocationL", unitA);
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Nothing is used
         // Verify A is a root unit but X, Y, Z are not
@@ -217,13 +224,17 @@ public class UsageReportTest {
         when(unitB.satisfies(reqB)).thenReturn(true);
         when(unitX.satisfies(reqX)).thenReturn(true);
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with unitA in LocationL
+        // analyzeLocations will discover B and X as dependencies
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
+        TargetDefinitionContent content = createMockContent(unitA, unitB, unitX);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report units with proper parent relationships
-        report.reportProvided(unitA, targetDef, "LocationL", null);
-        report.reportProvided(unitB, targetDef, "LocationL", unitA);
-        report.reportProvided(unitX, targetDef, "LocationL", unitB);
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Mark only X as used
         report.usedUnits.add(unitX);
@@ -264,12 +275,17 @@ public class UsageReportTest {
         when(unitA.getRequirements()).thenReturn(Arrays.asList(reqB));
         when(unitB.satisfies(reqB)).thenReturn(true);
         
-        // Create mock target definition with specific origin
-        TargetDefinition targetDef = createMockTargetDefinition("my-target.target");
+        // Create target definition with unitA in LocationL
+        // analyzeLocations will discover B as a dependency
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("my-target.target", locationUnits);
+        TargetDefinitionContent content = createMockContent(unitA, unitB);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report units
-        report.reportProvided(unitA, targetDef, "LocationL", null);
-        report.reportProvided(unitB, targetDef, "LocationL", unitA);
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Verify provenance for root unit
         String providedByA = report.getProvidedBy(unitA);
@@ -311,14 +327,17 @@ public class UsageReportTest {
         when(unitB.satisfies(reqB)).thenReturn(true);
         when(unitC.satisfies(reqC)).thenReturn(true);
         
-        // Create mock target definition
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with unitA in LocationL
+        // analyzeLocations will discover B and C as dependencies
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL", Arrays.asList(unitA)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
+        TargetDefinitionContent content = createMockContent(unitA, unitB, unitC);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report units - B has two paths: A->B (length 2) and A->C->B (length 3)
-        report.reportProvided(unitA, targetDef, "LocationL", null);
-        report.reportProvided(unitB, targetDef, "LocationL", unitA);
-        report.reportProvided(unitC, targetDef, "LocationL", unitA);
-        // Don't add B as child of C to keep this test focused on direct path
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Get shortest path from root to B
         List<IInstallableUnit> path = report.getShortestPathFromRoot(unitB);
@@ -494,7 +513,7 @@ public class UsageReportTest {
         when(iuLocation.getUnits()).thenReturn((List) Arrays.asList(unitADef));
         TargetDefinition.Repository repo = mock(TargetDefinition.Repository.class);
         when(repo.getLocation()).thenReturn("LocationL1");
-        when(iuLocation.getRepositories()).thenReturn(Arrays.asList(repo));
+        when(iuLocation.getRepositories()).thenReturn((List) Arrays.asList(repo));
         
         List<TargetDefinition.Location> locationsA = new ArrayList<>();
         locationsA.add(refLocation);
@@ -607,23 +626,17 @@ public class UsageReportTest {
         when(unitP.satisfies(reqP)).thenReturn(true);
         when(unitY.satisfies(reqYforQ)).thenReturn(true);
         
-        // Create mock target definitions for two locations
-        TargetDefinition targetDef = createMockTargetDefinition("target.target");
+        // Create target definition with units in two locations
+        Map<String, List<IInstallableUnit>> locationUnits = Map.of(
+            "LocationL1", Arrays.asList(unitA),
+            "LocationL2", Arrays.asList(unitQ)
+        );
+        TargetDefinition targetDef = createMockTargetDefinitionWithIULocations("target.target", locationUnits);
         TargetDefinitionContent content = createMockContent(unitA, unitB, unitX, unitY, unitZ, unitQ, unitP);
-        report.targetFiles.add(targetDef);
-        report.targetFileUnits.put(targetDef, content);
+        TargetDefinitionResolver resolver = createMockResolver(targetDef, content);
         
-        // Report units from Location L1
-        report.reportProvided(unitA, targetDef, "LocationL1", null);
-        report.reportProvided(unitB, targetDef, "LocationL1", unitA);
-        report.reportProvided(unitX, targetDef, "LocationL1", unitB);
-        report.reportProvided(unitY, targetDef, "LocationL1", unitB);
-        report.reportProvided(unitZ, targetDef, "LocationL1", unitB);
-        
-        // Report units from Location L2
-        report.reportProvided(unitQ, targetDef, "LocationL2", null);
-        report.reportProvided(unitP, targetDef, "LocationL2", unitQ);
-        // Note: Y is already reported from L1, so Q also references it
+        // Analyze the target using the proper API
+        report.analyzeLocations(targetDef, resolver, (l, e) -> {});
         
         // Mark X and Y as used
         MavenProject project = createMockProject("project1");
@@ -702,9 +715,13 @@ public class UsageReportTest {
             // Create Unit mocks
             List<TargetDefinition.Unit> unitList = new ArrayList<>();
             for (IInstallableUnit iu : units) {
+                // Store values before stubbing to avoid nested stubbing issues
+                String unitId = iu.getId();
+                String unitVersion = iu.getVersion().toString();
+                
                 TargetDefinition.Unit unit = mock(TargetDefinition.Unit.class);
-                when(unit.getId()).thenReturn(iu.getId());
-                when(unit.getVersion()).thenReturn(iu.getVersion().toString());
+                when(unit.getId()).thenReturn(unitId);
+                when(unit.getVersion()).thenReturn(unitVersion);
                 unitList.add(unit);
             }
             when(iuLocation.getUnits()).thenReturn((List) unitList);
