@@ -12,31 +12,38 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.resolver;
 
+import static org.junit.Assert.fail;
+
+import org.apache.maven.it.VerificationException;
 import org.apache.maven.it.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
 /**
- * Test for OSGi capability resolution with Provide-Capability and
- * Require-Capability. This test replicates the scenario from eclipse-equinox/p2
- * PR #972 where bundles use OSGi capabilities to express service dependencies.
+ * Test for OSGi capability cycle detection with Provide-Capability and
+ * Require-Capability. This test validates that Tycho properly detects and
+ * reports dependency cycles when bundles have circular capability requirements.
  * 
- * The test creates two bundles: - provider.bundle: Provides a capability for
- * Transport service - consumer.bundle: Requires that capability
+ * The test creates two bundles with a cycle:
+ * - provider.bundle: Provides a capability and requires consumer.bundle
+ * - consumer.bundle: Requires the capability provided by provider.bundle
  * 
- * This ensures Tycho can correctly resolve bundles with capability
- * requirements.
- * 
- * @see <a href=
- *      "https://github.com/eclipse-equinox/p2/pull/972">eclipse-equinox/p2#972</a>
+ * This ensures Tycho can detect cycles and provide meaningful error messages.
  */
 public class P2CapabilityTransportTest extends AbstractTychoIntegrationTest {
 
 	@Test
 	public void testCapabilityProvideRequire() throws Exception {
 		Verifier verifier = getVerifier("reactor.capability.cycle");
-		verifier.executeGoal("verify");
-		verifier.verifyErrorFreeLog();
+		try {
+			verifier.executeGoal("verify");
+			fail("Expected build to fail with cycle detection error");
+		} catch (VerificationException e) {
+			// Expected - verify the error message contains cycle information
+			verifier.verifyTextInLog("Dependency cycle detected");
+			verifier.verifyTextInLog("provider.bundle");
+			verifier.verifyTextInLog("consumer.bundle");
+		}
 	}
 
 }

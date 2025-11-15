@@ -15,9 +15,12 @@ package org.eclipse.tycho.p2maven;
 import java.io.File;
 import java.io.IOException;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -248,7 +251,7 @@ public class MavenProjectDependencyProcessor {
 
 	public static final class ProjectDependencies {
 
-		private final Map<IRequirement, Collection<IInstallableUnit>> requirementsMap;
+		final Map<IRequirement, Collection<IInstallableUnit>> requirementsMap;
 		private final Set<IInstallableUnit> projectUnits;
 
 		ProjectDependencies(Map<IRequirement, Collection<IInstallableUnit>> requirementsMap,
@@ -292,6 +295,148 @@ public class MavenProjectDependencyProcessor {
 				Function<MavenProject, Collection<IInstallableUnit>> contextIuSupplier);
 
 		/**
+		 * Helper method to detect cycles in project dependencies.
+		 * 
+		 * @param startProject the project to start cycle detection from
+		 * @param currentProject the current project being visited
+		 * @param contextIUs the context IUs to filter dependencies
+		 * @param visited set of visited projects to detect back edges
+		 * @param path current path from start to current project with requirements
+		 */
+		default void detectCycles(MavenProject startProject, MavenProject currentProject,
+				Collection<IInstallableUnit> contextIUs, Set<MavenProject> visited,
+				LinkedHashMap<MavenProject, String> path) {
+			if (visited.contains(currentProject)) {
+				if (path.containsKey(currentProject)) {
+					// Cycle detected! Build detailed error message
+					StringBuilder cycleMessage = new StringBuilder("Dependency cycle detected: ");
+					boolean inCycle = false;
+					List<String> cycleSteps = new ArrayList<>();
+					
+					for (Map.Entry<MavenProject, String> entry : path.entrySet()) {
+						MavenProject project = entry.getKey();
+						String edgeInfo = entry.getValue();
+						
+						if (project.equals(currentProject)) {
+							inCycle = true;
+						}
+						
+						if (inCycle) {
+							String projectInfo = project.getGroupId() + ":" + project.getArtifactId();
+							if (edgeInfo != null && !edgeInfo.isEmpty()) {
+								cycleSteps.add(projectInfo + edgeInfo);
+							} else {
+								cycleSteps.add(projectInfo);
+							}
+						}
+					}
+					
+					// Add the final step back to the start of the cycle
+					cycleSteps.add(currentProject.getGroupId() + ":" + currentProject.getArtifactId());
+					cycleMessage.append(String.join(" -> ", cycleSteps));
+					
+					throw new ProjectDependencyCycleException(cycleMessage.toString());
+				}
+				return; // Already processed this branch
+			}
+			
+			visited.add(currentProject);
+			
+			// Get direct dependencies
+			ProjectDependencies projectDependencies = getProjectDependecies(currentProject);
+			List<MavenProject> directDeps = projectDependencies.getDependencies(contextIUs).stream()
+					.flatMap(dependency -> getProject(dependency).stream()).distinct().toList();
+			
+			// For each dependency, determine what requirement/capability caused it
+			for (MavenProject depProject : directDeps) {
+				// Find requirements and capabilities that link these projects
+				String edgeInfo = buildEdgeInfo(currentProject, depProject, projectDependencies, contextIUs);
+				
+				// Add to path and recurse
+				path.put(depProject, edgeInfo);
+				detectCycles(startProject, depProject, contextIUs, visited, path);
+				path.remove(depProject);
+				
+				// Also check fragments if not a fragment itself
+				if (!isFragment(currentProject)) {
+					ProjectDependencies depDependencies = getProjectDependecies(depProject);
+					depDependencies.getDependencies(contextIUs).stream()
+							.filter(dep -> hasAnyHost(dep, depDependencies.projectUnits))
+							.flatMap(dependency -> getProject(dependency).stream())
+							.forEach(fragmentProject -> {
+								String fragmentEdgeInfo = buildEdgeInfo(depProject, fragmentProject, depDependencies, contextIUs);
+								path.put(fragmentProject, fragmentEdgeInfo);
+								detectCycles(startProject, fragmentProject, contextIUs, visited, path);
+								path.remove(fragmentProject);
+							});
+				}
+			}
+		}
+
+		/**
+		 * Build edge information describing the requirement/capability relationship
+		 */
+		default String buildEdgeInfo(MavenProject fromProject, MavenProject toProject,
+				ProjectDependencies fromDependencies, Collection<IInstallableUnit> contextIUs) {
+			Collection<IInstallableUnit> toUnits = getProjectUnits(toProject);
+			
+			// Find which requirements are satisfied by the target project
+			List<String> requirementInfos = new ArrayList<>();
+			fromDependencies.requirementsMap.entrySet().stream()
+					.filter(entry -> isMatch(entry.getKey(), contextIUs))
+					.forEach(entry -> {
+						IRequirement req = entry.getKey();
+						Collection<IInstallableUnit> satisfyingUnits = entry.getValue();
+						
+						// Check if any of the satisfying units belong to the target project
+						boolean satisfiedByTarget = satisfyingUnits.stream()
+								.anyMatch(iu -> toUnits.contains(iu));
+						
+						if (satisfiedByTarget) {
+							String reqInfo = getRequirementDescription(req);
+							
+							// Find what capabilities satisfy this requirement
+							List<String> capabilities = satisfyingUnits.stream()
+									.filter(toUnits::contains)
+									.flatMap(iu -> iu.getProvidedCapabilities().stream()
+											.filter(cap -> matchesRequirement(req, cap))
+											.map(cap -> cap.getNamespace() + ":" + cap.getName()))
+									.distinct()
+									.toList();
+							
+							if (!capabilities.isEmpty()) {
+								requirementInfos.add("[requires " + reqInfo + " satisfied by " + String.join(", ", capabilities) + "]");
+							} else {
+								requirementInfos.add("[requires " + reqInfo + "]");
+							}
+						}
+					});
+			
+			return requirementInfos.isEmpty() ? "" : String.join("", requirementInfos);
+		}
+
+		/**
+		 * Get a human-readable description of a requirement
+		 */
+		default String getRequirementDescription(IRequirement requirement) {
+			if (requirement instanceof IRequiredCapability requiredCapability) {
+				return requiredCapability.getNamespace() + ":" + requiredCapability.getName();
+			}
+			return requirement.toString();
+		}
+
+		/**
+		 * Check if a requirement matches a provided capability
+		 */
+		default boolean matchesRequirement(IRequirement requirement, IProvidedCapability capability) {
+			if (requirement instanceof IRequiredCapability requiredCapability) {
+				return requiredCapability.getNamespace().equals(capability.getNamespace()) &&
+					   requiredCapability.getName().equals(capability.getName());
+			}
+			return false;
+		}
+
+		/**
 		 * Given a maven project returns all other maven projects this one (directly)
 		 * depends on
 		 * 
@@ -303,6 +448,13 @@ public class MavenProjectDependencyProcessor {
 		 */
 		default Collection<MavenProject> getDependencyProjects(MavenProject mavenProject,
 				Collection<IInstallableUnit> contextIUs) {
+			// First, detect cycles
+			Set<MavenProject> visited = new HashSet<>();
+			LinkedHashMap<MavenProject, String> path = new LinkedHashMap<>();
+			path.put(mavenProject, "");
+			detectCycles(mavenProject, mavenProject, contextIUs, visited, path);
+			
+			// If no cycle detected, return dependencies as before
 			ProjectDependencies projectDependecies = getProjectDependecies(mavenProject);
 			List<MavenProject> list = projectDependecies.getDependencies(contextIUs).stream()
 					.flatMap(dependency -> getProject(dependency).stream()).distinct().toList();
@@ -330,5 +482,16 @@ public class MavenProjectDependencyProcessor {
 		 */
 		boolean isFragment(MavenProject mavenProject);
 
+	}
+
+	/**
+	 * Exception thrown when a cycle is detected in project dependencies
+	 */
+	public static class ProjectDependencyCycleException extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+
+		public ProjectDependencyCycleException(String message) {
+			super(message);
+		}
 	}
 }
