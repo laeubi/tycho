@@ -111,27 +111,20 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 				.flatMap(Collection::stream)
 				.collect(Collectors.toList());
 
-		// For each project, build edges based on requirements
-		for (var entry : projectIUMap.entrySet()) {
+		// Build edges for each project in parallel
+		Map<MavenProject, Set<Edge>> result = new java.util.concurrent.ConcurrentHashMap<>();
+		
+		projectIUMap.entrySet().parallelStream().unordered().forEach(entry -> {
 			MavenProject project = entry.getKey();
 			Set<Edge> edges = new LinkedHashSet<>();
 			Collection<IInstallableUnit> projectUnits = entry.getValue();
 
 			// Collect all requirements from all IUs of this project (excluding MetaRequirements)
+			// Include all requirements, even self-satisfied ones (allowing cyclic dependencies)
 			Set<Requirement> requirements = new LinkedHashSet<>();
 			for (IInstallableUnit iu : projectUnits) {
 				for (IRequirement req : iu.getRequirements()) {
-					// Don't include self-satisfied requirements
-					boolean selfSatisfied = false;
-					for (IInstallableUnit projectIU : projectUnits) {
-						if (projectIU.satisfies(req)) {
-							selfSatisfied = true;
-							break;
-						}
-					}
-					if (!selfSatisfied) {
-						requirements.add(new Requirement(iu, req));
-					}
+					requirements.add(new Requirement(iu, req));
 				}
 			}
 
@@ -153,8 +146,10 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 				edges.add(new Edge(requirement, matchingCapabilities));
 			}
 
-			projectEdgesMap.put(project, edges);
-		}
+			result.put(project, edges);
+		});
+		
+		projectEdgesMap.putAll(result);
 	}
 
 	/**

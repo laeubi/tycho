@@ -103,10 +103,11 @@ public class ProjectDependencyClosureGraphTest {
 
 		ProjectDependencyClosureGraph graph = new ProjectDependencyClosureGraph(projectIUMap);
 
-		// Self-satisfied requirements should not appear in dependencies
+		// Self-satisfied requirements are now included in the graph but filtered out in dependencies
+		// because they are from the same project (projectUnits filter)
 		ProjectDependencies deps = graph.getProjectDependecies(project);
 		Collection<IInstallableUnit> dependencies = deps.getDependencies(List.of());
-		assertTrue(dependencies.isEmpty(), "Self-satisfied requirements should not create dependencies");
+		assertTrue(dependencies.isEmpty(), "Self-satisfied requirements should be filtered out in dependencies");
 	}
 
 	@Test
