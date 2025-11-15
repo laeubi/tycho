@@ -59,7 +59,7 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 	/**
 	 * Represents a directional edge in the dependency graph
 	 */
-	record Edge(Requirement requirement, Set<Capability> capabilities) {
+	record Edge(Requirement requirement, Capability capability) {
 	}
 
 	private static final ProjectDependencies EMPTY_DEPENDENCIES = new ProjectDependencies(Map.of(), Set.of());
@@ -128,22 +128,17 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 				}
 			}
 
-			// For each requirement, find matching capabilities
+			// For each requirement, find matching capabilities and create edges
 			for (Requirement requirement : requirements) {
-				Set<Capability> matchingCapabilities = new LinkedHashSet<>();
-				
 				// Search through all IUs to find those that satisfy the requirement
 				for (IInstallableUnit iu : allIUs) {
 					if (iu.satisfies(requirement.requirement)) {
-						// Collect all capabilities from this IU
+						// Create an edge for each capability from this IU
 						for (IProvidedCapability cap : iu.getProvidedCapabilities()) {
-							matchingCapabilities.add(new Capability(iu, cap));
+							edges.add(new Edge(requirement, new Capability(iu, cap)));
 						}
 					}
 				}
-				
-				// Create edge even if no capabilities match (empty set indicates unsatisfied)
-				edges.add(new Edge(requirement, matchingCapabilities));
 			}
 
 			result.put(project, edges);
@@ -163,19 +158,18 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 			Set<IInstallableUnit> projectUnits = Set.copyOf(entry.getValue());
 			
 			// Build requirements map from edges
+			// Group edges by requirement and collect all satisfying IUs
 			Map<IRequirement, Collection<IInstallableUnit>> requirementsMap = new LinkedHashMap<>();
 			Set<Edge> edges = projectEdgesMap.getOrDefault(project, Set.of());
 			
 			for (Edge edge : edges) {
-				List<IInstallableUnit> satisfyingUnits = edge.capabilities.stream()
-						.map(cap -> cap.installableUnit)
-						.filter(iu -> !projectUnits.contains(iu)) // Exclude own units
-						.distinct()
-						.collect(Collectors.toList());
+				IInstallableUnit satisfyingIU = edge.capability.installableUnit;
 				
-				// Always add the requirement to the map, even if it has no satisfying units
-				// This maintains the same behavior as the old implementation
-				requirementsMap.put(edge.requirement.requirement, satisfyingUnits);
+				// Only add if not from the same project
+				if (!projectUnits.contains(satisfyingIU)) {
+					requirementsMap.computeIfAbsent(edge.requirement.requirement, k -> new ArrayList<>())
+							.add(satisfyingIU);
+				}
 			}
 			
 			result.put(project, new ProjectDependencies(requirementsMap, projectUnits));
@@ -216,11 +210,9 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 				// Collect target projects from edges
 				Set<MavenProject> targetProjects = new HashSet<>();
 				for (Edge edge : entry.getValue()) {
-					for (Capability capability : edge.capabilities) {
-						MavenProject targetProject = iuProjectMap.get(capability.installableUnit);
-						if (targetProject != null && !targetProject.equals(sourceProject)) {
-							targetProjects.add(targetProject);
-						}
+					MavenProject targetProject = iuProjectMap.get(edge.capability.installableUnit);
+					if (targetProject != null && !targetProject.equals(sourceProject)) {
+						targetProjects.add(targetProject);
 					}
 				}
 				
