@@ -15,9 +15,12 @@ package org.eclipse.tycho.p2maven;
 import java.io.File;
 import java.io.IOException;
 import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -248,7 +251,7 @@ public class MavenProjectDependencyProcessor {
 
 	public static final class ProjectDependencies {
 
-		private final Map<IRequirement, Collection<IInstallableUnit>> requirementsMap;
+		final Map<IRequirement, Collection<IInstallableUnit>> requirementsMap;
 		private final Set<IInstallableUnit> projectUnits;
 
 		ProjectDependencies(Map<IRequirement, Collection<IInstallableUnit>> requirementsMap,
@@ -265,6 +268,101 @@ public class MavenProjectDependencyProcessor {
 		}
 
 
+	}
+
+	/**
+	 * Simple graph structure for dependency cycle detection
+	 */
+	public static class ProjectDependencyGraph {
+		private final Map<MavenProject, List<DependencyEdge>> adjacencyList;
+		
+		public ProjectDependencyGraph() {
+			this.adjacencyList = new HashMap<>();
+		}
+		
+		public void addEdge(MavenProject from, MavenProject to, String requirementInfo, String capabilityInfo) {
+			adjacencyList.computeIfAbsent(from, k -> new ArrayList<>())
+				.add(new DependencyEdge(to, requirementInfo, capabilityInfo));
+		}
+		
+		public List<MavenProject> getDirectDependencies(MavenProject project) {
+			return adjacencyList.getOrDefault(project, List.of()).stream()
+				.map(edge -> edge.target)
+				.toList();
+		}
+		
+		/**
+		 * Detect all cycles in the dependency graph
+		 * @return list of cycles, where each cycle is a list of projects forming the cycle
+		 */
+		public List<List<DependencyEdge>> detectCycles() {
+			List<List<DependencyEdge>> cycles = new ArrayList<>();
+			Set<MavenProject> visited = new HashSet<>();
+			Set<MavenProject> recursionStack = new HashSet<>();
+			LinkedHashMap<MavenProject, DependencyEdge> path = new LinkedHashMap<>();
+			
+			for (MavenProject project : adjacencyList.keySet()) {
+				if (!visited.contains(project)) {
+					detectCyclesDFS(project, visited, recursionStack, path, cycles);
+				}
+			}
+			
+			return cycles;
+		}
+		
+		private void detectCyclesDFS(MavenProject current, Set<MavenProject> visited, 
+				Set<MavenProject> recursionStack, LinkedHashMap<MavenProject, DependencyEdge> path,
+				List<List<DependencyEdge>> cycles) {
+			
+			visited.add(current);
+			recursionStack.add(current);
+			
+			List<DependencyEdge> edges = adjacencyList.getOrDefault(current, List.of());
+			for (DependencyEdge edge : edges) {
+				MavenProject next = edge.target;
+				
+				if (recursionStack.contains(next)) {
+					// Cycle detected! Extract the cycle from the path
+					List<DependencyEdge> cycle = new ArrayList<>();
+					boolean inCycle = false;
+					
+					// Extract cycle from path - find where the cycle starts
+					for (Map.Entry<MavenProject, DependencyEdge> entry : path.entrySet()) {
+						MavenProject pathNode = entry.getKey();
+						if (pathNode.equals(next)) {
+							inCycle = true;
+						}
+						if (inCycle && entry.getValue() != null) {
+							cycle.add(entry.getValue());
+						}
+					}
+					// Add the edge that completes the cycle
+					cycle.add(edge);
+					cycles.add(cycle);
+				} else if (!visited.contains(next)) {
+					path.put(current, edge); // Map from source to edge going to target
+					detectCyclesDFS(next, visited, recursionStack, path, cycles);
+					path.remove(current);
+				}
+			}
+			
+			recursionStack.remove(current);
+		}
+		
+		/**
+		 * Represents an edge in the dependency graph
+		 */
+		public static class DependencyEdge {
+			public final MavenProject target;
+			public final String requirementInfo;
+			public final String capabilityInfo;
+			
+			public DependencyEdge(MavenProject target, String requirementInfo, String capabilityInfo) {
+				this.target = target;
+				this.requirementInfo = requirementInfo;
+				this.capabilityInfo = capabilityInfo;
+			}
+		}
 	}
 
 	public static interface ProjectDependencyClosure {
@@ -292,6 +390,134 @@ public class MavenProjectDependencyProcessor {
 				Function<MavenProject, Collection<IInstallableUnit>> contextIuSupplier);
 
 		/**
+		 * Build a dependency graph for cycle detection
+		 */
+		default ProjectDependencyGraph buildDependencyGraph(Collection<IInstallableUnit> contextIUs) {
+			ProjectDependencyGraph graph = new ProjectDependencyGraph();
+			Set<MavenProject> processed = new HashSet<>();
+			
+			// Build graph by traversing all projects
+			dependencies(always -> contextIUs).forEach(entry -> {
+				MavenProject project = entry.getKey();
+				if (processed.add(project)) {
+					buildGraphForProject(project, contextIUs, graph);
+				}
+			});
+			
+			return graph;
+		}
+		
+		/**
+		 * Build graph edges for a single project
+		 */
+		default void buildGraphForProject(MavenProject project, Collection<IInstallableUnit> contextIUs, 
+				ProjectDependencyGraph graph) {
+			ProjectDependencies projectDependencies = getProjectDependecies(project);
+			List<MavenProject> directDeps = projectDependencies.getDependencies(contextIUs).stream()
+					.flatMap(dependency -> getProject(dependency).stream()).distinct().toList();
+			
+			for (MavenProject depProject : directDeps) {
+				String requirementInfo = buildRequirementInfo(project, depProject, projectDependencies, contextIUs);
+				String capabilityInfo = getProjectProvidesInfo(depProject);
+				graph.addEdge(project, depProject, requirementInfo, capabilityInfo);
+			}
+		}
+		
+		/**
+		 * Build requirement information for an edge
+		 */
+		default String buildRequirementInfo(MavenProject fromProject, MavenProject toProject,
+				ProjectDependencies fromDependencies, Collection<IInstallableUnit> contextIUs) {
+			Collection<IInstallableUnit> toUnits = getProjectUnits(toProject);
+			
+			List<String> requirementInfos = new ArrayList<>();
+			fromDependencies.requirementsMap.entrySet().stream()
+					.filter(entry -> isMatch(entry.getKey(), contextIUs))
+					.forEach(entry -> {
+						IRequirement req = entry.getKey();
+						Collection<IInstallableUnit> satisfyingUnits = entry.getValue();
+						
+						boolean satisfiedByTarget = satisfyingUnits.stream()
+								.anyMatch(iu -> toUnits.contains(iu));
+						
+						if (satisfiedByTarget) {
+							String reqInfo = getRequirementDescription(req);
+							requirementInfos.add("[requires " + reqInfo + "]");
+						}
+					});
+			
+			return requirementInfos.isEmpty() ? "" : String.join("", requirementInfos);
+		}
+
+		/**
+		 * Get information about what capabilities a project provides
+		 */
+		default String getProjectProvidesInfo(MavenProject project) {
+			Collection<IInstallableUnit> projectUnits = getProjectUnits(project);
+			List<String> provides = new ArrayList<>();
+			
+			for (IInstallableUnit iu : projectUnits) {
+				for (IProvidedCapability cap : iu.getProvidedCapabilities()) {
+					// Only include interesting capabilities (exclude standard OSGi metadata)
+					String namespace = cap.getNamespace();
+					if (!"osgi.identity".equals(namespace) && 
+						!"org.eclipse.equinox.p2.eclipse.type".equals(namespace) &&
+						!"org.eclipse.equinox.p2.iu".equals(namespace) &&
+						!("osgi.bundle".equals(namespace) && cap.getName().equals(project.getArtifactId()))) {
+						provides.add("[provides " + namespace + ":" + cap.getName() + "]");
+					}
+				}
+			}
+			
+			return provides.isEmpty() ? "" : String.join("", provides);
+		}
+
+		/**
+		 * Get a human-readable description of a requirement
+		 */
+		default String getRequirementDescription(IRequirement requirement) {
+			if (requirement instanceof IRequiredCapability requiredCapability) {
+				return requiredCapability.getNamespace() + ":" + requiredCapability.getName();
+			}
+			return requirement.toString();
+		}
+
+		/**
+		 * Format a cycle as a human-readable error message
+		 */
+		default String formatCycle(List<ProjectDependencyGraph.DependencyEdge> cycle) {
+			if (cycle.isEmpty()) {
+				return "Empty cycle";
+			}
+			
+			StringBuilder message = new StringBuilder("Dependency cycle detected: ");
+			List<String> steps = new ArrayList<>();
+			
+			// Each edge in the cycle represents: (implicit source) -> target
+			// The cycle edges form a chain where each edge's target becomes the next edge's source
+			for (ProjectDependencyGraph.DependencyEdge edge : cycle) {
+				MavenProject project = edge.target;
+				
+				String projectInfo = project.getGroupId() + ":" + project.getArtifactId();
+				
+				// Add capability info for this project
+				if (edge.capabilityInfo != null && !edge.capabilityInfo.isEmpty()) {
+					projectInfo += edge.capabilityInfo;
+				}
+				
+				// Add requirement info from this edge
+				if (edge.requirementInfo != null && !edge.requirementInfo.isEmpty()) {
+					projectInfo += edge.requirementInfo;
+				}
+				
+				steps.add(projectInfo);
+			}
+			
+			message.append(String.join(" -> ", steps));
+			return message.toString();
+		}
+
+		/**
 		 * Given a maven project returns all other maven projects this one (directly)
 		 * depends on
 		 * 
@@ -303,6 +529,17 @@ public class MavenProjectDependencyProcessor {
 		 */
 		default Collection<MavenProject> getDependencyProjects(MavenProject mavenProject,
 				Collection<IInstallableUnit> contextIUs) {
+			// Build dependency graph and check for cycles
+			ProjectDependencyGraph graph = buildDependencyGraph(contextIUs);
+			List<List<ProjectDependencyGraph.DependencyEdge>> cycles = graph.detectCycles();
+			
+			if (!cycles.isEmpty()) {
+				// Format and throw exception for the first cycle
+				String cycleMessage = formatCycle(cycles.get(0));
+				throw new ProjectDependencyCycleException(cycleMessage);
+			}
+			
+			// If no cycle detected, return dependencies as before
 			ProjectDependencies projectDependecies = getProjectDependecies(mavenProject);
 			List<MavenProject> list = projectDependecies.getDependencies(contextIUs).stream()
 					.flatMap(dependency -> getProject(dependency).stream()).distinct().toList();
@@ -330,5 +567,16 @@ public class MavenProjectDependencyProcessor {
 		 */
 		boolean isFragment(MavenProject mavenProject);
 
+	}
+
+	/**
+	 * Exception thrown when a cycle is detected in project dependencies
+	 */
+	public static class ProjectDependencyCycleException extends RuntimeException {
+		private static final long serialVersionUID = 1L;
+
+		public ProjectDependencyCycleException(String message) {
+			super(message);
+		}
 	}
 }
