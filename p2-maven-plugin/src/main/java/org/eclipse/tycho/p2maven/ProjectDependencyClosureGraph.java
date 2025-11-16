@@ -53,7 +53,7 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 	/**
 	 * Represents a capability provided by an installable unit
 	 */
-	record Capability(IInstallableUnit installableUnit, IProvidedCapability providedCapability) {
+	record Capability(MavenProject project, IInstallableUnit installableUnit) {
 	}
 
 	/**
@@ -74,7 +74,7 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 	private Map<MavenProject, Collection<IInstallableUnit>> projectIUMap;
 
 	// Graph structure: maps each project to its outgoing edges
-	private Map<MavenProject, Set<Edge>> projectEdgesMap = new HashMap<>();
+	private Map<MavenProject, List<Edge>> projectEdgesMap = new HashMap<>();
 
 	ProjectDependencyClosureGraph(Map<MavenProject, Collection<IInstallableUnit>> projectIUMap) throws CoreException {
 		this.projectIUMap = projectIUMap;
@@ -106,17 +106,18 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 	 * then create edges to the capabilities that satisfy those requirements.
 	 */
 	private void buildGraph() {
-		// Collect all IUs from all projects for capability matching
-		List<IInstallableUnit> allIUs = projectIUMap.values().stream()
-				.flatMap(Collection::stream)
+		// Pre-create Capability objects for all IUs to prevent multiple object creation
+		List<Capability> allCapabilities = projectIUMap.entrySet().stream()
+				.flatMap(entry -> entry.getValue().stream()
+						.map(iu -> new Capability(entry.getKey(), iu)))
 				.collect(Collectors.toList());
 
 		// Build edges for each project in parallel
-		Map<MavenProject, Set<Edge>> result = new java.util.concurrent.ConcurrentHashMap<>();
+		Map<MavenProject, List<Edge>> result = new java.util.concurrent.ConcurrentHashMap<>();
 		
 		projectIUMap.entrySet().parallelStream().unordered().forEach(entry -> {
 			MavenProject project = entry.getKey();
-			Set<Edge> edges = new LinkedHashSet<>();
+			List<Edge> edges = new ArrayList<>();
 			Collection<IInstallableUnit> projectUnits = entry.getValue();
 
 			// Collect all requirements from all IUs of this project (excluding MetaRequirements)
@@ -130,13 +131,10 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 
 			// For each requirement, find matching capabilities and create edges
 			for (Requirement requirement : requirements) {
-				// Search through all IUs to find those that satisfy the requirement
-				for (IInstallableUnit iu : allIUs) {
-					if (iu.satisfies(requirement.requirement)) {
-						// Create an edge for each capability from this IU
-						for (IProvidedCapability cap : iu.getProvidedCapabilities()) {
-							edges.add(new Edge(requirement, new Capability(iu, cap)));
-						}
+				// Search through all capabilities to find those that satisfy the requirement
+				for (Capability capability : allCapabilities) {
+					if (capability.installableUnit.satisfies(requirement.requirement)) {
+						edges.add(new Edge(requirement, capability));
 					}
 				}
 			}
@@ -160,15 +158,13 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 			// Build requirements map from edges
 			// Group edges by requirement and collect all satisfying IUs
 			Map<IRequirement, Collection<IInstallableUnit>> requirementsMap = new LinkedHashMap<>();
-			Set<Edge> edges = projectEdgesMap.getOrDefault(project, Set.of());
+			List<Edge> edges = projectEdgesMap.getOrDefault(project, List.of());
 			
 			for (Edge edge : edges) {
-				IInstallableUnit satisfyingIU = edge.capability.installableUnit;
-				
-				// Only add if not from the same project
-				if (!projectUnits.contains(satisfyingIU)) {
+				// Only add if not from the same project (use project from capability)
+				if (!edge.capability.project.equals(project)) {
 					requirementsMap.computeIfAbsent(edge.requirement.requirement, k -> new ArrayList<>())
-							.add(satisfyingIU);
+							.add(edge.capability.installableUnit);
 				}
 			}
 			
@@ -210,8 +206,8 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 				// Collect target projects from edges
 				Set<MavenProject> targetProjects = new HashSet<>();
 				for (Edge edge : entry.getValue()) {
-					MavenProject targetProject = iuProjectMap.get(edge.capability.installableUnit);
-					if (targetProject != null && !targetProject.equals(sourceProject)) {
+					MavenProject targetProject = edge.capability.project;
+					if (!targetProject.equals(sourceProject)) {
 						targetProjects.add(targetProject);
 					}
 				}
