@@ -17,7 +17,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -245,6 +247,126 @@ public class DotDump {
 
 	private static String escapeLabel(String label) {
 		return label.replace("\\", "\\\\").replace("\"", "\\\"");
+	}
+	
+	/**
+	 * Dump a filtered graph showing which edges were removed during cycle resolution
+	 * 
+	 * @param file the file to write the DOT representation to
+	 * @param graph the graph to dump
+	 * @param project the project being analyzed
+	 * @param keptEdges edges that were kept after filtering
+	 * @param removedEdges edges that were removed during filtering
+	 * @throws IOException if writing fails
+	 */
+	public static void dumpFiltered(File file, ProjectDependencyClosureGraph graph, 
+			MavenProject project, Collection<ProjectDependencyClosureGraph.Edge> keptEdges,
+			Set<ProjectDependencyClosureGraph.Edge> removedEdges) throws IOException {
+		
+		try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
+			writer.println("digraph FilteredProjectDependencies {");
+			writer.println("  rankdir=LR;");
+			writer.println("  node [shape=box];");
+			writer.println("  label=\"Filtered dependencies for " + escapeLabel(project.getArtifactId()) + "\";");
+			writer.println("  labelloc=\"t\";");
+			writer.println();
+			
+			// Create a mapping of projects to short names
+			Map<MavenProject, String> projectNames = new HashMap<>();
+			Set<MavenProject> allProjects = new HashSet<>();
+			allProjects.add(project);
+			
+			// Collect all projects from edges
+			for (var edge : keptEdges) {
+				allProjects.add(edge.capability().project());
+			}
+			for (var edge : removedEdges) {
+				allProjects.add(edge.capability().project());
+			}
+			
+			int counter = 0;
+			for (MavenProject p : allProjects) {
+				String nodeName = "p" + counter++;
+				projectNames.put(p, nodeName);
+				String label = p.getArtifactId();
+				
+				// Highlight the source project
+				if (p.equals(project)) {
+					writer.println("  " + nodeName + " [label=\"" + escapeLabel(label) + "\", style=filled, fillcolor=lightblue];");
+				} else {
+					writer.println("  " + nodeName + " [label=\"" + escapeLabel(label) + "\"];");
+				}
+			}
+			writer.println();
+			
+			// Write kept edges (normal color)
+			Map<MavenProject, Map<String, List<ProjectDependencyClosureGraph.Edge>>> keptEdgesByTarget = new HashMap<>();
+			for (var edge : keptEdges) {
+				MavenProject target = edge.capability().project();
+				String edgeType = getEdgeTypeLabel(edge);
+				keptEdgesByTarget.computeIfAbsent(target, k -> new HashMap<String, List<ProjectDependencyClosureGraph.Edge>>())
+					.computeIfAbsent(edgeType, k -> new ArrayList<ProjectDependencyClosureGraph.Edge>())
+					.add(edge);
+			}
+			
+			for (var targetEntry : keptEdgesByTarget.entrySet()) {
+				MavenProject target = targetEntry.getKey();
+				String targetName = projectNames.get(target);
+				String sourceName = projectNames.get(project);
+				
+				for (var typeEntry : targetEntry.getValue().entrySet()) {
+					String edgeType = typeEntry.getKey();
+					List<ProjectDependencyClosureGraph.Edge> edges = typeEntry.getValue();
+					
+					// Build label from requirements
+					StringBuilder label = new StringBuilder();
+					for (int i = 0; i < edges.size(); i++) {
+						if (i > 0) label.append("\\n");
+						label.append(edges.get(i).requirement().requirement().toString());
+					}
+					
+					writer.println("  " + sourceName + " -> " + targetName + " [label=\"" + 
+							escapeLabel(label.toString()) + "\", tooltip=\"Type: " + edgeType + "\"];");
+				}
+			}
+			
+			// Write removed edges (gray color)
+			Map<MavenProject, Map<String, List<ProjectDependencyClosureGraph.Edge>>> removedEdgesByTarget = new HashMap<>();
+			for (var edge : removedEdges) {
+				MavenProject target = edge.capability().project();
+				String edgeType = getEdgeTypeLabel(edge);
+				removedEdgesByTarget.computeIfAbsent(target, k -> new HashMap<String, List<ProjectDependencyClosureGraph.Edge>>())
+					.computeIfAbsent(edgeType, k -> new ArrayList<ProjectDependencyClosureGraph.Edge>())
+					.add(edge);
+			}
+			
+			for (var targetEntry : removedEdgesByTarget.entrySet()) {
+				MavenProject target = targetEntry.getKey();
+				String targetName = projectNames.get(target);
+				String sourceName = projectNames.get(project);
+				
+				for (var typeEntry : targetEntry.getValue().entrySet()) {
+					String edgeType = typeEntry.getKey();
+					List<ProjectDependencyClosureGraph.Edge> edges = typeEntry.getValue();
+					
+					// Build label from requirements
+					StringBuilder label = new StringBuilder();
+					for (int i = 0; i < edges.size(); i++) {
+						if (i > 0) label.append("\\n");
+						label.append(edges.get(i).requirement().requirement().toString());
+					}
+					
+					writer.println("  " + sourceName + " -> " + targetName + " [label=\"" + 
+							escapeLabel(label.toString()) + "\", color=gray, style=dashed, tooltip=\"REMOVED - Type: " + edgeType + "\"];");
+				}
+			}
+			
+			writer.println("}");
+		}
+	}
+	
+	private static String getEdgeTypeLabel(ProjectDependencyClosureGraph.Edge edge) {
+		return edge.type().toString();
 	}
 
 }
