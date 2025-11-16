@@ -43,6 +43,27 @@ import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor.ProjectDependen
 import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor.ProjectDependencyClosure;
 import org.eclipse.tycho.p2maven.tmp.BundlesAction;
 
+/**
+ * Simple logger interface for debugging dependency resolution
+ */
+interface DependencyLogger {
+	void debug(String message);
+	void info(String message);
+	void error(String message);
+	
+	/**
+	 * No-op logger that discards all messages
+	 */
+	static DependencyLogger NONE = new DependencyLogger() {
+		@Override
+		public void debug(String message) {}
+		@Override
+		public void info(String message) {}
+		@Override
+		public void error(String message) {}
+	};
+}
+
 class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 
 	/**
@@ -58,9 +79,45 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 	}
 
 	/**
+	 * Types of edges in the dependency graph
+	 */
+	enum EdgeType {
+		/** Edge representing an attached fragment */
+		ATTACHED_FRAGMENT,
+		/** Edge representing a mandatory compile-time requirement (osgi.bundle or java.package) */
+		COMPILE_REQUIRED,
+		/** Edge representing an optional requirement */
+		OPTIONAL,
+		/** Edge representing any other type of requirement */
+		OTHER
+	}
+	
+	/**
 	 * Represents a directional edge in the dependency graph
 	 */
-	record Edge(Requirement requirement, Capability capability) {
+	record Edge(Requirement requirement, Capability capability, EdgeType type) {
+		
+		/**
+		 * Determine the edge type based on the requirement
+		 */
+		static EdgeType determineType(IRequirement requirement, boolean isFragment) {
+			if (isFragment) {
+				return EdgeType.ATTACHED_FRAGMENT;
+			}
+			if (requirement.getMin() == 0) {
+				return EdgeType.OPTIONAL;
+			}
+			// Check if it's a compile-required dependency
+			if (requirement instanceof IRequiredCapability) {
+				IRequiredCapability reqCap = (IRequiredCapability) requirement;
+				String namespace = reqCap.getNamespace();
+				if (BundlesAction.CAPABILITY_NS_OSGI_BUNDLE.equals(namespace)
+						|| "java.package".equals(namespace)) {
+					return EdgeType.COMPILE_REQUIRED;
+				}
+			}
+			return EdgeType.OTHER;
+		}
 	}
 
 	private static final ProjectDependencies EMPTY_DEPENDENCIES = new ProjectDependencies(Map.of(), Set.of());
@@ -132,7 +189,9 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 				// Search through all capabilities to find those that satisfy the requirement
 				for (Capability capability : allCapabilities) {
 					if (capability.installableUnit.satisfies(requirement.requirement)) {
-						edges.add(new Edge(requirement, capability));
+						// Determine edge type (fragment status is determined later in getDependencyProjects)
+						EdgeType type = Edge.determineType(requirement.requirement, false);
+						edges.add(new Edge(requirement, capability, type));
 					}
 				}
 			}
@@ -284,24 +343,220 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 	@Override
 	public Collection<MavenProject> getDependencyProjects(MavenProject mavenProject,
 			Collection<IInstallableUnit> contextIUs) {
+		return getDependencyProjects(mavenProject, contextIUs, DependencyLogger.NONE);
+	}
+	
+	/**
+	 * Get the dependency projects for a given project with optional logging for debugging.
+	 * This is the enhanced version that handles cycles properly.
+	 * 
+	 * @param mavenProject the project to analyze
+	 * @param contextIUs the context IUs for filtering
+	 * @param logger optional logger for debugging (use DependencyLogger.NONE for no logging)
+	 * @return collection of cycle-free dependency projects
+	 */
+	public Collection<MavenProject> getDependencyProjects(MavenProject mavenProject,
+			Collection<IInstallableUnit> contextIUs, DependencyLogger logger) {
+		
+		// Use the original logic to get base dependencies
 		ProjectDependencies projectDependecies = getProjectDependecies(mavenProject);
-		List<MavenProject> list = projectDependecies.getDependencies(contextIUs).stream()
+		List<MavenProject> baseDeps = projectDependecies.getDependencies(contextIUs).stream()
 				.flatMap(dependency -> getProject(dependency).stream()).distinct().toList();
-		if (isFragment(mavenProject)) {
-			// for projects that are fragments don't do any special processing...
-			return list;
+		
+		// Step 1: Handle fragment attachment uniformly for all projects
+		List<MavenProject> depsWithFragments = new ArrayList<>();
+		Set<MavenProject> processedProjects = new HashSet<>();
+		Collection<IInstallableUnit> projectUnits = getProjectUnits(mavenProject);
+		
+		for (MavenProject depProject : baseDeps) {
+			if (!processedProjects.contains(depProject)) {
+				processedProjects.add(depProject);
+				depsWithFragments.add(depProject);
+				
+				// Find and attach fragments for this dependency
+				ProjectDependencies depDependencies = getProjectDependecies(depProject);
+				depDependencies.getDependencies(contextIUs).stream()
+						.filter(dep -> isFragment(dep) && hasAnyHost(dep, getProjectUnits(depProject)))
+						.flatMap(dependency -> getProject(dependency).stream())
+						.forEach(fragmentProject -> {
+							if (!depsWithFragments.contains(fragmentProject)) {
+								depsWithFragments.add(fragmentProject);
+								logger.debug("Attaching fragment " + fragmentProject.getArtifactId() 
+										+ " to " + depProject.getArtifactId());
+							}
+						});
+			}
 		}
-		// for regular projects we must check if they have any fragment requirements
-		// that must be attached here, example is SWT that defines a requirement to its
-		// fragments and if build inside the same reactor with a consumer (e.g. JFace)
-		// has to be applied
-		return list.stream().flatMap(project -> {
-			ProjectDependencies dependecies = getProjectDependecies(project);
-			return Stream.concat(Stream.of(project),
-					dependecies.getDependencies(contextIUs).stream()
-							.filter(dep -> hasAnyHost(dep, dependecies.projectUnits))
-							.flatMap(dependency -> getProject(dependency).stream()));
-		}).toList();
+		
+		// Also check if the project itself has fragments that should be attached
+		projectDependecies.getDependencies(contextIUs).stream()
+				.filter(dep -> isFragment(dep) && hasAnyHost(dep, projectUnits))
+				.flatMap(dependency -> getProject(dependency).stream())
+				.forEach(fragmentProject -> {
+					if (!depsWithFragments.contains(fragmentProject)) {
+						depsWithFragments.add(fragmentProject);
+						logger.debug("Attaching fragment " + fragmentProject.getArtifactId() 
+								+ " to " + mavenProject.getArtifactId());
+					}
+				});
+		
+		// Step 2: Filter out cyclic dependencies
+		List<MavenProject> filtered = new ArrayList<>();
+		Set<MavenProject> removed = new HashSet<>();
+		List<Edge> keptEdges = new ArrayList<>();
+		Set<Edge> removedEdges = new HashSet<>();
+		
+		for (MavenProject depProject : depsWithFragments) {
+			// Check if including this dependency creates a cycle
+			if (createsCycleWithProject(mavenProject, depProject)) {
+				// Determine how to handle this based on the edge type
+				boolean isFragmentDep = isFragment(depProject);
+				boolean shouldRemove = false;
+				
+				if (isFragmentDep) {
+					// Fragment in cycle - remove it
+					shouldRemove = true;
+					removed.add(depProject);
+					logger.debug("Removing fragment edge in cycle: " + depProject.getArtifactId());
+				} else {
+					// Check the edge type
+					List<Edge> edgesToDep = getEdges(mavenProject, depProject);
+					boolean hasCompileRequired = edgesToDep.stream()
+							.anyMatch(e -> e.type == EdgeType.COMPILE_REQUIRED);
+					
+					if (hasCompileRequired) {
+						// Compile required - check for alternative
+						boolean hasAlternative = hasAlternativeProviderForProject(
+								depProject, depsWithFragments, mavenProject, contextIUs);
+						
+						if (hasAlternative) {
+							shouldRemove = true;
+							removed.add(depProject);
+							removedEdges.addAll(edgesToDep);
+							logger.info("Removing compile-required edge with alternative provider: " 
+									+ depProject.getArtifactId());
+						} else {
+							// No alternative - this is an error
+							String errorMsg = "Cyclic compile-required dependency detected: " 
+									+ mavenProject.getArtifactId() + " -> " + depProject.getArtifactId();
+							logger.error(errorMsg);
+							throw new IllegalStateException(errorMsg);
+						}
+					} else {
+						// Other type - can be removed
+						shouldRemove = true;
+						removed.add(depProject);
+						removedEdges.addAll(edgesToDep);
+						logger.info("Removing edge in cycle: " + depProject.getArtifactId());
+					}
+				}
+				
+				if (!shouldRemove) {
+					filtered.add(depProject);
+					keptEdges.addAll(getEdges(mavenProject, depProject));
+				}
+			} else {
+				// No cycle - keep it
+				filtered.add(depProject);
+				keptEdges.addAll(getEdges(mavenProject, depProject));
+			}
+		}
+		
+		// Step 3: Write filtered DOT file if DUMP_DATA is enabled
+		if (DUMP_DATA && mavenProject.getBasedir() != null) {
+			try {
+				File dotFile = new File(mavenProject.getBasedir(), "project-dependencies-filtered.dot");
+				DotDump.dumpFiltered(dotFile, this, mavenProject, keptEdges, removedEdges);
+			} catch (IOException e) {
+				// Ignore dump errors
+			}
+		}
+		
+		return filtered;
+	}
+	
+	/**
+	 * Get all edges from source project to target project
+	 */
+	private List<Edge> getEdges(MavenProject source, MavenProject target) {
+		List<Edge> result = new ArrayList<>();
+		List<Edge> sourceEdges = projectEdgesMap.getOrDefault(source, List.of());
+		for (Edge edge : sourceEdges) {
+			if (edge.capability.project.equals(target)) {
+				result.add(edge);
+			}
+		}
+		return result;
+	}
+	
+	/**
+	 * Check if adding a dependency from source to target would create a cycle
+	 */
+	private boolean createsCycleWithProject(MavenProject source, MavenProject target) {
+		// If source equals target, it's definitely a cycle
+		if (source.equals(target)) {
+			return true;
+		}
+		
+		// Use BFS to check if there's a path from target back to source in the graph
+		Set<MavenProject> visited = new HashSet<>();
+		List<MavenProject> queue = new ArrayList<>();
+		queue.add(target);
+		visited.add(target);
+		
+		while (!queue.isEmpty()) {
+			MavenProject current = queue.remove(0);
+			
+			// Get all edges from current project
+			List<Edge> currentEdges = projectEdgesMap.getOrDefault(current, List.of());
+			for (Edge edge : currentEdges) {
+				MavenProject next = edge.capability.project;
+				
+				// If we reached source, we have a cycle
+				if (next.equals(source)) {
+					return true;
+				}
+				
+				// Continue BFS
+				if (!visited.contains(next)) {
+					visited.add(next);
+					queue.add(next);
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	/**
+	 * Check if there's an alternative provider for the capabilities provided by a project
+	 */
+	private boolean hasAlternativeProviderForProject(MavenProject project, 
+			List<MavenProject> allDeps, MavenProject excludeProject, Collection<IInstallableUnit> contextIUs) {
+		// Get capabilities provided by the project
+		Collection<IInstallableUnit> projectUnits = getProjectUnits(project);
+		
+		// Check if any other project in allDeps provides the same capabilities
+		for (MavenProject altProject : allDeps) {
+			if (altProject.equals(project) || altProject.equals(excludeProject)) {
+				continue;
+			}
+			
+			// Check if altProject provides any of the same capabilities
+			Collection<IInstallableUnit> altUnits = getProjectUnits(altProject);
+			
+			// Check if there's overlap in provided capabilities
+			for (IInstallableUnit projectUnit : projectUnits) {
+				for (IInstallableUnit altUnit : altUnits) {
+					// If they have the same ID, it's an alternative
+					if (projectUnit.getId().equals(altUnit.getId())) {
+						return true;
+					}
+				}
+			}
+		}
+		
+		return false;
 	}
 
 	private static boolean isFragment(IInstallableUnit installableUnit) {

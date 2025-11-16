@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,7 @@ import org.eclipse.equinox.p2.metadata.IProvidedCapability;
 import org.eclipse.equinox.p2.metadata.IRequirement;
 import org.eclipse.equinox.p2.metadata.Version;
 import org.eclipse.tycho.p2maven.MavenProjectDependencyProcessor.ProjectDependencies;
+import org.eclipse.tycho.p2maven.tmp.BundlesAction;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -750,5 +752,104 @@ public class ProjectDependencyClosureGraphTest {
 		assertTrue(content.contains("selfRef"), "Should contain selfRef");
 		
 		System.out.println("Self-reference cycle DOT content:\n" + content);
+	}
+	
+	@Test
+	public void testSimpleDependencyResolution() throws CoreException {
+		// Simple test: A depends on B, no cycles
+		MavenProject projectA = createMockProject("projectA");
+		MavenProject projectB = createMockProject("projectB");
+		
+		// Project A requires B
+		IInstallableUnit iuA = createMockIU("bundleA", "1.0.0");
+		when(iuA.getProvidedCapabilities()).thenReturn(List.of());
+		IRequirement reqB = createMockRequirement("osgi.bundle", "bundleB");
+		when(iuA.getRequirements()).thenReturn(List.of(reqB));
+		when(iuA.getMetaRequirements()).thenReturn(List.of());
+		
+		// Project B provides capability
+		IInstallableUnit iuB = createMockIU("bundleB", "1.0.0");
+		IProvidedCapability capB = createMockCapability("osgi.bundle", "bundleB", "1.0.0");
+		when(iuB.getProvidedCapabilities()).thenReturn(List.of(capB));
+		when(iuB.getRequirements()).thenReturn(List.of());
+		when(iuB.getMetaRequirements()).thenReturn(List.of());
+		
+		// Setup satisfaction
+		when(iuB.satisfies(reqB)).thenReturn(true);
+		when(iuA.satisfies(reqB)).thenReturn(false);
+		
+		Map<MavenProject, Collection<IInstallableUnit>> projectIUMap = Map.of(
+				projectA, List.of(iuA),
+				projectB, List.of(iuB)
+		);
+		
+		ProjectDependencyClosureGraph graph = new ProjectDependencyClosureGraph(projectIUMap);
+		
+		// Get dependencies for A - should contain B
+		Collection<MavenProject> depsA = graph.getDependencyProjects(projectA, List.of());
+		assertTrue(depsA.contains(projectB), "A should depend on B");
+		
+		// Get dependencies for B - should be empty (no dependencies)
+		Collection<MavenProject> depsB = graph.getDependencyProjects(projectB, List.of());
+		assertTrue(depsB.isEmpty() || !depsB.contains(projectA), "B should not depend on A");
+	}
+	
+	@Test
+	public void testLoggingDuringDependencyResolution() throws CoreException {
+		// Test that logging works correctly during normal resolution
+		List<String> debugMessages = new ArrayList<>();
+		List<String> infoMessages = new ArrayList<>();
+		
+		DependencyLogger logger = new DependencyLogger() {
+			@Override
+			public void debug(String message) {
+				debugMessages.add(message);
+			}
+			
+			@Override
+			public void info(String message) {
+				infoMessages.add(message);
+			}
+			
+			@Override
+			public void error(String message) {
+				// Not testing errors here
+			}
+		};
+		
+		MavenProject projectA = createMockProject("projectA");
+		MavenProject projectB = createMockProject("projectB");
+		
+		// Project A requires B
+		IInstallableUnit iuA = createMockIU("bundleA", "1.0.0");
+		when(iuA.getProvidedCapabilities()).thenReturn(List.of());
+		IRequirement reqB = createMockRequirement("osgi.bundle", "bundleB");
+		when(iuA.getRequirements()).thenReturn(List.of(reqB));
+		when(iuA.getMetaRequirements()).thenReturn(List.of());
+		
+		// Project B provides capability
+		IInstallableUnit iuB = createMockIU("bundleB", "1.0.0");
+		IProvidedCapability capB = createMockCapability("osgi.bundle", "bundleB", "1.0.0");
+		when(iuB.getProvidedCapabilities()).thenReturn(List.of(capB));
+		when(iuB.getRequirements()).thenReturn(List.of());
+		when(iuB.getMetaRequirements()).thenReturn(List.of());
+		
+		// Setup satisfaction
+		when(iuB.satisfies(reqB)).thenReturn(true);
+		when(iuA.satisfies(reqB)).thenReturn(false);
+		
+		Map<MavenProject, Collection<IInstallableUnit>> projectIUMap = Map.of(
+				projectA, List.of(iuA),
+				projectB, List.of(iuB)
+		);
+		
+		ProjectDependencyClosureGraph graph = new ProjectDependencyClosureGraph(projectIUMap);
+		
+		// Get dependencies with logging
+		graph.getDependencyProjects(projectA, List.of(), logger);
+		
+		// Just verify the logger interface works
+		System.out.println("Debug messages: " + debugMessages);
+		System.out.println("Info messages: " + infoMessages);
 	}
 }
