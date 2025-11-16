@@ -310,4 +310,159 @@ public class ProjectDependencyClosureGraphTest {
 		when(req.getMax()).thenReturn(Integer.MAX_VALUE); // No limit on max
 		return req;
 	}
+
+	@Test
+	public void testTwoProjectCycleDetection() throws CoreException, IOException {
+		// Create the cycle: provider.bundle -> consumer.bundle -> provider.bundle
+		// This simulates the OSGi service example from the comment
+		
+		MavenProject providerProject = createMockProject("provider.bundle");
+		MavenProject consumerProject = createMockProject("consumer.bundle");
+
+		// Provider bundle provides a service and requires consumer bundle
+		IInstallableUnit providerIU = createMockIU("provider.bundle", "1.0.0");
+		IProvidedCapability serviceCapability = createMockCapability("osgi.implementation", 
+				"org.eclipse.equinox.internal.p2.repository.Transport", "1.0.0");
+		when(providerIU.getProvidedCapabilities()).thenReturn(List.of(serviceCapability));
+		
+		IRequirement reqConsumer = createMockRequirement("osgi.bundle", "consumer.bundle");
+		when(providerIU.getRequirements()).thenReturn(List.of(reqConsumer));
+		when(providerIU.getMetaRequirements()).thenReturn(List.of());
+
+		// Consumer bundle requires the service (which provider provides)
+		IInstallableUnit consumerIU = createMockIU("consumer.bundle", "1.0.0");
+		when(consumerIU.getProvidedCapabilities()).thenReturn(List.of());
+		
+		IRequirement reqService = createMockRequirement("osgi.implementation", 
+				"org.eclipse.equinox.internal.p2.repository.Transport");
+		when(consumerIU.getRequirements()).thenReturn(List.of(reqService));
+		when(consumerIU.getMetaRequirements()).thenReturn(List.of());
+
+		// Setup satisfaction
+		when(consumerIU.satisfies(reqConsumer)).thenReturn(true);
+		when(providerIU.satisfies(reqConsumer)).thenReturn(false);
+		when(providerIU.satisfies(reqService)).thenReturn(true);
+		when(consumerIU.satisfies(reqService)).thenReturn(false);
+
+		Map<MavenProject, Collection<IInstallableUnit>> projectIUMap = Map.of(
+				providerProject, List.of(providerIU),
+				consumerProject, List.of(consumerIU)
+		);
+
+		// Create graph and dump
+		ProjectDependencyClosureGraph graph = new ProjectDependencyClosureGraph(projectIUMap);
+		File dotFile = new File(tempDir, "two-project-cycle.dot");
+		graph.dump(dotFile);
+
+		// Verify file was created and contains cycle markers
+		assertTrue(dotFile.exists(), "DOT file should be created");
+		String content = Files.readString(dotFile.toPath());
+		
+		// Should have red edges for the cycle
+		assertTrue(content.contains("[color=red]"), "Should contain red edges for transitive cycle");
+		assertTrue(content.contains("provider.bundle"), "Should contain provider.bundle");
+		assertTrue(content.contains("consumer.bundle"), "Should contain consumer.bundle");
+		
+		System.out.println("Two-project cycle DOT content:\n" + content);
+	}
+
+	@Test
+	public void testThreeProjectCycleDetection() throws CoreException, IOException {
+		// Create the cycle: A -> B -> C -> A
+		
+		MavenProject projectA = createMockProject("projectA");
+		MavenProject projectB = createMockProject("projectB");
+		MavenProject projectC = createMockProject("projectC");
+
+		// Project A requires B
+		IInstallableUnit iuA = createMockIU("bundleA", "1.0.0");
+		when(iuA.getProvidedCapabilities()).thenReturn(List.of());
+		IRequirement reqB = createMockRequirement("osgi.bundle", "bundleB");
+		when(iuA.getRequirements()).thenReturn(List.of(reqB));
+		when(iuA.getMetaRequirements()).thenReturn(List.of());
+
+		// Project B requires C
+		IInstallableUnit iuB = createMockIU("bundleB", "1.0.0");
+		when(iuB.getProvidedCapabilities()).thenReturn(List.of());
+		IRequirement reqC = createMockRequirement("osgi.bundle", "bundleC");
+		when(iuB.getRequirements()).thenReturn(List.of(reqC));
+		when(iuB.getMetaRequirements()).thenReturn(List.of());
+
+		// Project C requires A
+		IInstallableUnit iuC = createMockIU("bundleC", "1.0.0");
+		when(iuC.getProvidedCapabilities()).thenReturn(List.of());
+		IRequirement reqA = createMockRequirement("osgi.bundle", "bundleA");
+		when(iuC.getRequirements()).thenReturn(List.of(reqA));
+		when(iuC.getMetaRequirements()).thenReturn(List.of());
+
+		// Setup satisfaction
+		when(iuB.satisfies(reqB)).thenReturn(true);
+		when(iuA.satisfies(reqB)).thenReturn(false);
+		when(iuC.satisfies(reqB)).thenReturn(false);
+		
+		when(iuC.satisfies(reqC)).thenReturn(true);
+		when(iuA.satisfies(reqC)).thenReturn(false);
+		when(iuB.satisfies(reqC)).thenReturn(false);
+		
+		when(iuA.satisfies(reqA)).thenReturn(true);
+		when(iuB.satisfies(reqA)).thenReturn(false);
+		when(iuC.satisfies(reqA)).thenReturn(false);
+
+		Map<MavenProject, Collection<IInstallableUnit>> projectIUMap = Map.of(
+				projectA, List.of(iuA),
+				projectB, List.of(iuB),
+				projectC, List.of(iuC)
+		);
+
+		// Create graph and dump
+		ProjectDependencyClosureGraph graph = new ProjectDependencyClosureGraph(projectIUMap);
+		File dotFile = new File(tempDir, "three-project-cycle.dot");
+		graph.dump(dotFile);
+
+		// Verify file was created and contains cycle markers
+		assertTrue(dotFile.exists(), "DOT file should be created");
+		String content = Files.readString(dotFile.toPath());
+		
+		// Should have red edges for the cycle
+		assertTrue(content.contains("[color=red]"), "Should contain red edges for transitive cycle");
+		assertTrue(content.contains("projectA"), "Should contain projectA");
+		assertTrue(content.contains("projectB"), "Should contain projectB");
+		assertTrue(content.contains("projectC"), "Should contain projectC");
+		
+		System.out.println("Three-project cycle DOT content:\n" + content);
+	}
+
+	@Test
+	public void testSelfReferenceCycleDetection() throws CoreException, IOException {
+		// Create a project with self-reference
+		MavenProject project = createMockProject("selfRef");
+		IInstallableUnit iu = createMockIU("bundleSelf", "1.0.0");
+
+		IProvidedCapability cap = createMockCapability("osgi.bundle", "bundleSelf", "1.0.0");
+		when(iu.getProvidedCapabilities()).thenReturn(List.of(cap));
+
+		IRequirement req = createMockRequirement("osgi.bundle", "bundleSelf");
+		when(iu.getRequirements()).thenReturn(List.of(req));
+		when(iu.getMetaRequirements()).thenReturn(List.of());
+		when(iu.satisfies(req)).thenReturn(true);
+
+		Map<MavenProject, Collection<IInstallableUnit>> projectIUMap = Map.of(
+				project, List.of(iu)
+		);
+
+		// Create graph and dump
+		ProjectDependencyClosureGraph graph = new ProjectDependencyClosureGraph(projectIUMap);
+		File dotFile = new File(tempDir, "self-reference-cycle.dot");
+		graph.dump(dotFile);
+
+		// Verify file was created and contains gray edge for self-reference
+		assertTrue(dotFile.exists(), "DOT file should be created");
+		String content = Files.readString(dotFile.toPath());
+		
+		// Should have gray edge for self-reference
+		assertTrue(content.contains("[color=gray]"), "Should contain gray edge for self-reference");
+		assertTrue(content.contains("selfRef"), "Should contain selfRef");
+		
+		System.out.println("Self-reference cycle DOT content:\n" + content);
+	}
 }

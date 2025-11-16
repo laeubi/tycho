@@ -181,6 +181,9 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 	 * @throws IOException if writing fails
 	 */
 	public void dump(File file) throws IOException {
+		// Detect cycles
+		Set<Set<MavenProject>> cycles = detectCycles();
+		
 		try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
 			writer.println("digraph ProjectDependencies {");
 			writer.println("  rankdir=LR;");
@@ -198,31 +201,137 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 			}
 			writer.println();
 			
-			// Write edges
+			// Write edges with color coding based on cycle type
 			for (var entry : projectEdgesMap.entrySet()) {
 				MavenProject sourceProject = entry.getKey();
 				String sourceName = projectNames.get(sourceProject);
 				
 				// Collect target projects from edges
-				Set<MavenProject> targetProjects = new HashSet<>();
+				Map<MavenProject, String> targetProjectColors = new HashMap<>();
 				for (Edge edge : entry.getValue()) {
 					MavenProject targetProject = edge.capability.project;
-					if (!targetProject.equals(sourceProject)) {
-						targetProjects.add(targetProject);
+					
+					// Determine edge color
+					String color;
+					if (targetProject.equals(sourceProject)) {
+						// Self-reference cycle - GRAY
+						color = "gray";
+					} else if (isInCycle(sourceProject, targetProject, cycles)) {
+						// Part of a transitive cycle - RED
+						color = "red";
+					} else {
+						// Normal dependency - BLACK
+						color = "black";
 					}
+					
+					targetProjectColors.put(targetProject, color);
 				}
 				
-				// Write edge for each target project
-				for (MavenProject targetProject : targetProjects) {
+				// Write edge for each target project (including self-references)
+				for (var targetEntry : targetProjectColors.entrySet()) {
+					MavenProject targetProject = targetEntry.getKey();
+					String color = targetEntry.getValue();
 					String targetName = projectNames.get(targetProject);
 					if (targetName != null) {
-						writer.println("  " + sourceName + " -> " + targetName + ";");
+						writer.println("  " + sourceName + " -> " + targetName + " [color=" + color + "];");
 					}
 				}
 			}
 			
 			writer.println("}");
 		}
+	}
+	
+	/**
+	 * Detect all cycles in the dependency graph using Tarjan's algorithm for strongly connected components
+	 * 
+	 * @return a set of sets, where each inner set represents a cycle (strongly connected component with more than one node)
+	 */
+	private Set<Set<MavenProject>> detectCycles() {
+		Set<Set<MavenProject>> cycles = new HashSet<>();
+		Map<MavenProject, Integer> index = new HashMap<>();
+		Map<MavenProject, Integer> lowLink = new HashMap<>();
+		Map<MavenProject, Boolean> onStack = new HashMap<>();
+		List<MavenProject> stack = new ArrayList<>();
+		int[] indexCounter = {0};
+		
+		for (MavenProject project : projectIUMap.keySet()) {
+			if (!index.containsKey(project)) {
+				strongConnect(project, index, lowLink, onStack, stack, indexCounter, cycles);
+			}
+		}
+		
+		return cycles;
+	}
+	
+	/**
+	 * Tarjan's strongly connected components algorithm
+	 */
+	private void strongConnect(MavenProject v, Map<MavenProject, Integer> index, 
+			Map<MavenProject, Integer> lowLink, Map<MavenProject, Boolean> onStack,
+			List<MavenProject> stack, int[] indexCounter, Set<Set<MavenProject>> cycles) {
+		
+		index.put(v, indexCounter[0]);
+		lowLink.put(v, indexCounter[0]);
+		indexCounter[0]++;
+		stack.add(v);
+		onStack.put(v, true);
+		
+		// Consider successors of v
+		List<Edge> edges = projectEdgesMap.getOrDefault(v, List.of());
+		for (Edge edge : edges) {
+			MavenProject w = edge.capability.project;
+			
+			if (!index.containsKey(w)) {
+				// Successor w has not yet been visited; recurse on it
+				strongConnect(w, index, lowLink, onStack, stack, indexCounter, cycles);
+				lowLink.put(v, Math.min(lowLink.get(v), lowLink.get(w)));
+			} else if (onStack.getOrDefault(w, false)) {
+				// Successor w is in stack and hence in the current SCC
+				lowLink.put(v, Math.min(lowLink.get(v), index.get(w)));
+			}
+		}
+		
+		// If v is a root node, pop the stack and generate an SCC
+		if (lowLink.get(v).equals(index.get(v))) {
+			Set<MavenProject> scc = new HashSet<>();
+			MavenProject w;
+			do {
+				w = stack.remove(stack.size() - 1);
+				onStack.put(w, false);
+				scc.add(w);
+			} while (!w.equals(v));
+			
+			// Only add if it's a real cycle (more than one node, or has self-edge)
+			if (scc.size() > 1 || hasSelfEdge(v)) {
+				cycles.add(scc);
+			}
+		}
+	}
+	
+	/**
+	 * Check if a project has a self-referencing edge
+	 */
+	private boolean hasSelfEdge(MavenProject project) {
+		List<Edge> edges = projectEdgesMap.getOrDefault(project, List.of());
+		for (Edge edge : edges) {
+			if (edge.capability.project.equals(project)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	/**
+	 * Check if an edge from source to target is part of a cycle
+	 */
+	private boolean isInCycle(MavenProject source, MavenProject target, Set<Set<MavenProject>> cycles) {
+		for (Set<MavenProject> cycle : cycles) {
+			if (cycle.contains(source) && cycle.contains(target)) {
+				return true;
+			}
+		}
+		return false;
 	}
 	
 	private String escapeLabel(String label) {
