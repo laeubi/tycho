@@ -201,13 +201,13 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 			}
 			writer.println();
 			
-			// Write edges with color coding based on cycle type
+			// Write edges with color coding based on cycle type and requirement labels
 			for (var entry : projectEdgesMap.entrySet()) {
 				MavenProject sourceProject = entry.getKey();
 				String sourceName = projectNames.get(sourceProject);
 				
-				// Collect target projects from edges
-				Map<MavenProject, String> targetProjectColors = new HashMap<>();
+				// Group edges by target project to collect all requirements for each dependency
+				Map<MavenProject, EdgeInfo> targetProjectEdges = new HashMap<>();
 				for (Edge edge : entry.getValue()) {
 					MavenProject targetProject = edge.capability.project;
 					
@@ -224,21 +224,56 @@ class ProjectDependencyClosureGraph implements ProjectDependencyClosure {
 						color = "black";
 					}
 					
-					targetProjectColors.put(targetProject, color);
+					EdgeInfo edgeInfo = targetProjectEdges.computeIfAbsent(targetProject, 
+							k -> new EdgeInfo(color));
+					edgeInfo.addRequirement(edge.requirement.requirement);
 				}
 				
-				// Write edge for each target project (including self-references)
-				for (var targetEntry : targetProjectColors.entrySet()) {
+				// Write edge for each target project with requirement labels
+				for (var targetEntry : targetProjectEdges.entrySet()) {
 					MavenProject targetProject = targetEntry.getKey();
-					String color = targetEntry.getValue();
+					EdgeInfo edgeInfo = targetEntry.getValue();
 					String targetName = projectNames.get(targetProject);
 					if (targetName != null) {
-						writer.println("  " + sourceName + " -> " + targetName + " [color=" + color + "];");
+						// Build label from requirements
+						String label = edgeInfo.getLabel();
+						writer.println("  " + sourceName + " -> " + targetName + 
+								" [color=" + edgeInfo.color + ", label=\"" + escapeLabel(label) + "\"];");
 					}
 				}
 			}
 			
 			writer.println("}");
+		}
+	}
+	
+	/**
+	 * Helper class to collect edge information for a dependency relationship
+	 */
+	private static class EdgeInfo {
+		final String color;
+		final List<String> requirements = new ArrayList<>();
+		
+		EdgeInfo(String color) {
+			this.color = color;
+		}
+		
+		void addRequirement(IRequirement requirement) {
+			String reqString = requirement.toString();
+			if (!requirements.contains(reqString)) {
+				requirements.add(reqString);
+			}
+		}
+		
+		String getLabel() {
+			if (requirements.isEmpty()) {
+				return "";
+			} else if (requirements.size() == 1) {
+				return requirements.get(0);
+			} else {
+				// Join multiple requirements with line breaks
+				return String.join("\\n", requirements);
+			}
 		}
 	}
 	

@@ -359,7 +359,7 @@ public class ProjectDependencyClosureGraphTest {
 		String content = Files.readString(dotFile.toPath());
 		
 		// Should have red edges for the cycle
-		assertTrue(content.contains("[color=red]"), "Should contain red edges for transitive cycle");
+		assertTrue(content.contains("color=red"), "Should contain red edges for transitive cycle");
 		assertTrue(content.contains("provider.bundle"), "Should contain provider.bundle");
 		assertTrue(content.contains("consumer.bundle"), "Should contain consumer.bundle");
 		
@@ -424,7 +424,7 @@ public class ProjectDependencyClosureGraphTest {
 		String content = Files.readString(dotFile.toPath());
 		
 		// Should have red edges for the cycle
-		assertTrue(content.contains("[color=red]"), "Should contain red edges for transitive cycle");
+		assertTrue(content.contains("color=red"), "Should contain red edges for transitive cycle");
 		assertTrue(content.contains("projectA"), "Should contain projectA");
 		assertTrue(content.contains("projectB"), "Should contain projectB");
 		assertTrue(content.contains("projectC"), "Should contain projectC");
@@ -460,7 +460,7 @@ public class ProjectDependencyClosureGraphTest {
 		String content = Files.readString(dotFile.toPath());
 		
 		// Should have gray edge for self-reference
-		assertTrue(content.contains("[color=gray]"), "Should contain gray edge for self-reference");
+		assertTrue(content.contains("color=gray"), "Should contain gray edge for self-reference");
 		assertTrue(content.contains("selfRef"), "Should contain selfRef");
 		
 		System.out.println("Self-reference cycle DOT content:\n" + content);
