@@ -546,6 +546,56 @@ public class ProjectDependencyClosureGraphTest {
 		System.out.println("All combined formatting DOT content:\n" + content);
 	}
 
+	@Test
+	public void testNonMandatoryCompileRequirementNoBoLD() throws CoreException, IOException {
+		// Verify that requirements with other namespaces (not osgi.bundle or java.package)
+		// don't get bold formatting
+		MavenProject projectA = createMockProject("projectA");
+		MavenProject projectB = createMockProject("projectB");
+
+		IInstallableUnit iuA = createMockIU("bundleA", "1.0.0");
+		IInstallableUnit iuB = createMockIU("bundleB", "1.0.0");
+
+		// Create a requirement with a different namespace (should NOT be bold)
+		IRequirement nonCompileReq = mock(org.eclipse.equinox.internal.p2.metadata.IRequiredCapability.class);
+		when(nonCompileReq.toString()).thenReturn("Requirement[osgi.service:SomeService]");
+		when(nonCompileReq.getFilter()).thenReturn(null);
+		when(nonCompileReq.getMax()).thenReturn(Integer.MAX_VALUE);
+		when(nonCompileReq.getMin()).thenReturn(1); // Mandatory but not compile
+		when(nonCompileReq.isGreedy()).thenReturn(false);
+		when(((org.eclipse.equinox.internal.p2.metadata.IRequiredCapability)nonCompileReq).getNamespace())
+				.thenReturn("osgi.service"); // Different namespace, should NOT be bold
+
+		when(iuA.getRequirements()).thenReturn(List.of(nonCompileReq));
+		when(iuA.getMetaRequirements()).thenReturn(List.of());
+		when(iuA.getProvidedCapabilities()).thenReturn(List.of());
+
+		IProvidedCapability capB = createMockCapability("osgi.service", "SomeService", "1.0.0");
+		when(iuB.getProvidedCapabilities()).thenReturn(List.of(capB));
+		when(iuB.getRequirements()).thenReturn(List.of());
+		when(iuB.getMetaRequirements()).thenReturn(List.of());
+
+		when(iuB.satisfies(nonCompileReq)).thenReturn(true);
+		when(iuA.satisfies(nonCompileReq)).thenReturn(false);
+
+		Map<MavenProject, Collection<IInstallableUnit>> projectIUMap = Map.of(
+				projectA, List.of(iuA),
+				projectB, List.of(iuB)
+		);
+
+		ProjectDependencyClosureGraph graph = new ProjectDependencyClosureGraph(projectIUMap);
+		File dotFile = new File(tempDir, "non-compile-requirement.dot");
+		DotDump.dump(dotFile, graph);
+
+		assertTrue(dotFile.exists(), "DOT file should be created");
+		String content = Files.readString(dotFile.toPath());
+		
+		// Should NOT contain bold formatting for non-compile requirement
+		assertFalse(content.contains("<B>"), "Should NOT contain bold formatting for non-compile namespace");
+		// Should still have the requirement listed
+		assertTrue(content.contains("osgi.service"), "Should contain the requirement");
+		System.out.println("Non-compile requirement DOT content:\n" + content);
+	}
 
 	@Test
 	public void testTwoProjectCycleDetection() throws CoreException, IOException {
