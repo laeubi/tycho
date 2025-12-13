@@ -294,6 +294,24 @@
 			<version>0.17.8</version>
 			<scope>test</scope>
 		</dependency>
+		<!-- Maven 4 rc-5's MavenRepositorySystemUtils.newSession() still references old Eclipse Aether -->
+		<!-- internal classes like ConfigurableVersionSelector which no longer exist. This is a Maven 4 -->
+		<!-- rc-5 bug. As a workaround, we add Eclipse Aether 1.1.0 dependencies which provide the -->
+		<!-- org.eclipse.aether.* classes, though ConfigurableVersionSelector was never part of the -->
+		<!-- public API and cannot be provided without creating conflicts. -->
+		<!-- The affected tests (M2E PDE target tests) will fail until Maven 4 final fixes this issue. -->
+		<dependency>
+			<groupId>org.eclipse.aether</groupId>
+			<artifactId>aether-api</artifactId>
+			<version>1.1.0</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.aether</groupId>
+			<artifactId>aether-util</artifactId>
+			<version>1.1.0</version>
+			<scope>test</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.eclipse.aether</groupId>
 			<artifactId>aether-impl</artifactId>
