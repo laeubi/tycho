@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.surefire;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -23,7 +23,8 @@ public class TestOptionalDependenciesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testIgnoreMutuallyExclusiveOptionalDependenciesForTestRuntimeComputation() throws Exception {
 		Verifier verifier = getVerifier("/surefire.optionalDependencies.ignore", true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	} // see also OptionalDependenciesTest.testOptionallyRequiredBundleCanBeIgnored()
 
@@ -32,7 +33,8 @@ public class TestOptionalDependenciesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void reactorIndirectOptionalDependencies() throws Exception {
 		Verifier verifier = getVerifier("/surefire.optionalDependencies.reactor", true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

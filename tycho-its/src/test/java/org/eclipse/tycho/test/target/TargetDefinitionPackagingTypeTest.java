@@ -16,7 +16,7 @@ package org.eclipse.tycho.test.target;
 import java.io.File;
 import java.nio.file.Files;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.ResourceUtil;
 import org.eclipse.tycho.test.util.TargetDefinitionUtil;
@@ -45,24 +45,27 @@ public class TargetDefinitionPackagingTypeTest extends AbstractTychoIntegrationT
 
 	@Test
 	public void testTargetDefinitionFromWithinReactor() throws Exception {
-		verifier.addCliOption("-PtargetAndBundle");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-PtargetAndBundle");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testTargetDefinitionFromLocalRepo() throws Exception {
 		// first, install the target definition into the local repo
-		verifier.addCliOption("-PtargetOnly");
-		verifier.executeGoal("install");
+		verifier.addCliArgument("-PtargetOnly");
+		verifier.addCliArgument("install");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.assertArtifactContents(TARGET_GROUPID, TARGET_ARTIFACTID, TARGET_VERSION, TARGET_EXTENSION,
 				Files.readString(targetDefinitionFile.toPath()));
 		// then, run the build of the bundle module only which should now
 		// be able to resolve the target definition from the local repo
 		verifier = getVerifier("target.packagingType", false);
-		verifier.addCliOption("-PbundleOnly");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-PbundleOnly");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

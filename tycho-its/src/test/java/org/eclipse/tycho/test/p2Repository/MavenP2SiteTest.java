@@ -18,7 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -28,18 +28,21 @@ public class MavenP2SiteTest extends AbstractTychoIntegrationTest {
 	public void testProduceConsume() throws Exception {
 		{// parent
 			Verifier verifier = getVerifier("p2mavensite", false);
-			verifier.executeGoals(asList("install"));
+			verifier.addCliArguments("install");
+			verifier.execute();
 			verifier.verifyErrorFreeLog();
 		}
 		{ // producer
 			Verifier verifier = getVerifier("p2mavensite/producer", false);
-			verifier.executeGoals(asList("clean", "install"));
+			verifier.addCliArguments("clean", "install");
+			verifier.execute();
 			verifier.verifyErrorFreeLog();
 			verifyRepositoryExits(verifier, "");
 		}
 		{ // consumer
 			Verifier verifier = getVerifier("p2mavensite/consumer", false);
-			verifier.executeGoals(asList("clean", "verify"));
+			verifier.addCliArguments("clean", "verify");
+			verifier.execute();
 			verifier.verifyErrorFreeLog();
 		}
 	}
@@ -47,7 +50,8 @@ public class MavenP2SiteTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testDeployIgnore() throws Exception {
 		Verifier verifier = getVerifier("p2mavensite.reactor", false);
-		verifier.executeGoals(asList("install"));
+		verifier.addCliArguments("install");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifyRepositoryExits(verifier, "site/");
 		String artifacts = Files.readString(Paths.get(verifier.getBasedir(), "site/target/repository/artifacts.xml"),
@@ -65,7 +69,8 @@ public class MavenP2SiteTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testPGP() throws Exception {
 		Verifier verifier = getVerifier("p2mavensite.pgp", false);
-		verifier.executeGoals(asList("clean", "install"));
+		verifier.addCliArguments("clean", "install");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifyRepositoryExits(verifier, "site/");
 	}

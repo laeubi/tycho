@@ -20,7 +20,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.eclipse.tycho.test.util.P2RepositoryTool.IU;
@@ -34,7 +34,8 @@ public class IUMetadataGenerationTest extends AbstractTychoIntegrationTest {
 	@BeforeClass
 	public static void runBuild() throws Exception {
 		Verifier verifier = new IUMetadataGenerationTest().getVerifier("iu.artifact", false);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File repoProject = new File(verifier.getBasedir(), "repository");

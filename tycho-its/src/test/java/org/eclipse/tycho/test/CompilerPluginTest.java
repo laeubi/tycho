@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.junit.Test;
 
 /**
@@ -23,7 +23,8 @@ public class CompilerPluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testJavac() throws Exception {
 		Verifier verifier = getVerifier("tycho-compiler-plugin/javac", true, true);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

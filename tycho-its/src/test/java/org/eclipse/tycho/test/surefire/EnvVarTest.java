@@ -15,7 +15,7 @@ package org.eclipse.tycho.test.surefire;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -26,7 +26,8 @@ public class EnvVarTest extends AbstractTychoIntegrationTest {
         Verifier verifier = getVerifier("surefire.envVars");
         Map<String, String> env = new HashMap<>();
         env.put("KEY_1", "value_1");
-        verifier.executeGoal("integration-test", env);
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         // project contains a test doing the assertions
         verifier.verifyErrorFreeLog();
     }

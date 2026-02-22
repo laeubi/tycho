@@ -21,8 +21,8 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -31,7 +31,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testJUnit5ContainerWithoutTarget() throws Exception {
 		Verifier verifier = getVerifier("compiler.junitcontainer/junit5-without-target", false, true);
-		verifier.executeGoal("test");
+		verifier.addCliArgument("test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("-- in bundle.test.AdderTest");
 		verifier.verifyTextInLog("-- in bundle.test.SubtractorTest");
@@ -41,7 +42,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testJUnit5ContainerWithLinkedResources() throws Exception {
 		Verifier verifier = getVerifier("compiler.junitcontainer/junit5-with-linked-resources", false, true);
-		verifier.executeGoal("test");
+		verifier.addCliArgument("test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("Compiling 2 source files");
 		verifier.verifyTextInLog("-- in bundle.test.AdderTest");
@@ -52,7 +54,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testJUnit4Container() throws Exception {
 		Verifier verifier = getVerifier("compiler.junitcontainer/junit4-in-bundle", true);
-		verifier.executeGoal("test");
+		verifier.addCliArgument("test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("Tests run: 5, Failures: 0, Errors: 0, Skipped: 0");
 	}
@@ -60,7 +63,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testJUnit4ContainerWithDependencies() throws Exception {
 		Verifier verifier = getVerifier("compiler.junitcontainer/junit4-in-bundle-with-dependencies", true);
-		verifier.executeGoal("test");
+		verifier.addCliArgument("test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("Tests run: 5, Failures: 0, Errors: 0, Skipped: 0");
 	}
@@ -68,7 +72,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testLibEntry() throws Exception {
 		Verifier verifier = getVerifier("compiler.libentry/my.bundle", false);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -78,12 +83,13 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 		// first test to consume from target platform
 		verifyDs(verifier);
 		// now test consume from maven directly
-		verifier.addCliOption("-Pfiltered");
+		verifier.addCliArgument("-Pfiltered");
 		verifyDs(verifier);
 	}
 
 	private void verifyDs(Verifier verifier) throws VerificationException {
-		verifier.executeGoals(List.of("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File generated = new File(verifier.getBasedir(), "target/classes/OSGI-INF");
 		assertTrue(new File(generated, "tycho.ds.TestComponent.xml").isFile());
@@ -93,7 +99,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testTransitiveDSComponents() throws Exception {
 		Verifier verifier = getVerifier("tycho-ds-dependency", true, true);
-		verifier.executeGoals(List.of("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		Path generated = Path.of(verifier.getBasedir(), "plugin.a/target/classes/OSGI-INF");
 		assertTrue(Files.isRegularFile(generated.resolve("foo.bar.MyComponent.xml")));
@@ -102,7 +109,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testOSGiAnnotations() throws Exception {
 		Verifier verifier = getVerifier("compiler.annotations", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File dependencies = new File(verifier.getBasedir(), "target/dependencies-list.txt");
 		assertTrue(dependencies.getAbsoluteFile() + " not found!", dependencies.isFile());
@@ -119,7 +127,8 @@ public class CompilerClasspathEntryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testImplicitJDTAnnotations() throws Exception {
 		Verifier verifier = getVerifier("compiler.annotations", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File dependencies = new File(verifier.getBasedir(), "target/dependencies-list.txt");
 		assertTrue(dependencies.getAbsoluteFile() + " not found!", dependencies.isFile());

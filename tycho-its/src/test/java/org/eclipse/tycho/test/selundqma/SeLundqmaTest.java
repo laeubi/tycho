@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.selundqma;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -24,12 +24,14 @@ public class SeLundqmaTest extends AbstractTychoIntegrationTest {
 
 		// build01
 		Verifier v01 = getVerifier("selundqma", true, ignoreLocallyInstalledArtifacts);
-		v01.executeGoal("install");
+		v01.addCliArgument("install");
+		v01.execute();
 		v01.verifyErrorFreeLog();
 
 		// build02
 		Verifier v02 = getVerifier("selundqma/clients", true, ignoreLocallyInstalledArtifacts);
-		v02.executeGoal("install");
+		v02.addCliArgument("install");
+		v02.execute();
 		v02.verifyErrorFreeLog();
 	}
 

@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.resolver;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -21,7 +21,8 @@ public class PomDependenciesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testPomDependencies() throws Exception {
 		Verifier verifier = getVerifier("/resolver.pomDependencies");
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

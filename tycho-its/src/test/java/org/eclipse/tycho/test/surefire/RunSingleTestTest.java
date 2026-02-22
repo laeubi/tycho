@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.surefire;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,8 +22,9 @@ public class RunSingleTestTest extends AbstractTychoIntegrationTest {
 		Verifier verifier = getVerifier("surefire.testSelection");
 
 		// call test with -Dtest=bundle.WorkingTest -> supported since TYCHO-356
-		verifier.addCliOption("-Dtest=bundle.WorkingTest");
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("-Dtest=bundle.WorkingTest");
+		verifier.addCliArgument("integration-test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 }

@@ -15,8 +15,8 @@ package org.eclipse.tycho.test.compiler;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -25,7 +25,7 @@ public class MisconfigurationTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testCompilerMisconfigured() throws Exception {
 		Verifier verifier = getVerifier("compiler.misconfiguration", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("compile"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("compile"); verifier.execute(); });
 		// expected
 		verifier.verifyTextInLog("org.codehaus.plexus.compiler.CompilerException: Unrecognized option : -boo boo");
 	}

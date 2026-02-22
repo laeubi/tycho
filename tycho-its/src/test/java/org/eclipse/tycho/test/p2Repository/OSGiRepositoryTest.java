@@ -14,7 +14,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -23,7 +23,8 @@ public class OSGiRepositoryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testProduceConsume() throws Exception {
 		Verifier verifier = getVerifier("osgiRepository", false, true);
-		verifier.executeGoals(asList("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File repoFile = new File(verifier.getBasedir(), "site/target/repository/repository.xml.gz");
 		assertTrue("repo file " + repoFile + " not found!", repoFile.exists());

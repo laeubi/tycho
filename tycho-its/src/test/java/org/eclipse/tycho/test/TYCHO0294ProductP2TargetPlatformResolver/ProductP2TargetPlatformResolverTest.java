@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.TYCHO0294ProductP2TargetPlatformResolver;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class ProductP2TargetPlatformResolverTest extends AbstractTychoIntegratio
 	@Test
 	public void testBasic() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO0294ProductP2TargetPlatformResolver");
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File target = new File(verifier.getBasedir(), "product.bundle-based/target/repository/binary");

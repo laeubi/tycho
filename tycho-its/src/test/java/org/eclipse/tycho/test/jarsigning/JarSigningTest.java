@@ -18,7 +18,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.XMLTool;
 import org.junit.Test;
@@ -31,7 +31,9 @@ public class JarSigningTest extends AbstractTychoIntegrationTest {
 	public void testSigning() throws Exception {
 		Verifier verifier = getVerifier("jar-signing", true);
 
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("verified successfully");
 		checkSha256SumsArePresent(verifier);
@@ -41,7 +43,9 @@ public class JarSigningTest extends AbstractTychoIntegrationTest {
 	public void testExtraSigning() throws Exception {
 		Verifier verifier = getVerifier("jar-signing-extra", true);
 
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("verified successfully");
 		checkSha256SumsArePresent(verifier);

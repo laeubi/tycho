@@ -15,8 +15,8 @@ package org.eclipse.tycho.test.compiler;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -27,7 +27,7 @@ public class RequireJREPackagesImportTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testStrictImportJREPackages() throws Exception {
 		Verifier verifier = getVerifier("compiler.requireJREPackageImports", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("compile"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("compile"); verifier.execute(); });
 		// expected
 		verifier.verifyTextInLog("[ERROR] Access restriction: The type 'InitialContext' is not API");
 	}

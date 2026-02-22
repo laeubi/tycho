@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.Stream.Builder;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -41,7 +41,8 @@ public class JUnit5Test extends AbstractTychoIntegrationTest {
 	@Test
 	public void testJUnit5() throws Exception {
 		final Verifier verifier = getVerifier("/tycho-surefire-plugin/junit5/basic");
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		final String projectBasedir = verifier.getBasedir();
 		assertTestMethodWasSuccessfullyExecuted(projectBasedir, "bundle.test.JUnit5Test", "My 1st JUnit 5 test!");
@@ -74,7 +75,8 @@ public class JUnit5Test extends AbstractTychoIntegrationTest {
 	@MethodSource("junitVersions")
 	public void testJUnitCompatibility(String version, String type) throws Exception {
 		final Verifier verifier = getVerifier("/tycho-surefire-plugin/junit5/compatibility/" + version);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		final String projectBasedir = verifier.getBasedir() + "/" + type;
 		if ("runner".equals(type)) {

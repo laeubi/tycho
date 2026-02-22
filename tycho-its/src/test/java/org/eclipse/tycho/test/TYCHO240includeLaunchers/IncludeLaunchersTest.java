@@ -20,7 +20,7 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.SystemUtils;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -29,7 +29,8 @@ public class IncludeLaunchersTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void includeLaunchers() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO240includeLaunchers/includeLaunchers");
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("integration-test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File targetdir = new File(verifier.getBasedir(), "target");
@@ -59,7 +60,8 @@ public class IncludeLaunchersTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void noIncludeLaunchers() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO240includeLaunchers/noIncludeLaunchers");
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("integration-test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File targetdir = new File(verifier.getBasedir(), "target");

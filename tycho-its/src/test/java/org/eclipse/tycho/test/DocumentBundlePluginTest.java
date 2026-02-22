@@ -17,8 +17,8 @@ import static org.junit.Assert.assertThrows;
 import java.io.File;
 import java.nio.file.Files;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.junit.Test;
 
 public class DocumentBundlePluginTest extends AbstractTychoIntegrationTest {
@@ -26,7 +26,7 @@ public class DocumentBundlePluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testGenerateIndex() throws Exception {
 		Verifier verifier = getVerifier("document-bundle-plugin/build-help-index", true, true);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("package"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("package"); verifier.execute(); });
 		// a full test seems rather complex, so what we can do here is call the test and
 		// check that the mojo was executed successful (even though it produces an
 		// error)
@@ -36,7 +36,8 @@ public class DocumentBundlePluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void test1() throws Exception {
 		Verifier verifier = getVerifier("document-bundle-plugin/test1", true, true);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		/*******************************************************************************
 		 * Copyright (c) 2014 IBH SYSTEMS GmbH and others. All rights reserved. This
@@ -72,7 +73,8 @@ public class DocumentBundlePluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testAdditionalDeps() throws Exception {
 		Verifier verifier = getVerifier("document-bundle-plugin/additionalDepsTest", true, true);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		/*******************************************************************************

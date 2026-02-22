@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.product;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -31,7 +31,8 @@ public class MetaRequirementsTest extends AbstractTychoIntegrationTest {
 		 * used.)
 		 */
 		Verifier verifier = getVerifier("product.metaRequirements", false);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("The custom touchpoint action has been executed");
 	}

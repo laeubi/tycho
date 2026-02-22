@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.surefire;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -24,7 +24,8 @@ public class TwoJunitVersionsTest extends AbstractTychoIntegrationTest {
     @Test
     public void test() throws Exception {
         Verifier verifier = getVerifier("surefire.twoJunitVersions");
-        verifier.executeGoal("integration-test");
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
 
         assertFileExists(new File(verifier.getBasedir()), "target/surefire-reports/some.Test.txt");

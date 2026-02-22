@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.pomDependencyConsider;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.p2.repository.GAV;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.NoopFileLockService;
@@ -37,7 +37,8 @@ public class PomDependencyOnLocallyBuiltTychoArtifactTest extends AbstractTychoI
 
 		// this fails unless the p2-metadata.xml is reused (because the POM dependency
 		// publisher doesn't create source bundles)
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		String testProjectRoot = verifier.getBasedir();
@@ -56,7 +57,8 @@ public class PomDependencyOnLocallyBuiltTychoArtifactTest extends AbstractTychoI
 
 	private void setUpBundleWithSourceBundle() throws Exception {
 		Verifier testDataProject = getVerifier("pomDependencyConsider.p2Data.reuse/testDataBundle", false);
-		testDataProject.executeGoal("install");
+		testDataProject.addCliArgument("install");
+		testDataProject.execute();
 		testDataProject.verifyErrorFreeLog();
 		// prevent that the created bundle & source bundle can be automatically seen by
 		// other Tycho builds

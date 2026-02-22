@@ -12,8 +12,8 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.tycho026;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -25,7 +25,9 @@ public class Tycho26MissingFeatureTest extends AbstractTychoIntegrationTest {
         Verifier verifier = getVerifier("/tycho026");
         verifier.setAutoclean(false);
 
-        verifier.executeGoal("package");
+        verifier.addCliArgument("package");
+
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 

@@ -21,7 +21,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.equinox.p2.repository.IRepository;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.HttpServer;
@@ -55,7 +55,8 @@ public class TargetVariableResolutionTest extends AbstractTychoIntegrationTest {
 	public void repositoryUrlCanContainEnvVarVariable() throws Exception {
 		Verifier verifier = getVerifier("target.variables/env", false);
 		verifier.setEnvironmentVariable("MY_MIRROR", baseurl);
-		verifier.executeGoals(Arrays.asList("package"));
+		verifier.addCliArguments("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("validate-target-platform");
 		verifyResolution(verifier);
@@ -65,7 +66,8 @@ public class TargetVariableResolutionTest extends AbstractTychoIntegrationTest {
 	public void repositoryUrlCanContainSystemPropertyVariable() throws Exception {
 		Verifier verifier = getVerifier("target.variables/sysprop", false);
 		verifier.setSystemProperty("myMirror", baseurl);
-		verifier.executeGoals(Arrays.asList("package"));
+		verifier.addCliArguments("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("validate-target-platform");
 		verifyResolution(verifier);

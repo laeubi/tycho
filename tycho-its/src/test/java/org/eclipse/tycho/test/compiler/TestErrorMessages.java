@@ -14,8 +14,8 @@ package org.eclipse.tycho.test.compiler;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -31,7 +31,8 @@ public class TestErrorMessages extends AbstractTychoIntegrationTest {
 		// test failing because of an improved handling in tycho feel free to remove it
 		// as it actually should be equal to the plain profile
 		Verifier verifier = getVerifier("compiler.messages/missing-bree", false);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -43,8 +44,8 @@ public class TestErrorMessages extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMissingBREEWithPlainProfile() throws Exception {
 		Verifier verifier = getVerifier("compiler.messages/missing-bree", false);
-		verifier.addCliOption("-Pplain");
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("compile"));
+		verifier.addCliArgument("-Pplain");
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("compile"); verifier.execute(); });
 		verifier.verifyTextInLog("java17.bundle 1.0.0 requires Execution Environment that matches");
 		verifier.verifyTextInLog("but the current resolution context uses");
 	}
@@ -57,8 +58,8 @@ public class TestErrorMessages extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMissingBREEWithJustJProfile() throws Exception {
 		Verifier verifier = getVerifier("compiler.messages/missing-bree", false);
-		verifier.addCliOption("-Pjustj");
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("compile"));
+		verifier.addCliArgument("-Pjustj");
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("compile"); verifier.execute(); });
 		verifier.verifyTextInLog(
 				"The following Execution Environments are currently known but are ignored by configuration");
 	}

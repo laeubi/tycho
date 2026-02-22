@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.TYCHO246rcpSourceBundles;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class TYCHO246rcpSourceBundlesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMultiplatformReactorBuild() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO246rcpSourceBundles");
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("integration-test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File productTarget = new File(verifier.getBasedir(), "product/target");

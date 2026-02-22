@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.codehaus.plexus.util.xml.Xpp3DomBuilder;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -42,7 +42,8 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenLocation() throws Exception {
 		Verifier verifier = getVerifier("target.maven", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		// check that there are no warnings
 		assertThrows("Warning about missing digest algorithm was printed to the log", VerificationException.class,
@@ -55,15 +56,17 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenLocationScopes() throws Exception {
 		Verifier verifier = getVerifier("target.maven-scopes", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testMavenArtifactHaveMavenRepoPath() throws Exception {
 		Verifier verifier = getVerifier("target.maven", false, true);
-		verifier.addCliOption("-DoutputAbsoluteArtifactFilename=true");
-		verifier.executeGoal("dependency:list");
+		verifier.addCliArgument("-DoutputAbsoluteArtifactFilename=true");
+		verifier.addCliArgument("dependency:list");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertFalse("Location for Maven deps should not resolve to cache",
 				Files.readString(Path.of(verifier.getBasedir(), verifier.getLogFileName())).contains("p2/osgi"));
@@ -72,7 +75,8 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenArtifactHaveMavenDepsCoordinates() throws Exception {
 		Verifier verifier = getVerifier("target.maven", false, true);
-		verifier.executeGoal("dependency:list");
+		verifier.addCliArgument("dependency:list");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("commons-lang:commons-lang:jar:2.4:compile"); // this is a weak assert, should
 																				// be
@@ -82,7 +86,8 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenLocationMulti() throws Exception {
 		Verifier verifier = getVerifier("target.mavenMulti", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -90,28 +95,31 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Ignore(value = "This test is flaky on the buildserver")
 	public void testMavenLocationRepositories() throws Exception {
 		Verifier verifier = getVerifier("target.mavenRepos", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testDirectoryLocation() throws Exception {
 		Verifier verifier = getVerifier("target.directory", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testTargetPlatformArtifactCaching() throws Exception {
 		Verifier verifier = getVerifier("target.artifact.caching", false, true);
-		verifier.addCliOption("-Dtycho.localArtifacts=default");
+		verifier.addCliArgument("-Dtycho.localArtifacts=default");
 
 		File annotBundleManifestFile = new File(verifier.getBasedir(),
 				"target.test/plugins/osgi.annotation.bundle_0.0.1/META-INF/MANIFEST.MF");
 		DefaultBundleReader reader = new DefaultBundleReader();
 		OsgiManifest annotBundleManifest = reader.loadManifest(annotBundleManifestFile);
 		Assert.assertEquals("tycho.test.package", annotBundleManifest.getValue("Export-Package"));
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		List<String> out = Files.lines(annotBundleManifestFile.toPath())
@@ -120,7 +128,7 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 				StandardOpenOption.TRUNCATE_EXISTING);
 
 		assertThrows("Reference to the not exported package did not fail the build", VerificationException.class,
-				() -> verifier.executeGoal("verify"));
+				() -> { verifier.addCliArgument("verify"); verifier.execute(); });
 		verifier.verifyTextInLog(
 				" Missing requirement: test.bundle 0.0.1.qualifier requires 'java.package; tycho.test.package 0.0.0' but it could not be found");
 	}
@@ -128,7 +136,8 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenLocationAutogeneratedFeature() throws Exception {
 		Verifier verifier = getVerifier("target.maven.autofeature", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		Path targetPlatformRepository = Path.of(verifier.getBasedir(),
@@ -160,7 +169,8 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenLocationEclipseFeature() throws Exception {
 		Verifier verifier = getVerifier("target.maven.eclipse-feature", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetdir = new File(verifier.getBasedir(), "repository/target");
 		assertFileExists(targetdir, "repository/features/org.eclipse.jgit_6.1.0.202203080745-r.jar");
@@ -169,21 +179,24 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenLocationTransitiveFeature() throws Exception {
 		Verifier verifier = getVerifier("target.maven-deps", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testTargetDefinedInRepositories() throws Exception {
 		Verifier verifier = getVerifier("target.userepositories", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testTargetRepositoryLocation() throws Exception {
 		Verifier verifier = getVerifier("target.repository", false, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 }

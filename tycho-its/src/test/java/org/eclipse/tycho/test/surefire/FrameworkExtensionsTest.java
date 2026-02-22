@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.surefire;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class FrameworkExtensionsTest extends AbstractTychoIntegrationTest {
     public void testFrameworkExtensions() throws Exception {
         // project with a framework extension in the test runtime -> supported since TYCHO-353
         Verifier verifier = getVerifier("surefire.frameworkExtensions");
-        verifier.executeGoal("integration-test");
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 

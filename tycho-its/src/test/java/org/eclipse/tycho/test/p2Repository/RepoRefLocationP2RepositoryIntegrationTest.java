@@ -26,8 +26,8 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.eclipse.tycho.test.util.P2RepositoryTool.RepositoryReference;
@@ -40,7 +40,7 @@ public class RepoRefLocationP2RepositoryIntegrationTest extends AbstractTychoInt
 	public void testRefLocation() throws Exception {
 
 		List<RepositoryReference> allRepositoryReferences = buildAndGetRepositoryReferences(
-				"/p2Repository.repositoryRef.location", v -> v.addCliOption("-Dtest-data-repo="
+				"/p2Repository.repositoryRef.location", v -> v.addCliArgument("-Dtest-data-repo="
 						+ ResourceUtil.P2Repositories.ECLIPSE_LATEST.toString().replace("/", "//")));
 
 		assertEquals(4, allRepositoryReferences.size());
@@ -91,7 +91,8 @@ public class RepoRefLocationP2RepositoryIntegrationTest extends AbstractTychoInt
 	public void testTargetResolutionWithReferencedRepositoryInclude() throws Exception {
 		// <referencedRepositoryMode>include</referencedRepositoryMode> is the default
 		Verifier verifier = getVerifier("/p2Repository.repositoryRef.targetresolution.include", false);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -99,7 +100,8 @@ public class RepoRefLocationP2RepositoryIntegrationTest extends AbstractTychoInt
 	public void testTargetResolutionWithReferencedRepositoryIgnore() throws Exception {
 		Verifier verifier = getVerifier("/p2Repository.repositoryRef.targetresolution.ignore", false);
 		try {
-			verifier.executeGoal("package");
+			verifier.addCliArgument("package");
+			verifier.execute();
 			fail("Build should fail due to missing transitive dependency dependency");
 		} catch (VerificationException e) {
 			verifier.verifyTextInLog("requires 'osgi.bundle; org.eclipse.emf.ecore 0.0.0' but it could not be found");
@@ -110,7 +112,8 @@ public class RepoRefLocationP2RepositoryIntegrationTest extends AbstractTychoInt
 			throws Exception, VerificationException {
 		Verifier verifier = getVerifier(buildRoot, false);
 		setup.accept(verifier);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		P2RepositoryTool p2Repo = P2RepositoryTool.forEclipseRepositoryModule(new File(verifier.getBasedir()));

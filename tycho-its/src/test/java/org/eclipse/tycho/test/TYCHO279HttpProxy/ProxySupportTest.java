@@ -28,7 +28,7 @@ import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.jetty.server.NetworkTrafficServerConnector;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -86,7 +86,8 @@ public class ProxySupportTest extends AbstractTychoIntegrationTest {
 		configureProxyInSettingsXml(true, null, null);
 		replaceSettingsArg(verifier);
 		verifier.getSystemProperties().setProperty("p2.repo", getP2RepoUrl());
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		List<String> accessedUris = proxyServlet.getAccessedUris();
 		assertTrue("proxy was not accessed", accessedUris.size() > 0);
@@ -106,7 +107,8 @@ public class ProxySupportTest extends AbstractTychoIntegrationTest {
 		Properties systemProperties = verifier.getSystemProperties();
 		systemProperties.setProperty("p2.repo", getP2RepoUrl());
 		systemProperties.setProperty("settings.security", new File(baseDir, "settings-security.xml").getAbsolutePath());
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		List<String> accessedUris = proxyServlet.getAccessedUris();
 		assertTrue("proxy was not accessed", accessedUris.size() > 0);
@@ -121,7 +123,8 @@ public class ProxySupportTest extends AbstractTychoIntegrationTest {
 		configureProxyInSettingsXml(false, null, null);
 		replaceSettingsArg(verifier);
 		verifier.getSystemProperties().setProperty("p2.repo", getP2RepoUrl());
-		verifier.executeGoal("package"); // build fails
+		verifier.addCliArgument("package");
+		verifier.execute(); // build fails
 		List<String> accessedUris = proxyServlet.getAccessedUris();
 		assertTrue("proxy was accessed although not active. Accessed URIs: " + accessedUris, accessedUris.isEmpty());
 	}

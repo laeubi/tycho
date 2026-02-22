@@ -8,7 +8,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.target;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -19,7 +19,8 @@ public class TargetPlatformEagerResolverTest extends AbstractTychoIntegrationTes
     @Test
     public void testTargetPlatformForJUnit5() throws Exception {
         Verifier verifier = getVerifier("target.eagerResolver", false, true);
-        verifier.executeGoals(List.of("clean", "verify"));
+        verifier.addCliArguments("clean", "verify");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 }

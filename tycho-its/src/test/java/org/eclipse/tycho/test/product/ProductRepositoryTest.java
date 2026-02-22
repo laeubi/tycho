@@ -15,7 +15,7 @@ package org.eclipse.tycho.test.product;
 import java.io.File;
 import java.util.Arrays;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -24,7 +24,8 @@ public class ProductRepositoryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testShouldNotContainSources() throws Exception {
 		Verifier verifier = getVerifier("product.productRepository", false);
-		verifier.executeGoals(Arrays.asList("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertFileExists(new File(verifier.getBasedir()), //
 				"target/repository/plugins/org.eclipse.osgi_*.jar");
@@ -39,8 +40,9 @@ public class ProductRepositoryTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testShouldContainSourcesWhenExlicitlyIncluded() throws Exception {
 		Verifier verifier = getVerifier("product.productRepository", false);
-		verifier.addCliOption("-Pwithsources");
-		verifier.executeGoals(Arrays.asList("clean", "verify"));
+		verifier.addCliArgument("-Pwithsources");
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertFileExists(new File(verifier.getBasedir()), //
 				"target/repository/plugins/org.eclipse.osgi_*.jar");

@@ -15,8 +15,8 @@ package org.eclipse.tycho.test.surefire;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -25,7 +25,7 @@ public class TrimStackTrace extends AbstractTychoIntegrationTest {
 	@Test
 	public void testTrimStackTraceFalse() throws Exception {
 		Verifier verifier = getVerifier("surefire.trimstacktrace");
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("integration-test"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("integration-test"); verifier.execute(); });
 		// expected
 		verifier.verifyTextInLog("org.junit.Assert.fail");
 	}

@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.TYCHO253extraClassPathEntries;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -21,21 +21,26 @@ public class ExtraClassPathEntriesTest extends AbstractTychoIntegrationTest {
     @Test
     public void testJarsExtraClasspath() throws Exception {
         Verifier verifier = getVerifier("/TYCHO253extraClassPathEntries");
-        executeOnlyProject(verifier, "org.eclipse.tycho.testExtraClasspathTest1").executeGoal("verify");
+        executeOnlyProject(verifier, "org.eclipse.tycho.testExtraClasspathTest1");
+        verifier.addCliArgument("verify");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 
     @Test
     public void testExtraClasspath() throws Exception {
         Verifier verifier = getVerifier("/TYCHO253extraClassPathEntries");
-        executeOnlyProject(verifier, "org.eclipse.tycho.testExtraClasspathTest2").executeGoal("verify");
+        executeOnlyProject(verifier, "org.eclipse.tycho.testExtraClasspathTest2");
+        verifier.addCliArgument("verify");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 
     @Test
     public void testReferenceToInnerJar() throws Exception {
         Verifier verifier = getVerifier("/TYCHO253extraClassPathEntries");
-        verifier.executeGoal("verify");
+        verifier.addCliArgument("verify");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 }

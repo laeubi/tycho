@@ -15,7 +15,7 @@ package org.eclipse.tycho.test.TYCHO449SrcIncludesExcludes;
 import java.io.File;
 import java.util.jar.JarFile;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -25,7 +25,8 @@ public class Tycho449SrcIncludesExcludesTest extends AbstractTychoIntegrationTes
 	@Test
 	public void testDefaultSourceBundleSuffix() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO449SrcIncludesExcludes", false);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		try (JarFile sourceJar = new JarFile(
 				new File(verifier.getBasedir(), "target/TestSourceIncludesExcludes-1.0.0-SNAPSHOT-sources.jar"))) {

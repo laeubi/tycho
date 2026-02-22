@@ -1,7 +1,7 @@
 package org.eclipse.tycho.test.p2Repository;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.After;
 import org.junit.Before;
@@ -43,7 +43,8 @@ public class P2RepositoryFtpHandlerTest extends AbstractTychoIntegrationTest {
     public void testFtpRepository() throws Exception {
         final Verifier verifier = getVerifier(TEST_BASEDIR, false);
         verifier.getSystemProperties().setProperty("p2.ftp.repository", repositoryUrl);
-        verifier.executeGoal("package");
+        verifier.addCliArgument("package");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 

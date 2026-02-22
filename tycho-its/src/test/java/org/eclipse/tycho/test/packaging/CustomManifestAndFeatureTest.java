@@ -1,6 +1,6 @@
 package org.eclipse.tycho.test.packaging;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -18,7 +18,8 @@ public class CustomManifestAndFeatureTest extends AbstractTychoIntegrationTest {
     @Test
     public void testManifestAndFeatureConfigsHaveBeenFiltered() throws Exception {
         final Verifier verifier = getVerifier("/packaging.manifestAndFeature", false);
-        verifier.executeGoals(Arrays.asList("clean", "package"));
+        verifier.addCliArguments("clean", "package");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
 
         // Verify filtered MANIFEST.MF

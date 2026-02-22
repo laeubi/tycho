@@ -18,8 +18,8 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.util.Arrays;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -28,7 +28,8 @@ public class TestsInBundleTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testCompile() throws Exception {
 		Verifier verifier = getVerifier("surefire.combinedtests/bundle.test");
-		verifier.executeGoals(Arrays.asList("clean", "test-compile"));
+		verifier.addCliArguments("clean", "test-compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertTrue("compiled class file does not exist",
 				new File(verifier.getBasedir(), "target/classes/bundle/test/Counter.class").exists());
@@ -39,7 +40,8 @@ public class TestsInBundleTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testCompile5() throws Exception {
 		Verifier verifier = getVerifier("surefire.combinedtests/bundle5.test");
-		verifier.executeGoals(Arrays.asList("clean", "test-compile"));
+		verifier.addCliArguments("clean", "test-compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertTrue("compiled class file does not exist",
 				new File(verifier.getBasedir(), "target/classes/bundle/test/Counter.class").exists());
@@ -51,7 +53,7 @@ public class TestsInBundleTest extends AbstractTychoIntegrationTest {
 	public void testCompile5WithoutVintage() throws Exception {
 		Verifier verifier = getVerifier("surefire.combinedtests/bundle5.no.vintage.test");
 		assertThrows("Compilation must fail because the usage of junit 4 annotations", VerificationException.class,
-				() -> verifier.executeGoals(Arrays.asList("clean", "test-compile")));
+				() -> { verifier.addCliArguments("clean", "test-compile"); verifier.execute(); });
 		verifier.verifyTextInLog("The import org.junit.Assert cannot be resolved");
 		verifier.verifyTextInLog("The import org.junit.Test cannot be resolved");
 	}
@@ -59,7 +61,8 @@ public class TestsInBundleTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testTest() throws Exception {
 		Verifier verifier = getVerifier("surefire.combinedtests/bundle.test");
-		verifier.executeGoals(Arrays.asList("clean", "test"));
+		verifier.addCliArguments("clean", "test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertTrue("tests were not run",
 				new File(verifier.getBasedir(), "target/surefire-reports/bundle.test.AdderTest.txt").exists());
@@ -68,7 +71,8 @@ public class TestsInBundleTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testIntegrationTest() throws Exception {
 		Verifier verifier = getVerifier("surefire.combinedtests/bundle.test");
-		verifier.executeGoals(Arrays.asList("clean", "integration-test"));
+		verifier.addCliArguments("clean", "integration-test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertTrue("summary report not found",
 				new File(verifier.getBasedir(), "target/failsafe-reports/failsafe-summary.xml").exists());
@@ -80,7 +84,7 @@ public class TestsInBundleTest extends AbstractTychoIntegrationTest {
 	public void testVerify() throws Exception {
 		Verifier verifier = getVerifier("surefire.combinedtests/bundle.test");
 		assertThrows("the build succeed but test-failures are expected!", VerificationException.class,
-				() -> verifier.executeGoals(Arrays.asList("clean", "verify")));
+				() -> { verifier.addCliArguments("clean", "verify"); verifier.execute(); });
 		// thats good indeed...
 		verifier.verifyTextInLog("There are test failures");
 	}

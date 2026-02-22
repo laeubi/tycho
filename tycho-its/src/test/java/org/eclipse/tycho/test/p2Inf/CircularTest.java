@@ -11,7 +11,7 @@ package org.eclipse.tycho.test.p2Inf;
 
 import static java.util.Arrays.asList;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -21,7 +21,8 @@ public class CircularTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testVirtualUnitRequirementDoesNotFailBuild() throws Exception {
 		Verifier verifier = getVerifier("/p2Inf.circular", false);
-		verifier.executeGoals(asList("verify"));
+		verifier.addCliArguments("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 }

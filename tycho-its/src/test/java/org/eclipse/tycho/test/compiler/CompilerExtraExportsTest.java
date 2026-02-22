@@ -13,7 +13,7 @@
 
 package org.eclipse.tycho.test.compiler;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class CompilerExtraExportsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testExtraExports() throws Exception {
 		Verifier verifier = getVerifier("compiler.extraExports", false);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

@@ -13,7 +13,7 @@
 
 package org.eclipse.tycho.test.versionsplugin;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class MissingPluginVersionsTest extends AbstractTychoIntegrationTest {
     @Test
     public void testMissingPluginVersion() throws Exception {
         Verifier verifier = getVerifier("missingPluginVersions", false);
-        verifier.executeGoal("compile");
+        verifier.addCliArgument("compile");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 }

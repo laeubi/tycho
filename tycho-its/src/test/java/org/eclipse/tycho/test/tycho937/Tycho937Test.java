@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.tycho937;
 
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -23,7 +23,8 @@ public class Tycho937Test extends AbstractTychoIntegrationTest {
 	@Test
 	public void testCompilerSourceTargetConfigurationViaManifest() throws Exception {
 		Verifier verifier = getVerifier("tycho937", false);
-		verifier.executeGoals(List.of("clean", "javadoc:aggregate-jar", "verify"));
+		verifier.addCliArguments("clean", "javadoc:aggregate-jar", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.resolver;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class OptionalDependenciesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testOptionallyRequiredBundleIsOnCompileClassPath() throws Exception {
 		Verifier verifier = getVerifier("/resolver.optionalDependencies/require-bundle", true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -31,7 +32,8 @@ public class OptionalDependenciesTest extends AbstractTychoIntegrationTest {
 		Verifier verifier = getVerifier("/resolver.optionalDependencies/require-bundle-ignore", false);
 		// empty target platform -> dependency would not resolve if the project had not
 		// overridden the optionalDependencies=require default
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

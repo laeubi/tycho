@@ -13,7 +13,7 @@
 
 package org.eclipse.tycho.test.packaging;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class AttachedZipTest extends AbstractTychoIntegrationTest {
     @Test
     public void testAttachP2Metadata() throws Exception {
         Verifier verifier = getVerifier("/packaging.attachedZip", false);
-        verifier.executeGoal("verify");
+        verifier.addCliArgument("verify");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 }

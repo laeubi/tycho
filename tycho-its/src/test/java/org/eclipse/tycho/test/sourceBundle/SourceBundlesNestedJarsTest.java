@@ -21,7 +21,7 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.jar.JarFile;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.osgi.util.ManifestElement;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
@@ -31,7 +31,8 @@ public class SourceBundlesNestedJarsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testDistinctSourceRoots() throws Exception {
 		Verifier verifier = getVerifier("sourceBundle.nestedJars", false);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File sourceJar = new File(verifier.getBasedir(), "target/test.distinct.sourceroots-1.0.0-sources.jar");
 		assertTrue(sourceJar.isFile());

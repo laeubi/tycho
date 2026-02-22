@@ -15,7 +15,7 @@ package org.eclipse.tycho.test.product;
 import java.io.File;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -23,7 +23,8 @@ public class ProductArchiveFormatTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("/product.archiveFormat", true);
-		verifier.executeGoals(List.of("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File basedir = new File(verifier.getBasedir());

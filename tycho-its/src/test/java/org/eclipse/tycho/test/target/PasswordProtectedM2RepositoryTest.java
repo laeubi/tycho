@@ -15,7 +15,7 @@ package org.eclipse.tycho.test.target;
 import java.io.File;
 import java.util.Properties;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.HttpServer;
 import org.eclipse.tycho.test.util.ResourceUtil;
@@ -46,7 +46,8 @@ public class PasswordProtectedM2RepositoryTest extends AbstractTychoIntegrationT
 		File platformBundle = new File(verifier.getBasedir(), "target.test");
 		File platformFile = new File(platformBundle, "platform.target");
 		TargetDefinitionUtil.setRepositoryURLs(platformFile, m2RepoUrl);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

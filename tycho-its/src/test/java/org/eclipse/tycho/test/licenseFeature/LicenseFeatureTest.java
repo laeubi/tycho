@@ -23,7 +23,7 @@ import java.util.Properties;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.model.Feature;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
@@ -35,7 +35,8 @@ public class LicenseFeatureTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("/licenseFeature", true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		assertFeatureJar(

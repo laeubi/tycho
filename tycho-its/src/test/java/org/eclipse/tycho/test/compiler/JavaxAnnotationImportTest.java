@@ -13,7 +13,7 @@
 
 package org.eclipse.tycho.test.compiler;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,6 +22,7 @@ public class JavaxAnnotationImportTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testStrictImportJREPackages() throws Exception {
 		Verifier verifier = getVerifier("compiler.javaxAnnotationImport", true);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 	}
 }

@@ -18,8 +18,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -28,8 +28,9 @@ public class SbomPluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testBuildWithProfile() throws Exception {
 		Verifier verifier = getVerifier("sbom-simple-product", false);
-		verifier.addCliOption("-Psbom-generation");
-		verifier.executeGoals(List.of("clean", "verify"));
+		verifier.addCliArgument("-Psbom-generation");
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		Path basedir = Path.of(verifier.getBasedir());
 		assertTrue("sbom.xml is missing!", Files.isRegularFile(basedir.resolve("target/sbom-simple-product.xml")));
@@ -39,7 +40,8 @@ public class SbomPluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testCLIInvocation() throws Exception {
 		Verifier verifier = getVerifier("sbom-simple-product", true);
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.setAutoclean(false);
 		verifyErrorFreeLog(verifier);
 		// Execute in the maven project itself
@@ -52,8 +54,8 @@ public class SbomPluginTest extends AbstractTychoIntegrationTest {
 	}
 
 	private void verifyCLI(Verifier verifier, String installation) throws VerificationException {
-		verifier.executeGoals(List.of("org.eclipse.tycho:tycho-sbom-plugin:generator", "-Dinstallation=" + installation,
-				"-Dprint.xml"));
+		verifier.addCliArguments("org.eclipse.tycho:tycho-sbom-plugin:generator", "-Dinstallation=", "-Dprint.xml");
+		verifier.execute();
 		verifyErrorFreeLog(verifier);
 		verifier.verifyTextInLog("<bom "); // not very smart but should make sure we actually run it
 	}

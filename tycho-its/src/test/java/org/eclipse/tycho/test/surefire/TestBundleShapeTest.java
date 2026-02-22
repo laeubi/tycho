@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.surefire;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -21,7 +21,8 @@ public class TestBundleShapeTest extends AbstractTychoIntegrationTest {
     public void test() throws Exception {
         // TYCHO-460
         Verifier verifier = getVerifier("surefire.bundleResources");
-        verifier.executeGoal("integration-test");
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 }

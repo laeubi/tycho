@@ -6,7 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -16,7 +16,9 @@ public class DifferentTargetFilesSameAbsolutePathTest extends AbstractTychoInteg
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("sameAbsoluteTarget");
 
-		verifier.executeGoals(List.of("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		// 2 modules with relative path to target, but identical absolute target file

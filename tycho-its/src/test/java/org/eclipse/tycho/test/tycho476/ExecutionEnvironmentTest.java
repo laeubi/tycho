@@ -16,7 +16,7 @@ import java.io.File;
 
 import org.apache.bcel.classfile.ClassParser;
 import org.apache.bcel.classfile.JavaClass;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -26,7 +26,8 @@ public class ExecutionEnvironmentTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testCompilerSourceTargetConfigurationViaManifest() throws Exception {
 		Verifier verifier = getVerifier("TYCHO476", false);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		// compile only succeeds with source level 1.6 which
 		// is configured indirectly via Bundle-RequiredExecutionEnvironment: JavaSE-1.6
 		verifier.verifyErrorFreeLog();

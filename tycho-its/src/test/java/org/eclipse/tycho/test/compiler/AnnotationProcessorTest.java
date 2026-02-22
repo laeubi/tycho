@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -26,7 +26,8 @@ public class AnnotationProcessorTest extends AbstractTychoIntegrationTest {
     @Test
     public void testAnnotationProcessor() throws Exception {
         Verifier verifier = getVerifier("TYCHO590annotationProcessing", false);
-        verifier.executeGoal("install");
+        verifier.addCliArgument("install");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
         File annotatedProjectTargetDir = new File(verifier.getBasedir(), "annotated-project/target");
         File generatedSource = new File(annotatedProjectTargetDir,

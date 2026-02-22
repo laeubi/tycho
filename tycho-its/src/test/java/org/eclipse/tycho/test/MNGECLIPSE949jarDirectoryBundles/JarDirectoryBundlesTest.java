@@ -17,7 +17,7 @@ import static org.junit.Assert.assertEquals;
 import java.io.File;
 import java.io.FileFilter;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.core.osgitools.DefaultBundleReader;
 import org.eclipse.tycho.core.osgitools.OsgiManifest;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
@@ -29,7 +29,9 @@ public class JarDirectoryBundlesTest extends AbstractTychoIntegrationTest {
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("MNGECLIPSE949jarDirectoryBundles");
 
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File[] sitePlugins = new File(verifier.getBasedir(), "site/target/repository/plugins").listFiles(

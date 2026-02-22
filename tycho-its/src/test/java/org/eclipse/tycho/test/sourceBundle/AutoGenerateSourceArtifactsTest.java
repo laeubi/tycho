@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.sourceBundle;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -21,7 +21,8 @@ public class AutoGenerateSourceArtifactsTest extends AbstractTychoIntegrationTes
     @Test
     public void testSourceGeneration() throws Exception {
         Verifier verifier = getVerifier("/automaticSourceGeneration", false, true);
-        verifier.executeGoal("package");
+        verifier.addCliArgument("package");
+        verifier.execute();
         verifier.displayStreamBuffers();
         verifier.verifyErrorFreeLog();
     }

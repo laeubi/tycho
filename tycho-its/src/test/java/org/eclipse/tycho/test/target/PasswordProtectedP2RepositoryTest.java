@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.target;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.HttpServer;
 import org.eclipse.tycho.test.util.ResourceUtil;
@@ -62,8 +62,9 @@ public class PasswordProtectedP2RepositoryTest extends AbstractTychoIntegrationT
 	public void testAuthMirror() throws Exception {
 		Verifier verifier = createVerifier("settings-auth-mirror.xml");
 		verifier.setSystemProperty("p2.authMirror", p2AuthMirrorUrl);
-		verifier.addCliOption("-P=repository");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=repository");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -76,24 +77,27 @@ public class PasswordProtectedP2RepositoryTest extends AbstractTychoIntegrationT
 	public void testMirror() throws Exception {
 		Verifier verifier = createVerifier("settings-mirror.xml");
 		verifier.setSystemProperty("p2.mirror", p2MirrorUrl);
-		verifier.addCliOption("-P=repository");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=repository");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testRepository() throws Exception {
 		Verifier verifier = createVerifier("settings.xml");
-		verifier.addCliOption("-P=repository");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=repository");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testRepositoryEncrypted() throws Exception {
 		Verifier verifier = createVerifier("settings-encrypted.xml", "settings-security.xml");
-		verifier.addCliOption("-P=repository");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=repository");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -102,8 +106,9 @@ public class PasswordProtectedP2RepositoryTest extends AbstractTychoIntegrationT
 		Verifier verifier = createVerifier("settings.xml");
 		File platformFile = new File(verifier.getBasedir(), "platform.target");
 		TargetDefinitionUtil.setRepositoryURLs(platformFile, p2RepoUrl);
-		verifier.addCliOption("-P=target-definition");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=target-definition");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -119,8 +124,9 @@ public class PasswordProtectedP2RepositoryTest extends AbstractTychoIntegrationT
 		File platformFile = new File(verifier.getBasedir(), "platform.target");
 		TargetDefinitionUtil.setRepositoryURLs(platformFile, p2RepoUrl);
 		verifier.setSystemProperty("p2.mirror", p2MirrorUrl);
-		verifier.addCliOption("-P=target-definition");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=target-definition");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -136,8 +142,9 @@ public class PasswordProtectedP2RepositoryTest extends AbstractTychoIntegrationT
 		File platformFile = new File(verifier.getBasedir(), "platform.target");
 		TargetDefinitionUtil.setRepositoryURLs(platformFile, p2RepoUrl);
 		verifier.setSystemProperty("p2.authMirror", p2AuthMirrorUrl);
-		verifier.addCliOption("-P=target-definition");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=target-definition");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -146,8 +153,9 @@ public class PasswordProtectedP2RepositoryTest extends AbstractTychoIntegrationT
 		Verifier verifier = createVerifier("settings-encrypted.xml", "settings-security.xml");
 		File platformFile = new File(verifier.getBasedir(), "platform.target");
 		TargetDefinitionUtil.setRepositoryURLs(platformFile, p2RepoUrl);
-		verifier.addCliOption("-P=target-definition");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("-P=target-definition");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

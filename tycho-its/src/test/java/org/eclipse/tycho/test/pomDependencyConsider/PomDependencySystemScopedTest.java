@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.pomDependencyConsider;
 
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -27,7 +27,8 @@ public class PomDependencySystemScopedTest extends AbstractTychoIntegrationTest 
 		// fails on second resolver invocation in TestMojo
 		// if (injected) system-scoped dependencies are not filtered out for
 		// pomDependency=consider
-		verifier.executeGoals(List.of("clean", "integration-test"));
+		verifier.addCliArguments("clean", "integration-test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 }

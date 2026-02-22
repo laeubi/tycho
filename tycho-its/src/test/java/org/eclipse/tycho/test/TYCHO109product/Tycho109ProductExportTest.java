@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -27,7 +27,9 @@ public class Tycho109ProductExportTest extends AbstractTychoIntegrationTest {
 	public void exportFeatureProduct() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO109product/feature-rcp");
 
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File basedir = new File(verifier.getBasedir());
@@ -52,16 +54,20 @@ public class Tycho109ProductExportTest extends AbstractTychoIntegrationTest {
 	public void exportPluginRcpApplication() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO109product/plugin-rcp-app");
 
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void productNoZip() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO109product/product-nozip/product");
-		verifier.addCliOption("-Dtycho.product.createArchive=false");
+		verifier.addCliArgument("-Dtycho.product.createArchive=false");
 
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File basedir = new File(verifier.getBasedir());

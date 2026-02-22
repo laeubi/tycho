@@ -16,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.junit.Test;
@@ -26,7 +26,8 @@ public class RepositoryIncludeTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testFilterProvided() throws Exception {
 		Verifier verifier = getVerifier("p2Repository.filter", false, true);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		P2RepositoryTool p2Repo = P2RepositoryTool
 				.forEclipseRepositoryModule(new File(verifier.getBasedir(), "repository"));

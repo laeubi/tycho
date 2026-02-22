@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.surefire;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -26,7 +26,8 @@ public class ExplodedTestDependenciesTest extends AbstractTychoIntegrationTest {
 		// project that marks org.apache.ant as "exploded" (unpacked) for the test
 		// runtime -> supported since TYCHO-340
 		Verifier v01 = getVerifier("surefire.bundleUnpack");
-		v01.executeGoal("install");
+		v01.addCliArgument("install");
+		v01.execute();
 		v01.verifyErrorFreeLog();
 		// TODO this is only an indirect test; it should test that the bundles nested
 		// jars are accessible as file URLs

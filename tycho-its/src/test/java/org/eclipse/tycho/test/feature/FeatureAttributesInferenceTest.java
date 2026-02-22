@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.XMLTool;
 import org.hamcrest.Matcher;
@@ -41,7 +41,8 @@ public class FeatureAttributesInferenceTest extends AbstractTychoIntegrationTest
 	@Test
 	public void testFeatureAttributesInference() throws Exception {
 		Verifier verifier = getVerifier("feature.attributes.inference", true, true);
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File featureTargetDir = new File(verifier.getBasedir(), "feature/target");
 		File featureJar = assertFileExists(featureTargetDir, "feature.attributes.inference.test-1.0.0.jar")[0];

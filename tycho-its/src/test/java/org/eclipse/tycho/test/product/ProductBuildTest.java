@@ -25,8 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
@@ -44,7 +44,7 @@ public class ProductBuildTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testPluginProjectFailsOnMissingDependencies() throws Exception {
 		Verifier verifier = getVerifier("tycho-p2-director-plugin/missing-requirements-plugins", false, true);
-		assertThrows(VerificationException.class, () -> verifier.executeGoals(Arrays.asList("clean", "package")));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArguments("clean", "package"); verifier.execute(); });
 		verifier.verifyTextInLog(
 				"Cannot resolve dependencies of project tycho-its:plugin.product:eclipse-repository:1.0.0-SNAPSHOT");
 	}
@@ -52,7 +52,7 @@ public class ProductBuildTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testFeatureProjectFailsOnMissingDependencies() throws Exception {
 		Verifier verifier = getVerifier("tycho-p2-director-plugin/missing-requirements-feature", false, true);
-		assertThrows(VerificationException.class, () -> verifier.executeGoals(Arrays.asList("clean", "package")));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArguments("clean", "package"); verifier.execute(); });
 		verifier.verifyTextInLog(
 				"Cannot resolve dependencies of project tycho-its:feature.product:eclipse-repository:1.0.0-SNAPSHOT");
 	}
@@ -60,7 +60,8 @@ public class ProductBuildTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testPluginProductWithDifferentNativesCanBuild() throws Exception {
 		Verifier verifier = getVerifier("tycho-p2-director-plugin/product-with-native-fragments", false, true);
-		verifier.executeGoals(Arrays.asList("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		// FIXME verifier.verifyErrorFreeLog();
 		// See https://github.com/eclipse-platform/eclipse.platform.swt/issues/992
 		verifyTextNotInLog(verifier, "BUILD FAILURE");
@@ -78,14 +79,16 @@ public class ProductBuildTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenDepedencyInTarget() throws Exception {
 		Verifier verifier = getVerifier("product.mavenLocation", false);
-		verifier.executeGoals(Arrays.asList("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testPGPSignedInProduct() throws Exception {
 		Verifier verifier = getVerifier("product.pgp", false);
-		verifier.executeGoals(Arrays.asList("clean", "install"));
+		verifier.addCliArguments("clean", "install");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		checkPGP(verifier, "target/repository/artifacts.xml");
 		checkPGP(verifier, "target/products/pgp/linux/gtk/x86_64/artifacts.xml");
@@ -113,7 +116,8 @@ public class ProductBuildTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testAdditionOfUpdateRepositories() throws Exception {
 		Verifier verifier = getVerifier("product.update_repository", true);
-		verifier.executeGoals(List.of("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		TargetEnvironment env = TargetEnvironment.getRunningEnvironment();
 		Path baseDir = Path.of(verifier.getBasedir());

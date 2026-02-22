@@ -18,7 +18,7 @@ import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -35,7 +35,8 @@ public class DefaultBuildTimestampProviderTest extends AbstractTychoIntegrationT
     @Test
     public void testDefaulBuildTimestampIsTheMavenBuildTimestamp() throws Exception {
         Verifier verifier = getVerifier("/packaging.buildtimestamp", false);
-        verifier.executeGoal("verify");
+        verifier.addCliArgument("verify");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
         File baseDir = new File(verifier.getBasedir());
 

@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.multiplatform;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -23,7 +23,8 @@ public class MultiplatformReactorTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMultiplatformReactorBuild() throws Exception {
 		Verifier verifier = getVerifier("multiPlatform.reactor");
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		// assert product got proper platform fragments

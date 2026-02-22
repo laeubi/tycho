@@ -15,8 +15,8 @@ package org.eclipse.tycho.test.limitations;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.version.TychoVersion;
 import org.junit.Test;
@@ -26,7 +26,7 @@ public class MixedTychoVersionsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testSeveralTychoVersionsConfigured() throws Exception {
 		Verifier verifier = getVerifier("limitations.tychoVersions", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("compile"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("compile"); verifier.execute(); });
 		// expected
 		verifier.verifyTextInLog("[ERROR] Several versions of Tycho plugins are configured [0.13.0, 0.14.0, "
 				+ TychoVersion.getTychoVersion() + "]:");

@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.surefire;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,8 @@ public class BundleStartInSurefireTest extends AbstractTychoIntegrationTest {
     @Test
     public void implicitDSAutostart() throws Exception {
         Verifier verifier = getVerifier("surefire.bundleStart/implicit/ds.test");
-        verifier.executeGoal("integration-test");
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 
@@ -30,7 +31,8 @@ public class BundleStartInSurefireTest extends AbstractTychoIntegrationTest {
     public void explicitBundleStartLevel() throws Exception {
         // bundle and test with .qualifier versions -> regression test for TYCHO-170
         Verifier verifier = getVerifier("surefire.bundleStart/explicit");
-        verifier.executeGoal("integration-test");
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
     }
 

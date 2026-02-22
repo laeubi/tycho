@@ -14,8 +14,8 @@ package org.eclipse.tycho.test.limitations;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -24,7 +24,7 @@ public class NonUniqueBasedirsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testNonUniqueBasedirFailure() throws Exception {
 		Verifier verifier = getVerifier("limitations.uniqueBaseDirs", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("clean"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("clean"); verifier.execute(); });
 
 		// expect a clear error message -> requested in bug 366967
 		verifier.verifyTextInLog("Multiple modules within the same basedir are not supported");

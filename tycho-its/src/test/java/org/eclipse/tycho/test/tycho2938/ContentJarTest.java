@@ -24,8 +24,8 @@ import java.util.List;
 import javax.xml.parsers.ParserConfigurationException;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.HttpServer;
 import org.eclipse.tycho.test.util.ResourceUtil;
@@ -67,7 +67,8 @@ public class ContentJarTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void noRedirect() throws Exception {
 		configureRepositoryInTargetDefinition(mainRepoUrl);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertVisited(TARGET_FEATURE_PATH);
 	}
@@ -76,7 +77,8 @@ public class ContentJarTest extends AbstractTychoIntegrationTest {
 	public void redirectKeepFilename() throws Exception {
 		String redirectedUrl = server.addRedirect("repoB", originalPath -> mainRepoUrl + originalPath);
 		configureRepositoryInTargetDefinition(redirectedUrl);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertVisited(TARGET_FEATURE_PATH);
 	}
@@ -85,7 +87,7 @@ public class ContentJarTest extends AbstractTychoIntegrationTest {
 	public void redirectToBadLocation() throws Exception {
 		String redirectedUrl = server.addRedirect("repoB", originalPath -> mainRepoUrl + originalPath + "_invalid");
 		configureRepositoryInTargetDefinition(redirectedUrl);
-		Assert.assertThrows(VerificationException.class, () -> verifier.executeGoal("package"));
+		Assert.assertThrows(VerificationException.class, () -> { verifier.addCliArgument("package"); verifier.execute(); });
 		verifier.verifyTextInLog("Unable to read repository at " + redirectedUrl);
 		assertVisited("/content.jar_invalid");
 	}
@@ -100,7 +102,8 @@ public class ContentJarTest extends AbstractTychoIntegrationTest {
 		String redirectedUrl = server.addRedirect("repoB", originalPath -> mainRepoUrl + originalPath + "_invalid");
 
 		configureRepositoryInTargetDefinition(redirectedUrl);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		assertVisited("/content.jar_invalid");
 		assertVisited(TARGET_FEATURE_PATH + "_invalid");

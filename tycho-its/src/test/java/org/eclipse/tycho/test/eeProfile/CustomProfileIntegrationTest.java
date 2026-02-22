@@ -16,7 +16,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.eclipse.tycho.test.util.ResourceUtil;
@@ -41,7 +41,9 @@ public class CustomProfileIntegrationTest extends AbstractTychoIntegrationTest {
 		verifier.setSystemProperty("custom-profile-repo",
 				ResourceUtil.resolveTestResource("projects/eeProfile.custom/repository").toURI().toString());
 
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		// custom EE is in build result (because there is a dependency from the product

@@ -17,7 +17,7 @@ import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -26,7 +26,8 @@ public class TYCHO285EclipseSourceBundlesTest extends AbstractTychoIntegrationTe
     @Test
     public void testEclipseSourceBundleManifestAttributes() throws Exception {
         Verifier verifier = getVerifier("/TYCHO285EclipseSourceBundles");
-        verifier.executeGoal("integration-test");
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         verifier.verifyErrorFreeLog();
 
         File sourceJarFile = new File(verifier.getBasedir(), "target/bundle-1.2.3-SNAPSHOT-sources.jar");

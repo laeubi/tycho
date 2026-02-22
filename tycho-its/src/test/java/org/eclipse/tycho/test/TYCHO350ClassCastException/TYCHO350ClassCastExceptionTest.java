@@ -11,7 +11,7 @@ package org.eclipse.tycho.test.TYCHO350ClassCastException;
 
 import static java.util.Arrays.asList;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -19,7 +19,8 @@ public class TYCHO350ClassCastExceptionTest extends AbstractTychoIntegrationTest
 	@Test
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO350ClassCastException", false);
-		verifier.executeGoals(asList("verify"));
+		verifier.addCliArguments("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

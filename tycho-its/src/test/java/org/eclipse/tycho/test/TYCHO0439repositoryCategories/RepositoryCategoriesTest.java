@@ -16,7 +16,7 @@ import java.io.File;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -31,7 +31,8 @@ public class RepositoryCategoriesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testDeployableFeature() throws Exception {
 		Verifier v01 = getVerifier("TYCHO0439repositoryCategories");
-		v01.executeGoal("install");
+		v01.addCliArgument("install");
+		v01.execute();
 		v01.verifyErrorFreeLog();
 
 		File site = new File(v01.getBasedir(), "target/site");

@@ -21,7 +21,7 @@ import java.util.jar.JarFile;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -32,8 +32,9 @@ public class Tycho502SourceBundleQualifierTest extends AbstractTychoIntegrationT
 		Verifier verifier = getVerifier("/TYCHO502sourceBundleQualifier", false);
 		File targetDir = new File(verifier.getBasedir(), "target");
 		{
-			verifier.addCliOption("-DforceContextQualifier=old");
-			verifier.executeGoal("package");
+			verifier.addCliArgument("-DforceContextQualifier=old");
+			verifier.addCliArgument("package");
+			verifier.execute();
 			verifier.verifyErrorFreeLog();
 
 			String bundleQualifier = getBundleQualifier(targetDir);
@@ -43,9 +44,10 @@ public class Tycho502SourceBundleQualifierTest extends AbstractTychoIntegrationT
 		}
 		// rebuild _without clean_ and test again
 		{
-			verifier.addCliOption("-DforceContextQualifier=new");
+			verifier.addCliArgument("-DforceContextQualifier=new");
 			verifier.setAutoclean(false);
-			verifier.executeGoal("package");
+			verifier.addCliArgument("package");
+			verifier.execute();
 			verifier.verifyErrorFreeLog();
 			String bundleQualifier = getBundleQualifier(targetDir);
 			assertEquals("new", bundleQualifier);

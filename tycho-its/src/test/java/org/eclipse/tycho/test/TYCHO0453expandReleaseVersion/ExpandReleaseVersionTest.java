@@ -18,7 +18,7 @@ import static org.junit.Assert.assertTrue;
 import java.io.File;
 import java.nio.file.Files;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.model.Feature;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
@@ -27,7 +27,8 @@ public class ExpandReleaseVersionTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO0453expandReleaseVersion", false);
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("integration-test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File featureXml = new File(verifier.getBasedir(), "feature/target/feature.xml");

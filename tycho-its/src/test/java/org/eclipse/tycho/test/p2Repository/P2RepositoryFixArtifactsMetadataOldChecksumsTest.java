@@ -22,7 +22,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.codehaus.plexus.util.xml.Xpp3DomBuilder;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -46,7 +46,8 @@ public class P2RepositoryFixArtifactsMetadataOldChecksumsTest extends AbstractTy
 	@Test
 	public void testRemoveOldChecksumsNotRecalculated() throws Exception {
 		Verifier verifier = getVerifier("/p2Repository.fixArtifactsMetadata.oldChecksums", false);
-		verifier.executeGoals(asList("verify"));
+		verifier.addCliArguments("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		Path repositoryPath = Path.of(verifier.getBasedir(), "target/repository");

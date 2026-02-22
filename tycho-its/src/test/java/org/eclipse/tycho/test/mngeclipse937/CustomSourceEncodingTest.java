@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.mngeclipse937;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,7 +22,9 @@ public class CustomSourceEncodingTest extends AbstractTychoIntegrationTest {
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("MNGECLIPSE937");
 
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("integration-test");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 	}

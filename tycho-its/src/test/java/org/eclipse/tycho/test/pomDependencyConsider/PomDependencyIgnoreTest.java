@@ -9,7 +9,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.pomDependencyConsider;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -18,7 +18,8 @@ public class PomDependencyIgnoreTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testIgnorePomDependency() throws Exception {
 		Verifier verifier = getVerifier("pomDependency.ignore", true, true);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 }

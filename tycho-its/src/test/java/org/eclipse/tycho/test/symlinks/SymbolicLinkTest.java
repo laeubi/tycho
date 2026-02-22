@@ -18,7 +18,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -45,8 +45,9 @@ public class SymbolicLinkTest extends AbstractTychoIntegrationTest {
 
 	@Test
 	public void testBuildWithSymbolicLinkOnProjectPath() throws Exception {
-		verifier.getCliOptions().addAll(List.of("-f", LINK_NAME + "/pom.xml"));
-		verifier.executeGoal("package");
+		verifier.addCliArguments("-f", LINK_NAME + "/pom.xml");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

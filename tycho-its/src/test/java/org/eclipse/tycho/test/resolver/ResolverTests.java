@@ -14,7 +14,7 @@ import static org.junit.Assert.fail;
 
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -44,7 +44,8 @@ public class ResolverTests extends AbstractTychoIntegrationTest {
 	public void testUsesConstraintViolations() throws Exception {
 
 		Verifier verifier = getVerifier("resolver.usesConstraintViolations");
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -52,7 +53,8 @@ public class ResolverTests extends AbstractTychoIntegrationTest {
 	public void testMultipleVersionsWithSubstitution() throws Exception {
 
 		Verifier verifier = getVerifier("multiple-gson");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -67,7 +69,8 @@ public class ResolverTests extends AbstractTychoIntegrationTest {
 
 		Verifier verifier = getVerifier("mixed.reactor", false);
 		// FIXME see Issue #479 // verifier.executeGoal("compile");
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -75,7 +78,8 @@ public class ResolverTests extends AbstractTychoIntegrationTest {
 	public void testMultipleFragmentsOnlyOneIsChoosen() throws Exception {
 
 		Verifier verifier = getVerifier("resolver.multipleDownloads", false, false);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		List<String> lines = verifier.loadFile(verifier.getBasedir(), verifier.getLogFileName(), false);
 
@@ -110,7 +114,8 @@ public class ResolverTests extends AbstractTychoIntegrationTest {
 	@Test
 	public void testConsiderResolutionWithUsesDirectiveIfVanillaResolutionFails() throws Exception {
 		Verifier verifier = getVerifier("resolver.usesNecessary", false, false);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -122,7 +127,8 @@ public class ResolverTests extends AbstractTychoIntegrationTest {
 	// See https://github.com/eclipse-tycho/tycho/issues/2053
 	public void testResolveRebundledMavenDependencies() throws Exception {
 		Verifier verifier = getVerifier("target.maven.wrapAsBundle", true);
-		verifier.executeGoal("dependency:tree");
+		verifier.addCliArgument("dependency:tree");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("com.squareup.okhttp3:okhttp:jar:4.10.0:compile");
 	}

@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -49,7 +49,8 @@ public class VirtualUnitTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testVirtualUnitRequirementDoesNotFailBuild() throws Exception {
 		Verifier verifier = getVerifier("/p2Inf.virtualUnit", false);
-		verifier.executeGoals(asList("verify"));
+		verifier.addCliArguments("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		String hostUnitId = "pvu.bundle";
@@ -70,7 +71,8 @@ public class VirtualUnitTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testVirtualUnitMultiBundleWithRequirementDoesNotFailBuild() throws Exception {
 		Verifier verifier = getVerifier("/p2Inf.virtualUnit.multiBundle", false);
-		verifier.executeGoals(asList("verify"));
+		verifier.addCliArguments("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		// Host bundle and virtual IU assertions

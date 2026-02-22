@@ -16,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -24,7 +24,8 @@ public class MultiplatformProductTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void exportProduct() throws Exception {
 		Verifier verifier = getVerifier("multiPlatform.product");
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File targetdir = new File(verifier.getBasedir(), "tycho.demo.rcp/target");

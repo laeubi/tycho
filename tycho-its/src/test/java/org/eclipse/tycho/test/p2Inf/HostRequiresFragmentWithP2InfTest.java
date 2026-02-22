@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.p2Inf;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -33,7 +33,8 @@ public class HostRequiresFragmentWithP2InfTest extends AbstractTychoIntegrationT
 		// the consumer and hence it is added to the final target platform of the
 		// consumer, and
 		// the test runtime resolver adds the fragment to the test runtime.
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("Running phf.consumer.HostInterfaceUsageTest");
 	}

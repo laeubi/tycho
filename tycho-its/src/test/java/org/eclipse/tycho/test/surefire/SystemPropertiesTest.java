@@ -12,7 +12,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.surefire;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -22,8 +22,8 @@ public class SystemPropertiesTest extends AbstractTychoIntegrationTest {
     public void exportProduct() throws Exception {
         // project that passes system property to forked VM -> supported since TYCHO-351
         Verifier verifier = getVerifier("surefire.systemProperties");
-        verifier.executeGoal("integration-test");
-
+        verifier.addCliArgument("integration-test");
+        verifier.execute();
         // assertion is done in eclipse-test-plugin
         verifier.verifyErrorFreeLog();
     }

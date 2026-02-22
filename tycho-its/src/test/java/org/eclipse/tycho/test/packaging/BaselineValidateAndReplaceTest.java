@@ -8,8 +8,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.codehaus.plexus.util.FileUtils;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
@@ -28,7 +28,7 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 
 	private Verifier getVerifier(String project, File baselineRepo) throws Exception {
 		Verifier verifier = getVerifier("/packaging.reproducibleArtifacts/" + project, true);
-		verifier.addCliOption("-Dbaseline-repo=" + baselineRepo.toURI().toString());
+		verifier.addCliArgument("-Dbaseline-repo=" + baselineRepo.toURI().toString());
 		return verifier;
 	}
 
@@ -56,7 +56,9 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 		File notARepository = new File("baseline/src").getCanonicalFile();
 		Verifier verifier = getVerifier("baseline/src", notARepository);
 
-		verifier.executeGoals(Arrays.asList("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -64,7 +66,9 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testRebuildOfTheSameCodebase() throws Exception {
 		Verifier verifier = getVerifier("baseline/src", baselineRepo);
 
-		verifier.executeGoals(Arrays.asList("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File repository = new File(verifier.getBasedir(), "repository/target/repository");
@@ -77,9 +81,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	@Test
 	public void testNewVersion() throws Exception {
 		Verifier verifier = getVerifier("baseline/src", baselineRepo);
-		verifier.addCliOption("-DversionQualifier=2");
+		verifier.addCliArgument("-DversionQualifier=2");
 
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File repository = new File(verifier.getBasedir(), "repository/target/repository");
@@ -98,7 +104,7 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 		File corruptedBaselineRepo = new File("projects/packaging.reproducibleArtifacts/baseline/repository_corrupted")
 				.getCanonicalFile();
 		Verifier verifier = getVerifier("baseline/src", corruptedBaselineRepo);
-		assertThrows(VerificationException.class, () -> verifier.executeGoals(List.of("clean", "package")));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArguments("clean", "package"); verifier.execute(); });
 		File locallyBuiltJar = new File(verifier.getBasedir(), "bundle01/target/baseline.bundle01-1.0.0-SNAPSHOT.jar");
 		assertTrue(locallyBuiltJar.isFile());
 		// locally built jar must not be replaced with corrupted 0-byte baseline jar
@@ -111,7 +117,8 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 		Verifier verifier = getVerifier("contentchanged", baselineRepo);
 
 		try {
-			verifier.executeGoals(Arrays.asList("clean", "package"));
+			verifier.addCliArguments("clean", "package");
+			verifier.execute();
 		} catch (VerificationException expected) {
 			//
 		}
@@ -122,9 +129,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testBaselineDisable() throws Exception {
 		Verifier verifier = getVerifier("contentchanged", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=disable");
+		verifier.addCliArgument("-Dtycho.baseline=disable");
 
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -132,9 +141,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testBaselineWarn() throws Exception {
 		Verifier verifier = getVerifier("contentchanged", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=warn");
+		verifier.addCliArgument("-Dtycho.baseline=warn");
 
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyTextInLog("baseline and build artifacts have same version but different contents");
 	}
 
@@ -142,9 +153,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testBaselineWarn_changedAttachedArtifact() throws Exception {
 		Verifier verifier = getVerifier("changedattachedartifact", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=warn");
+		verifier.addCliArgument("-Dtycho.baseline=warn");
 
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyTextInLog("baseline and build artifacts have same version but different contents");
 
 		File repository = new File(verifier.getBasedir(), "repository/target/repository");
@@ -155,10 +168,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testBaselineFailCommon_Changed() throws Exception {
 		Verifier verifier = getVerifier("contentchanged", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=failCommon");
+		verifier.addCliArgument("-Dtycho.baseline=failCommon");
 
 		try {
-			verifier.executeGoals(List.of("clean", "package"));
+			verifier.addCliArguments("clean", "package");
+			verifier.execute();
 		} catch (VerificationException expected) {
 			//
 		}
@@ -169,10 +183,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	@Test
 	public void testBaselineFailCommon_Changed_ignoredFiles() throws Exception {
 		Verifier verifier = getVerifier("contentchanged", baselineRepo);
-		verifier.getCliOptions().addAll(Arrays.asList("--projects", "bundle01"));
-		verifier.addCliOption("-PignoreChanged");
-		verifier.addCliOption("-Dtycho.baseline=failCommon");
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("--projects", "bundle01");
+		verifier.addCliArgument("-PignoreChanged");
+		verifier.addCliArgument("-Dtycho.baseline=failCommon");
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -180,9 +195,10 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testBaselineFailCommon_newAttachedArtifact() throws Exception {
 		Verifier verifier = getVerifier("newattachedartifact", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=failCommon");
+		verifier.addCliArgument("-Dtycho.baseline=failCommon");
 		try {
-			verifier.executeGoals(List.of("clean", "package"));
+			verifier.addCliArguments("clean", "package");
+			verifier.execute();
 		} catch (VerificationException expected) {
 			//
 		}
@@ -193,10 +209,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testBaselineFail() throws Exception {
 		Verifier verifier = getVerifier("newattachedartifact", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=fail");
+		verifier.addCliArgument("-Dtycho.baseline=fail");
 
 		try {
-			verifier.executeGoals(List.of("clean", "package"));
+			verifier.addCliArguments("clean", "package");
+			verifier.execute();
 		} catch (VerificationException expected) {
 			//
 		}
@@ -208,10 +225,11 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testBaselineFail_changedAttachedArtifact() throws Exception {
 		Verifier verifier = getVerifier("changedattachedartifact", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=fail");
+		verifier.addCliArgument("-Dtycho.baseline=fail");
 
 		try {
-			verifier.executeGoals(List.of("clean", "package"));
+			verifier.addCliArguments("clean", "package");
+			verifier.execute();
 		} catch (VerificationException expected) {
 			//
 		}
@@ -222,10 +240,12 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testReplaceNone() throws Exception {
 		Verifier verifier = getVerifier("contentchanged", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=warn");
-		verifier.addCliOption("-Dtycho.baseline.replace=none");
+		verifier.addCliArgument("-Dtycho.baseline=warn");
+		verifier.addCliArgument("-Dtycho.baseline.replace=none");
 
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyTextInLog("baseline and build artifacts have same version but different contents");
 
 		File repository = new File(verifier.getBasedir(), "repository/target/repository");
@@ -236,10 +256,12 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testReplaceCommon() throws Exception {
 		Verifier verifier = getVerifier("newattachedartifact", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=warn");
-		verifier.addCliOption("-Dtycho.baseline.replace=common");
+		verifier.addCliArgument("-Dtycho.baseline=warn");
+		verifier.addCliArgument("-Dtycho.baseline.replace=common");
 
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyTextInLog("baseline and build artifacts have same version but different contents");
 
 		File repository = new File(verifier.getBasedir(), "repository/target/repository");
@@ -254,10 +276,12 @@ public class BaselineValidateAndReplaceTest extends AbstractTychoIntegrationTest
 	public void testReplaceAll() throws Exception {
 		Verifier verifier = getVerifier("newattachedartifact", baselineRepo);
 
-		verifier.addCliOption("-Dtycho.baseline=warn");
-		verifier.addCliOption("-Dtycho.baseline.replace=all");
+		verifier.addCliArgument("-Dtycho.baseline=warn");
+		verifier.addCliArgument("-Dtycho.baseline.replace=all");
 
-		verifier.executeGoals(Arrays.asList("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+
+		verifier.execute();
 		verifier.verifyTextInLog("baseline and build artifacts have same version but different contents");
 
 		File repository = new File(verifier.getBasedir(), "repository/target/repository");

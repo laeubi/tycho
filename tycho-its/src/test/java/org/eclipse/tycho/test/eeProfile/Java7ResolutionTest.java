@@ -18,7 +18,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import java.io.File;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.junit.BeforeClass;
@@ -32,8 +32,9 @@ public class Java7ResolutionTest extends AbstractTychoIntegrationTest {
 	public static void setUp() throws Exception {
 		Verifier verifier = new Java7ResolutionTest().getVerifier("eeProfile.java7", false);
 
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
 
+		verifier.execute();
 		// with bug 384494, the product could not be materialized
 		verifier.verifyErrorFreeLog();
 		buildResult = new File(verifier.getBasedir());
@@ -60,9 +61,9 @@ public class Java7ResolutionTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testP2ResolutionWithLowerBREEThanRequiredBundle() throws Exception {
 		Verifier verifier = getVerifier("eeProfile.java7/bundle2", false);
-		verifier.addCliOption("-Dp2.repo.url=" + new File(buildResult, "repository1/target/repository").toURI());
-		verifier.executeGoal("verify");
-
+		verifier.addCliArgument("-Dp2.repo.url=" + new File(buildResult, "repository1/target/repository").toURI());
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		// with bug 434959, p2 resolver would fail
 		verifier.verifyErrorFreeLog();
 	}

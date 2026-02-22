@@ -24,7 +24,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -43,9 +43,11 @@ public class Tycho465RootFilesTest extends AbstractTychoIntegrationTest {
 	public void testProductBuild() throws Exception {
 		Verifier verifier = getVerifier("product.rootFiles", true);
 
-		verifier.addCliOption("-DforceContextQualifier=" + QUALIFIER.toString());
+		verifier.addCliArgument("-DforceContextQualifier=" + QUALIFIER.toString());
 
-		verifier.executeGoal("install");
+		verifier.addCliArgument("install");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File targetDir = new File(verifier.getBasedir(), MODULE + "/target");
@@ -56,7 +58,8 @@ public class Tycho465RootFilesTest extends AbstractTychoIntegrationTest {
 		assertBuildProductAndRepository(targetDir, repositoryTargetDirectory, contentXml);
 
 		// clean the local build results
-		verifier.executeGoal("clean");
+		verifier.addCliArgument("clean");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		// re-build the repository project only (incl. products) to ensure that the
@@ -66,9 +69,11 @@ public class Tycho465RootFilesTest extends AbstractTychoIntegrationTest {
 		Verifier eclipseRepoProjectVerifier = getVerifier("product.rootFiles/eclipse-repository", true,
 				ignoreLocallyInstalledArtifacts);
 
-		eclipseRepoProjectVerifier.addCliOption("-DforceContextQualifier=" + QUALIFIER.toString());
+		eclipseRepoProjectVerifier.addCliArgument("-DforceContextQualifier=" + QUALIFIER.toString());
 
-		eclipseRepoProjectVerifier.executeGoal("verify");
+		eclipseRepoProjectVerifier.addCliArgument("verify");
+
+		eclipseRepoProjectVerifier.execute();
 		eclipseRepoProjectVerifier.verifyErrorFreeLog();
 
 		Document updatedContentXml = openMetadataRepositoryDocument(repositoryTargetDirectory);

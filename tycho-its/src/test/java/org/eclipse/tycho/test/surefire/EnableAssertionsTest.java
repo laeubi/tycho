@@ -12,8 +12,8 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.surefire;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -23,7 +23,8 @@ public class EnableAssertionsTest extends AbstractTychoIntegrationTest {
     public void testEnableAssertions() throws Exception {
         Verifier verifier = getVerifier("surefire.enableAssertions");
         try {
-            verifier.executeGoal("verify");
+            verifier.addCliArgument("verify");
+            verifier.execute();
         } catch (VerificationException ve) {
             // expected
         }

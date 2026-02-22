@@ -21,7 +21,7 @@ import java.nio.file.Files;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.p2.repository.FileBasedTychoRepositoryIndex;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
@@ -32,7 +32,8 @@ public class IncludeAllSourcesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testSourceInclusion() throws Exception {
 		Verifier verifier = getVerifier("p2Repository.includeAllSources", false);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		// Missing source should never trigger an error
 		verifier.verifyErrorFreeLog();
 		P2RepositoryTool p2Repo = P2RepositoryTool.forEclipseRepositoryModule(new File(verifier.getBasedir()));
@@ -57,7 +58,8 @@ public class IncludeAllSourcesTest extends AbstractTychoIntegrationTest {
 			List<String> lines = Files.readAllLines(indexFile.toPath(), StandardCharsets.UTF_8);
 			FileUtils.writeLines(indexFile, lines.stream().filter(line -> !line.contains("org.jdom.source")).toList());
 		}
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		P2RepositoryTool p2Repo = P2RepositoryTool.forEclipseRepositoryModule(new File(verifier.getBasedir()));
 		assertFalse(p2Repo.getUnitVersions("org.jdom.source").isEmpty(), "Missing org.jdom.source");

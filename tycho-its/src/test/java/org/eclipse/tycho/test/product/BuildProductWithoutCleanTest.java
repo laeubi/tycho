@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.eclipse.tycho.test.util.P2RepositoryTool.IU;
@@ -29,10 +29,11 @@ public class BuildProductWithoutCleanTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testProductUnitsAreCleaned() throws Exception {
 		Verifier verifier = getVerifier("product.clean", false);
-		verifier.addCliOption("-Dtest-data-repo=" + P2Repositories.ECLIPSE_342.toString());
+		verifier.addCliArgument("-Dtest-data-repo=" + P2Repositories.ECLIPSE_342.toString());
 
 		// run build to make target folder dirty
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		// there is a product IU in the the p2 repository in the target folder
@@ -47,7 +48,8 @@ public class BuildProductWithoutCleanTest extends AbstractTychoIntegrationTest {
 
 		// ... and rebuild without clean
 		verifier.setAutoclean(false);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		// expectation: there should be only one, new product IU - the old IU should no

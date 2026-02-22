@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.apache.maven.model.Build;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.Plugin;
@@ -30,9 +30,10 @@ public class PomlessTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testBnd() throws Exception {
 		Verifier verifier = getVerifier("pomless", false, true);
-		verifier.addCliOption("-pl");
-		verifier.addCliOption("bnd");
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArgument("-pl");
+		verifier.addCliArgument("bnd");
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File file = new File(verifier.getBasedir(), "bnd/target/classes/module-info.class");
 		assertTrue("module-info.class is not generated!", file.isFile());
@@ -41,10 +42,11 @@ public class PomlessTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testSourceFolder() throws Exception {
 		Verifier verifier = getVerifier("pomless", false, true);
-		verifier.addCliOption("-pl");
-		verifier.addCliOption("sourcefolder");
-		verifier.addCliOption("-Dpolyglot.dump.pom=generated.pom.xml");
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArgument("-pl");
+		verifier.addCliArgument("sourcefolder");
+		verifier.addCliArgument("-Dpolyglot.dump.pom=generated.pom.xml");
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File file = new File(verifier.getBasedir(), "sourcefolder/generated.pom.xml");
 		assertTrue("generated.pom.xml is not generated!", file.isFile());
@@ -69,7 +71,8 @@ public class PomlessTest extends AbstractTychoIntegrationTest {
 	public void testPomlessTestPluginDetection() throws Exception {
 
 		Verifier verifier = getVerifier("pomless-tests", false, true);
-		verifier.executeGoals(List.of("clean", "test"));
+		verifier.addCliArguments("clean", "test");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		verifier.verifyTextInLog("");
 
@@ -111,7 +114,8 @@ public class PomlessTest extends AbstractTychoIntegrationTest {
 		// - explicit pom.xml is always preferred
 
 		Verifier verifier = getVerifier("pomless-model", false, true);
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		Map<Path, ModelData> projectData = extractPomModelProperties(verifier);

@@ -9,7 +9,7 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.resolver;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -18,7 +18,8 @@ public class SplitPackagesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testSplitPackage() throws Exception {
 		Verifier verifier = getVerifier("/resolver.split/org.eclipse.equinox.security");
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

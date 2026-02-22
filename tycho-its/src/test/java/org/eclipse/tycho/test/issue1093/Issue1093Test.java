@@ -14,8 +14,8 @@ import static org.junit.Assert.assertThrows;
 
 import java.util.List;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -24,7 +24,7 @@ public class Issue1093Test extends AbstractTychoIntegrationTest {
 	@Test
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("issue1093", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoals(List.of("clean", "verify")));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArguments("clean", "verify"); verifier.execute(); });
 		// expected
 		verifier.verifyTextInLog("bin.includes value(s) [non-existing-file.txt] do not match any files");
 	}

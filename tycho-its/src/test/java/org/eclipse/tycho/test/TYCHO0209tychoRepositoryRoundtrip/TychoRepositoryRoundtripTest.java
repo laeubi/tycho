@@ -16,7 +16,7 @@ import static org.junit.Assert.assertEquals;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -26,13 +26,15 @@ public class TychoRepositoryRoundtripTest extends AbstractTychoIntegrationTest {
 	public void testLocalMavenRepository() throws Exception {
 		// build01
 		Verifier v01 = getVerifier("TYCHO0209tychoRepositoryRoundtrip/build01", true);
-		v01.executeGoal("install");
+		v01.addCliArgument("install");
+		v01.execute();
 		v01.verifyErrorFreeLog();
 
 		final boolean ignoreLocallyInstalledArtifacts = false;
 		// build02, some dependencies come from local, some from remote repositories
 		Verifier v02 = getVerifier("TYCHO0209tychoRepositoryRoundtrip/build02", true, ignoreLocallyInstalledArtifacts);
-		v02.executeGoal("install");
+		v02.addCliArgument("install");
+		v02.execute();
 		v02.verifyErrorFreeLog();
 		v02.verifyTextInLog(
 				"[WARNING] The following locally built units have been used to resolve project dependencies:");
@@ -43,7 +45,8 @@ public class TychoRepositoryRoundtripTest extends AbstractTychoIntegrationTest {
 
 		// build03, all dependencies come from local repository
 		Verifier v03 = getVerifier("TYCHO0209tychoRepositoryRoundtrip/build03", false, ignoreLocallyInstalledArtifacts);
-		v03.executeGoal("install");
+		v03.addCliArgument("install");
+		v03.execute();
 		v03.verifyErrorFreeLog();
 	}
 

@@ -16,7 +16,7 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -28,7 +28,8 @@ public class ProductTypesTest extends AbstractTychoIntegrationTest {
 	@BeforeClass
 	public static void setupBeforeClass() throws Exception {
 		testBuildVerifier = new ProductTypesTest().getVerifier("product.types", false);
-		testBuildVerifier.executeGoals(List.of("clean", "verify"));
+		testBuildVerifier.addCliArguments("clean", "verify");
+		testBuildVerifier.execute();
 		testBuildVerifier.verifyErrorFreeLog();
 	}
 

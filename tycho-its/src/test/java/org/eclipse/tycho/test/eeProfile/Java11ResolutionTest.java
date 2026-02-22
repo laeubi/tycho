@@ -18,7 +18,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import java.io.File;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.junit.BeforeClass;
@@ -31,7 +31,8 @@ public class Java11ResolutionTest extends AbstractTychoIntegrationTest {
 	@BeforeClass
 	public static void setUp() throws Exception {
 		Verifier verifier = new Java11ResolutionTest().getVerifier("eeProfile.java11", false);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		buildResult = new File(verifier.getBasedir());
 	}

@@ -19,7 +19,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.P2RepositoryTool;
 import org.junit.Test;
@@ -29,7 +29,8 @@ public class ReferenceBetweenProductsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testProductCanReferenceProductFromDifferentModule() throws Exception {
 		Verifier verifier = getVerifier("product.crossReference");
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File repositoryProject = new File(verifier.getBasedir(), "eclipse-repository");

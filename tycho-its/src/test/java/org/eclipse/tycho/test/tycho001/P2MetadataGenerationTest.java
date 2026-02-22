@@ -16,7 +16,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -26,7 +26,9 @@ public class P2MetadataGenerationTest extends AbstractTychoIntegrationTest {
 	public void test() throws Exception {
 		Verifier verifier = getVerifier("tycho001");
 
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		File site = new File(verifier.getBasedir(), "site/target/repository");

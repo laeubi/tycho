@@ -17,8 +17,8 @@ import static org.junit.Assert.assertThrows;
 
 import java.util.List;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -27,7 +27,7 @@ public class MavenCompilerPluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testJDTCompilerId() throws Exception {
 		Verifier verifier = getVerifier("compiler.mavenCompilerPlugin", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("compile"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("compile"); verifier.execute(); });
 		// expected
 		verifier.verifyTextInLog("field Foo.unused is not used");
 	}
@@ -35,21 +35,24 @@ public class MavenCompilerPluginTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testAdditionalBundles() throws Exception {
 		Verifier verifier = getVerifier("compiler.additional.bundles", true);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testAdditionalBundles2() throws Exception {
 		Verifier verifier = getVerifier("compiler.additional.bundles2", false, false);
-		verifier.executeGoals(List.of("clean", "install"));
+		verifier.addCliArguments("clean", "install");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testLimitModules() throws Exception {
 		Verifier verifier = getVerifier("compiler.limit.modules", true);
-		verifier.executeGoal("compile");
+		verifier.addCliArgument("compile");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 

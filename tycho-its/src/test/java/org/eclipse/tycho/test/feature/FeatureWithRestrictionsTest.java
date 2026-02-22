@@ -19,7 +19,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Optional;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.ResourceUtil;
 import org.junit.Test;
@@ -35,7 +35,8 @@ public class FeatureWithRestrictionsTest extends AbstractTychoIntegrationTest {
 		Verifier verifier = getVerifier("feature.restrictions/sample.feature", false, true);
 		verifier.setSystemProperty("repo-url", "file:"
 				+ ResourceUtil.resolveTestResource("projects/feature.restrictions/repository").getAbsolutePath());
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File contentXml = new File(verifier.getBasedir(), "target/p2content.xml");
 		Document artifactsDocument = XMLParser.parse(contentXml);

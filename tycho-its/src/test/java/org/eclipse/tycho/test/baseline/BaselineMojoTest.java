@@ -27,8 +27,8 @@ import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 import java.util.regex.Pattern;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.DefaultModelReader;
 import org.apache.maven.model.io.DefaultModelWriter;
@@ -210,24 +210,26 @@ public class BaselineMojoTest extends AbstractTychoIntegrationTest {
 		Path projectRoot = Path.of(verifier.getBasedir(), "api-bundle");
 		projectModifier.accept(projectRoot);
 
-		verifier.addCliOption("-Dbaseline-url=" + baselineRepo.toURI());
+		verifier.addCliArgument("-Dbaseline-url=" + baselineRepo.toURI());
 		for (String xarg : xargs) {
-			verifier.addCliOption(xarg);
+			verifier.addCliArgument(xarg);
 		}
 
 		if (compareShouldFail) {
-			assertThrows(VerificationException.class, () -> verifier.executeGoals(List.of("clean", "verify")));
+			assertThrows(VerificationException.class, () -> { verifier.addCliArguments("clean", "verify"); verifier.execute(); });
 			verifier.verifyTextInLog("Baseline problems found!");
 		} else {
-			verifier.executeGoals(List.of("clean", "verify"));
+			verifier.addCliArguments("clean", "verify");
+			verifier.execute();
 		}
 		return verifier;
 	}
 
 	private File buildBaseRepo() throws Exception, VerificationException {
 		Verifier verifier = getBaselineProject("base-repo");
-		verifier.addCliOption("-Dtycho.baseline.skip=true");
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArgument("-Dtycho.baseline.skip=true");
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File repoBase = new File(verifier.getBasedir(), "base-repo/site/target/repository");
 		assertTrue("base repository was not created at " + repoBase.getAbsolutePath(), repoBase.isDirectory());
@@ -240,8 +242,8 @@ public class BaselineMojoTest extends AbstractTychoIntegrationTest {
 
 	private Verifier getBaselineProject(String project) throws Exception {
 		Verifier verifier = getVerifier("baseline", false, true);
-		verifier.addCliOption("-f");
-		verifier.addCliOption(project + "/pom.xml");
+		verifier.addCliArgument("-f");
+		verifier.addCliArgument(project + "/pom.xml");
 		return verifier;
 	}
 

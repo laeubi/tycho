@@ -9,7 +9,7 @@ import java.util.Properties;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.osgi.framework.Constants;
@@ -19,7 +19,8 @@ class PDESourceHeaderGenerationTest extends AbstractTychoIntegrationTest {
 	@Test
 	void testSourceHeaderGeneration() throws Exception {
 		Verifier verifier = getVerifier("mixed.reactor", false);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		Path basedir = Path.of(verifier.getBasedir());
 		Path sourcesJar = basedir

@@ -10,7 +10,7 @@
 
 package org.eclipse.tycho.test.compare;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -19,7 +19,8 @@ public class CompareWithBaselineTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testEENone() throws Exception {
 		Verifier verifier = getVerifier("eeProfile.none/feature", false);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 }

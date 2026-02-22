@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -27,7 +27,8 @@ public class BuildQualifierTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testBuildQualifierMojoWithJGitTimestamp_jarPackagingType() throws Exception {
 		Verifier verifier = getVerifier("/packaging.build-qualifier/jar-packaging", false);
-		verifier.executeGoal("generate-sources");
+		verifier.addCliArgument("generate-sources");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		Path basedir = Path.of(verifier.getBasedir());

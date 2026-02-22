@@ -22,8 +22,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.junit.Test;
 
 import de.pdark.decentxml.Document;
@@ -129,11 +129,13 @@ public class P2ExtrasPlugin extends AbstractTychoIntegrationTest {
 		File logFile = new File(verifier.getBasedir(), verifier.getLogFileName());
 		logFile.delete();
 		if (success) {
-			verifier.executeGoals(goals);
+			for (String goal : goals) { verifier.addCliArgument(goal); }
+			verifier.execute();
 			verifier.verifyErrorFreeLog();
 		} else {
 			try {
-				verifier.executeGoals(goals);
+				for (String goal : goals) { verifier.addCliArgument(goal); }
+				verifier.execute();
 			} catch (VerificationException e) {
 				verifier.verifyTextInLog("Failed to execute goal org.eclipse.tycho.extras:tycho-p2-extras-plugin");
 			}
@@ -146,7 +148,8 @@ public class P2ExtrasPlugin extends AbstractTychoIntegrationTest {
 		final String featureId = "test_feature.feature.jar";
 
 		Verifier verifier = getVerifier("p2extra/publisherNoUnpack", false, true);
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 
 		Path contentXml = Path.of(verifier.getBasedir()).resolve("target/repository").resolve("content.xml");
 		Element pluginUnitInContentXml = extractUnitFromContentXml(contentXml, pluginId);

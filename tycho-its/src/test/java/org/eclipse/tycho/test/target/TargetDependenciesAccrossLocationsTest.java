@@ -8,8 +8,8 @@ import java.util.Arrays;
 
 import javax.xml.parsers.ParserConfigurationException;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.HttpServer;
 import org.eclipse.tycho.test.util.ResourceUtil;
@@ -45,7 +45,8 @@ public class TargetDependenciesAccrossLocationsTest extends AbstractTychoIntegra
 	public void slicerDoesNotFailWhenDependenciesExistInDifferentTargetLocation() throws Exception {
 		Verifier verifier = getVerifier("target.slicerWithDependenciesInDifferentTargetLocation", false);
 		fillInTargetUrls(verifier);
-		verifier.executeGoals(Arrays.asList("package"));
+		verifier.addCliArguments("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -53,7 +54,7 @@ public class TargetDependenciesAccrossLocationsTest extends AbstractTychoIntegra
 	public void slicerDoesNotFailWhenDependenciesDoNotExistInAnyLocation() throws Exception {
 		Verifier verifier = getVerifier("target.slicerWithMissingDependencies", false);
 		fillInTargetUrls(verifier);
-		assertThrows(VerificationException.class, () -> verifier.executeGoals(Arrays.asList("package")));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArguments("package"); verifier.execute(); });
 		verifier.verifyTextInLog(
 				"Missing requirement: bundle2 1.0.0 requires 'osgi.bundle; bundle1 0.0.0' but it could not be found");
 	}
@@ -62,7 +63,8 @@ public class TargetDependenciesAccrossLocationsTest extends AbstractTychoIntegra
 	public void plannerDoesNotFailWhenDependenciesExistInDifferentTargetLocation() throws Exception {
 		Verifier verifier = getVerifier("target.plannerWithDependenciesInDifferentTargetLocation", false);
 		fillInTargetUrls(verifier);
-		verifier.executeGoals(Arrays.asList("package"));
+		verifier.addCliArguments("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 
@@ -71,7 +73,8 @@ public class TargetDependenciesAccrossLocationsTest extends AbstractTychoIntegra
 		Verifier verifier = getVerifier("target.plannerWithMissingDependencies", false);
 		fillInTargetUrls(verifier);
 		try {
-			verifier.executeGoals(Arrays.asList("package"));
+			verifier.addCliArguments("package");
+			verifier.execute();
 		} catch (VerificationException e) {
 			// expected
 		}

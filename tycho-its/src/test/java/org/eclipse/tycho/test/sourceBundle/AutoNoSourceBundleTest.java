@@ -14,8 +14,8 @@ package org.eclipse.tycho.test.sourceBundle;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -28,7 +28,7 @@ public class AutoNoSourceBundleTest extends AbstractTychoIntegrationTest {
 
 		Verifier verifier = getVerifier("/sourceBundle.autoSkip", false);
 		assertThrows("Reference to a missing source bundle did not fail the build", VerificationException.class,
-				() -> verifier.executeGoal("verify"));
+				() -> { verifier.addCliArgument("verify"); verifier.execute(); });
 		verifier.verifyTextInLog(
 				"feature.feature.group 1.0.0.qualifier requires 'org.eclipse.equinox.p2.iu; bundle.source 0.0.0' but it could not be found");
 	}

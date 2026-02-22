@@ -15,7 +15,7 @@ package org.eclipse.tycho.test.feature;
 import java.io.File;
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -25,7 +25,8 @@ public class FeatureWithDependenciesTest extends AbstractTychoIntegrationTest {
 	public void testFeatureRestrictionWithIncludePluginsEnabled() throws Exception {
 		Verifier verifier = getVerifier("feature.dependency", false, true);
 		verifier.setSystemProperty("includePlugins", "true");
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetdir = new File(verifier.getBasedir(), "site/target");
 		assertFileExists(targetdir, "repository/plugins/org.aopalliance_*.jar");
@@ -39,7 +40,8 @@ public class FeatureWithDependenciesTest extends AbstractTychoIntegrationTest {
 	public void testFeatureRestrictionWithIncludeFeaturesEnabled() throws Exception {
 		Verifier verifier = getVerifier("feature.dependency", false, true);
 		verifier.setSystemProperty("includeFeatures", "true");
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetdir = new File(verifier.getBasedir(), "site/target");
 		assertFileExists(targetdir, "repository/plugins/org.aopalliance_*.jar");
@@ -54,7 +56,8 @@ public class FeatureWithDependenciesTest extends AbstractTychoIntegrationTest {
 		Verifier verifier = getVerifier("feature.dependency", false, true);
 		verifier.setSystemProperty("includePlugins", "true");
 		verifier.setSystemProperty("includeFeatures", "true");
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetdir = new File(verifier.getBasedir(), "site/target");
 		assertFileExists(targetdir, "repository/plugins/org.aopalliance_*.jar");
@@ -67,7 +70,8 @@ public class FeatureWithDependenciesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testFeatureRestrictionWithIncludePluginsAndFeaturesDisabled() throws Exception {
 		Verifier verifier = getVerifier("feature.dependency", false, true);
-		verifier.executeGoals(List.of("clean", "package"));
+		verifier.addCliArguments("clean", "package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetdir = new File(verifier.getBasedir(), "site/target");
 		assertFileExists(targetdir, "repository/plugins/org.aopalliance_*.jar");

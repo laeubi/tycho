@@ -14,8 +14,8 @@ package org.eclipse.tycho.test.TYCHO330validateVersion;
 
 import static org.junit.Assert.assertThrows;
 
-import org.apache.maven.it.VerificationException;
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.VerificationException;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -24,13 +24,13 @@ public class ValidateVersionTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testPlugin() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO330validateVersion/bundle", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("verify"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("verify"); verifier.execute(); });
 
 	}
 
 	@Test
 	public void testFeature() throws Exception {
 		Verifier verifier = getVerifier("/TYCHO330validateVersion/feature", false);
-		assertThrows(VerificationException.class, () -> verifier.executeGoal("verify"));
+		assertThrows(VerificationException.class, () -> { verifier.addCliArgument("verify"); verifier.execute(); });
 	}
 }

@@ -2,7 +2,7 @@ package org.eclipse.tycho.test.target;
 
 import java.util.List;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -13,7 +13,8 @@ public class TargetPlatformArtifactJUnitTest extends AbstractTychoIntegrationTes
 	@Ignore("No longer works, needs update to more recent examples")
 	public void testTargetPlatformForJUnit5() throws Exception {
 		Verifier verifier = getVerifier("target.artifact.junit", false, true);
-		verifier.executeGoals(List.of("clean", "verify"));
+		verifier.addCliArguments("clean", "verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 	}
 }

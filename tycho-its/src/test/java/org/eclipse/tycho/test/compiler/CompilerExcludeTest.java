@@ -16,7 +16,7 @@ package org.eclipse.tycho.test.compiler;
 import java.io.File;
 import java.util.zip.ZipFile;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Assert;
 import org.junit.Test;
@@ -26,7 +26,8 @@ public class CompilerExcludeTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testExtraExports() throws Exception {
 		Verifier verifier = getVerifier("compiler.exclude", false);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		try (ZipFile zip = new ZipFile(new File(verifier.getBasedir(), "mycodelib.jar"))) {

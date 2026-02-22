@@ -17,7 +17,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -29,7 +29,9 @@ public class JUnit4Test extends AbstractTychoIntegrationTest {
 		// a eclipse-test-plugin using JUnit 4 -> supported since MNGECLIPSE-1031
 		Verifier verifier = getVerifier("tycho-surefire-plugin/junit4/bundle.test");
 
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("integration-test");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 
 		assertTrue(testResultFile(verifier.getBasedir(), "bundle.test", "JUnit4Test").exists());
@@ -44,7 +46,9 @@ public class JUnit4Test extends AbstractTychoIntegrationTest {
 		// a eclipse-test-plugin using JUnit 4 -> supported since MNGECLIPSE-1031
 		Verifier verifier = getVerifier("tycho-surefire-plugin/junit4/contextclassloader.test/");
 
-		verifier.executeGoal("integration-test");
+		verifier.addCliArgument("integration-test");
+
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File testResultFile = testResultFile(verifier.getBasedir(), "contextclassloader.test", "JUnit4Test");
 		assertTrue("Test Result File" + testResultFile + " is missing", testResultFile.exists());

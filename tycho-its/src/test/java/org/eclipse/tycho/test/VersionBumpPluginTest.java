@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.aether.util.version.GenericVersionScheme;
 import org.eclipse.aether.version.Version;
 import org.eclipse.aether.version.VersionScheme;
@@ -44,8 +44,9 @@ public class VersionBumpPluginTest extends AbstractTychoIntegrationTest {
 		Verifier verifier = getVerifier("tycho-version-bump-plugin/update-target", false, true);
 		String sourceTargetFile = "update-target.target";
 		verifier.setSystemProperty("target", sourceTargetFile);
-		verifier.executeGoal("org.eclipse.tycho.extras:tycho-version-bump-plugin:" + TychoVersion.getTychoVersion()
+		verifier.addCliArgument("org.eclipse.tycho.extras:tycho-version-bump-plugin:" + TychoVersion.getTychoVersion()
 				+ ":update-target");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetFile = new File(verifier.getBasedir(), sourceTargetFile);
 		try (FileInputStream input = new FileInputStream(targetFile)) {
@@ -88,8 +89,9 @@ public class VersionBumpPluginTest extends AbstractTychoIntegrationTest {
 		String sourceTargetFile = "update-target.target";
 		verifier.setSystemProperty("target", sourceTargetFile);
 		verifier.setSystemProperty("allowMajorUpdates", "false");
-		verifier.executeGoal("org.eclipse.tycho.extras:tycho-version-bump-plugin:" + TychoVersion.getTychoVersion()
+		verifier.addCliArgument("org.eclipse.tycho.extras:tycho-version-bump-plugin:" + TychoVersion.getTychoVersion()
 				+ ":update-target");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetFile = new File(verifier.getBasedir(), sourceTargetFile);
 		try (FileInputStream input = new FileInputStream(targetFile)) {
@@ -116,8 +118,9 @@ public class VersionBumpPluginTest extends AbstractTychoIntegrationTest {
 		Verifier verifier = getVerifier("tycho-version-bump-plugin/update-target-version-range", false, true);
 		String sourceTargetFile = "update-target-version-range.target";
 		verifier.setSystemProperty("target", sourceTargetFile);
-		verifier.executeGoal("org.eclipse.tycho.extras:tycho-version-bump-plugin:" + TychoVersion.getTychoVersion()
+		verifier.addCliArgument("org.eclipse.tycho.extras:tycho-version-bump-plugin:" + TychoVersion.getTychoVersion()
 				+ ":update-target");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File targetFile = new File(verifier.getBasedir(), sourceTargetFile);
 		try (FileInputStream input = new FileInputStream(targetFile)) {

@@ -16,7 +16,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.nio.file.Files;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -25,7 +25,8 @@ public class ListDependenciesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testDependencyInReactor() throws Exception {
 		Verifier verifier = getVerifier("extra/dependencyList/multi-modules", false);
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File file = new File(verifier.getBasedir(), "dependent/target/dependencies-list.txt");
 		assertTrue(file.exists());
@@ -39,7 +40,8 @@ public class ListDependenciesTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testDependencyWithNestedJar() throws Exception {
 		Verifier verifier = getVerifier("extra/dependencyList/dependency-with-nested-jar");
-		verifier.executeGoal("verify");
+		verifier.addCliArgument("verify");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		File file = new File(verifier.getBasedir(), "target/dependencies-list.txt");
 		assertTrue(file.exists());

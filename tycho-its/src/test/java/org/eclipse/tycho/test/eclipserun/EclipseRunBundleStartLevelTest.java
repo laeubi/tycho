@@ -18,7 +18,7 @@ import static org.hamcrest.Matchers.matchesRegex;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.apache.maven.it.Verifier;
+import org.apache.maven.shared.verifier.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.Test;
 
@@ -27,7 +27,8 @@ public class EclipseRunBundleStartLevelTest extends AbstractTychoIntegrationTest
 	@Test
 	public void testBundleStartLevel() throws Exception {
 		Verifier verifier = getVerifier("eclipserun.bundleStartLevel", true);
-		verifier.executeGoal("package");
+		verifier.addCliArgument("package");
+		verifier.execute();
 		verifier.verifyErrorFreeLog();
 		String config = Files
 				.readString(Path.of(verifier.getBasedir(), "target", "eclipserun-work", "configuration", "config.ini"));
