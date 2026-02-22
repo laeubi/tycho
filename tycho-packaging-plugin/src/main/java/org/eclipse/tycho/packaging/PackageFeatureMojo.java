@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2022 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2024 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -30,11 +30,14 @@ import org.apache.maven.archiver.MavenArchiveConfiguration;
 import org.apache.maven.archiver.MavenArchiver;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Mojo;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Parameter;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import javax.inject.Inject;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.archiver.FileSet;
 import org.codehaus.plexus.archiver.jar.JarArchiver;
@@ -80,7 +83,7 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
     /**
      * The output directory of the jar file
      * 
-     * By default this is the Maven <tt>target/</tt> directory.
+     * By default this is the Maven <code>target/</code> directory.
      */
     @Parameter(property = "project.build.directory")
     private File outputDirectory;
@@ -102,30 +105,37 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
     @Parameter(property = "project.build.finalName", alias = "jarName", required = true)
     private String finalName;
 
-    /**
-     * If set to <code>true</code>, standard eclipse update site directory with feature content will
-     * be created under target folder.
-     */
-    @Parameter(defaultValue = "false")
-    private boolean deployableFeature = false;
-
     @Parameter(defaultValue = "${project.build.directory}/site")
     private File target;
 
-    @Component
+    /**
+     * Timestamp for reproducible output archive entries, either formatted as ISO
+     * 8601 extended offset date-time (e.g. in UTC such as '2011-12-03T10:15:30Z' or
+     * with an offset '2019-10-05T20:37:42+06:00'), or as an int representing
+     * seconds since the epoch (like <a href=
+     * "https://reproducible-builds.org/docs/source-date-epoch/">SOURCE_DATE_EPOCH</a>).
+     */
+    @Parameter(defaultValue = "${project.build.outputTimestamp}")
+    private String outputTimestamp;
+
+    @Inject
     private FeatureXmlTransformer featureXmlTransformer;
 
-    @Component
+    @Inject
     private LicenseFeatureHelper licenseFeatureHelper;
 
-	@Component
+	@Inject
 	private TargetPlatformService platformService;
 
-	@Component
+	@Inject
 	private BuildPropertiesParser buildPropertiesParser;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (skip) {
+            getLog().info("Skip packaging");
+            return;
+        }
         synchronized (LOCK) {
             outputDirectory.mkdirs();
 
@@ -164,6 +174,8 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
             MavenArchiver archiver = new MavenArchiver();
             JarArchiver jarArchiver = getJarArchiver();
             archiver.setArchiver(jarArchiver);
+            // configure for Reproducible Builds based on outputTimestamp value
+            archiver.configureReproducibleBuild(outputTimestamp);
             archiver.setOutputFile(outputJar);
             jarArchiver.setDestFile(outputJar);
 
@@ -200,10 +212,6 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
             }
 
             project.getArtifact().setFile(outputJar);
-
-            if (deployableFeature) {
-                assembleDeployableFeature();
-            }
         }
     }
 
@@ -267,8 +275,8 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
     }
 
     /**
-     * @return A {@link FileSet} including files as configured by the <tt>bin.includes</tt> and
-     *         <tt>bin.excludes</tt> properties without the files that are always included
+     * @return A {@link FileSet} including files as configured by the <code>bin.includes</code> and
+     *         <code>bin.excludes</code> properties without the files that are always included
      *         automatically.
      */
     private FileSet getManuallyIncludedFiles(BuildProperties buildProperties) {
@@ -276,11 +284,6 @@ public class PackageFeatureMojo extends AbstractTychoPackagingMojo {
         binExcludes.add(FEATURE_XML); // we'll include updated feature.xml
         binExcludes.add(FEATURE_PROPERTIES); // we'll include updated feature.properties
         return getFileSet(basedir, buildProperties.getBinIncludes(), binExcludes);
-    }
-
-    private void assembleDeployableFeature() throws MojoExecutionException {
-        UpdateSiteAssembler assembler = new UpdateSiteAssembler(plexus, target);
-		getTychoProjectFacet().getDependencyWalker(DefaultReactorProject.adapt(project)).walk(assembler);
     }
 
     private void expandVersionQualifiers(Feature feature) throws MojoFailureException {

@@ -15,20 +15,24 @@ package org.eclipse.tycho.extras.buildtimestamp.jgit;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
+import org.codehaus.plexus.util.xml.Xpp3DomBuilder;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.IndexDiff;
@@ -89,42 +93,35 @@ import org.eclipse.tycho.build.BuildTimestampProvider;
  * ...
  * </pre>
  */
-@Component(role = BuildTimestampProvider.class, hint = "jgit")
+@Named("jgit")
+@Singleton
 public class JGitBuildTimestampProvider implements BuildTimestampProvider {
+	private static final String PARAMETER_JGIT_IGNORE = "jgit.ignore";
 
-	@Requirement(hint = "default")
+	private static final String PARAMETER_JGIT_DIRTY_WORKING_TREE = "jgit.dirtyWorkingTree";
+
+	@Inject
+	@Named("default")
 	private BuildTimestampProvider defaultTimestampProvider;
 
-	@Requirement
+	@Inject
 	private Logger logger;
 
 	private boolean quiet;
 
 	private enum DirtyBehavior {
 
-		ERROR, WARNING, IGNORE;
+		ERROR, WARNING, IGNORE, FALLBACK;
 
-		public static DirtyBehavior getDirtyWorkingTreeBehaviour(MojoExecution execution) {
-			final DirtyBehavior defaultBehaviour = ERROR;
-			Xpp3Dom pluginConfiguration = (Xpp3Dom) execution.getPlugin().getConfiguration();
-			if (pluginConfiguration == null) {
-				return defaultBehaviour;
+		public static DirtyBehavior getDirtyWorkingTreeBehaviour(String value) {
+			if (value != null && !value.isBlank()) {
+				for (DirtyBehavior behavior : DirtyBehavior.values()) {
+					if (behavior.name().equalsIgnoreCase(value)) {
+						return behavior;
+					}
+				}
 			}
-			Xpp3Dom dirtyWorkingTreeDom = pluginConfiguration.getChild("jgit.dirtyWorkingTree");
-			if (dirtyWorkingTreeDom == null) {
-				return defaultBehaviour;
-			}
-			String value = dirtyWorkingTreeDom.getValue();
-			if (value == null) {
-				return defaultBehaviour;
-			}
-			value = value.trim();
-			if ("warning".equals(value)) {
-				return WARNING;
-			} else if ("ignore".equals(value)) {
-				return IGNORE;
-			}
-			return defaultBehaviour;
+			return ERROR;
 		}
 	}
 
@@ -152,7 +149,8 @@ public class JGitBuildTimestampProvider implements BuildTimestampProvider {
 					}
 					return defaultTimestampProvider.getTimestamp(session, project, execution);
 				}
-				DirtyBehavior dirtyBehaviour = DirtyBehavior.getDirtyWorkingTreeBehaviour(execution);
+				DirtyBehavior dirtyBehaviour = DirtyBehavior
+						.getDirtyWorkingTreeBehaviour(getDirtyBehaviorValue(execution));
 				if (dirtyBehaviour != DirtyBehavior.IGNORE) {
 					// 1. check if 'git status' is clean for relPath
 					IndexDiff diff = new IndexDiff(repository, headId, new FileTreeIterator(repository));
@@ -165,6 +163,9 @@ public class JGitBuildTimestampProvider implements BuildTimestampProvider {
 					diff.diff();
 					Status status = new Status(diff);
 					if (!status.isClean()) {
+						if (dirtyBehaviour == DirtyBehavior.FALLBACK) {
+							return defaultTimestampProvider.getTimestamp(session, project, execution);
+						}
 						String message = "Working tree is dirty.\ngit status " + (relPath != null ? relPath : "")
 								+ ":\n" + toGitStatusStyleOutput(diff);
 						if (dirtyBehaviour == DirtyBehavior.WARNING) {
@@ -204,6 +205,20 @@ public class JGitBuildTimestampProvider implements BuildTimestampProvider {
 		}
 	}
 
+	private String getDirtyBehaviorValue(MojoExecution execution) {
+		Xpp3Dom pluginConfiguration = getDom(execution);
+		if (pluginConfiguration != null) {
+			Xpp3Dom dirtyWorkingTreeDom = pluginConfiguration.getChild(PARAMETER_JGIT_DIRTY_WORKING_TREE);
+			if (dirtyWorkingTreeDom != null) {
+				String value = dirtyWorkingTreeDom.getValue();
+				if (value != null) {
+					return value.trim();
+				}
+			}
+		}
+		return System.getProperty(PARAMETER_JGIT_DIRTY_WORKING_TREE);
+	}
+
 	private static TreeFilter createPathFilter(String relPath, MojoExecution execution) {
 		if (relPath != null && !relPath.isEmpty()) {
 			return new PathFilter(relPath, getIgnoreFilter(execution));
@@ -212,11 +227,11 @@ public class JGitBuildTimestampProvider implements BuildTimestampProvider {
 	}
 
 	private static String getIgnoreFilter(MojoExecution execution) {
-		Xpp3Dom pluginConfiguration = (Xpp3Dom) execution.getPlugin().getConfiguration();
+		Xpp3Dom pluginConfiguration = getDom(execution);
 		if (pluginConfiguration == null) {
 			return null;
 		}
-		Xpp3Dom ignoreDom = pluginConfiguration.getChild("jgit.ignore");
+		Xpp3Dom ignoreDom = pluginConfiguration.getChild(PARAMETER_JGIT_IGNORE);
 		if (ignoreDom == null) {
 			return null;
 		}
@@ -286,6 +301,21 @@ public class JGitBuildTimestampProvider implements BuildTimestampProvider {
 	@Override
 	public void setQuiet(boolean quiet) {
 		this.quiet = quiet;
+	}
+
+	private static Xpp3Dom getDom(MojoExecution execution) {
+		Object config = execution.getPlugin().getConfiguration();
+		if (config == null) {
+			return null;
+		}
+		if (config instanceof Xpp3Dom xpp) {
+			return xpp;
+		}
+		try {
+			return Xpp3DomBuilder.build(new StringReader(String.valueOf(config)));
+		} catch (Exception e) {
+			throw new RuntimeException("can't get dom!", e);
+		}
 	}
 
 }

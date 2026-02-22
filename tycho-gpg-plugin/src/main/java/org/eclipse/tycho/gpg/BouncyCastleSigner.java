@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022 Eclipse contributors and others.
+ * Copyright (c) 2022, 2024 Eclipse contributors and others.
  *
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
@@ -26,12 +26,14 @@ import java.security.SecureRandom;
 import java.security.Security;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Iterator;
 
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.gpg.AbstractGpgSigner;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.CompressionAlgorithmTags;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
+import org.bouncycastle.bcpg.PublicKeyPacket;
 import org.bouncycastle.bcpg.SymmetricKeyAlgorithmTags;
 import org.bouncycastle.bcpg.sig.KeyFlags;
 import org.bouncycastle.crypto.generators.RSAKeyPairGenerator;
@@ -57,6 +59,7 @@ import org.bouncycastle.openpgp.operator.bc.BcPGPContentSignerBuilder;
 import org.bouncycastle.openpgp.operator.bc.BcPGPDigestCalculatorProvider;
 import org.bouncycastle.openpgp.operator.bc.BcPGPKeyPair;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentSignerBuilder;
+import org.bouncycastle.util.encoders.Hex;
 
 public class BouncyCastleSigner extends AbstractGpgSigner {
 
@@ -73,6 +76,8 @@ public class BouncyCastleSigner extends AbstractGpgSigner {
     private PGPSecretKey secretKey;
 
     private PGPPrivateKey privateKey;
+
+    public static final String NAME = "bc";
 
     /**
      * Create an empty instance that needs to be configured before it is used.
@@ -134,7 +139,8 @@ public class BouncyCastleSigner extends AbstractGpgSigner {
         var publicKey = secretKey.getPublicKey();
         var signatureGenerator = new PGPSignatureGenerator(
                 new JcaPGPContentSignerBuilder(publicKey.getAlgorithm(), HashAlgorithmTags.SHA256)
-                        .setProvider(BouncyCastleProvider.PROVIDER_NAME));
+                        .setProvider(BouncyCastleProvider.PROVIDER_NAME),
+                publicKey);
         signatureGenerator.init(PGPSignature.BINARY_DOCUMENT, privateKey);
         var subpackets = new PGPSignatureSubpacketGenerator();
         subpackets.setIssuerFingerprint(false, publicKey);
@@ -240,7 +246,8 @@ public class BouncyCastleSigner extends AbstractGpgSigner {
         var publicKeyRings = new ArrayList<PGPPublicKeyRing>();
         var secretKeyRings = new ArrayList<PGPSecretKeyRing>();
         for (var userID : userIDs) {
-            var signingKeyPair = new BcPGPKeyPair(PGPPublicKey.RSA_SIGN, keyPairGenerator.generateKeyPair(), now);
+            var signingKeyPair = new BcPGPKeyPair(PublicKeyPacket.VERSION_4, PGPPublicKey.RSA_GENERAL,
+                    keyPairGenerator.generateKeyPair(), now);
             var signatureSubpacketGenerator = new PGPSignatureSubpacketGenerator();
             signatureSubpacketGenerator.setKeyFlags(false, KeyFlags.SIGN_DATA | KeyFlags.CERTIFY_OTHER);
             signatureSubpacketGenerator.setPreferredSymmetricAlgorithms(false,
@@ -250,15 +257,17 @@ public class BouncyCastleSigner extends AbstractGpgSigner {
             signatureSubpacketGenerator.setPreferredCompressionAlgorithms(false,
                     new int[] { CompressionAlgorithmTags.ZIP, CompressionAlgorithmTags.BZIP2 });
 
-            var encryptionKeyPair = new BcPGPKeyPair(PGPPublicKey.RSA_ENCRYPT, keyPairGenerator.generateKeyPair(), now);
+            var encryptionKeyPair = new BcPGPKeyPair(PublicKeyPacket.VERSION_4, PGPPublicKey.RSA_GENERAL,
+                    keyPairGenerator.generateKeyPair(), now);
             var encryptionSubpacketGenerator = new PGPSignatureSubpacketGenerator();
             encryptionSubpacketGenerator.setKeyFlags(false, KeyFlags.ENCRYPT_COMMS | KeyFlags.ENCRYPT_STORAGE);
 
             var digestCalculator = new BcPGPDigestCalculatorProvider().get(HashAlgorithmTags.SHA1);
             var signatureSubpacketVector = signatureSubpacketGenerator.generate();
-            var contentSignerBuilder = new BcPGPContentSignerBuilder(PGPPublicKey.RSA_SIGN, HashAlgorithmTags.SHA256);
+            var contentSignerBuilder = new BcPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL,
+                    HashAlgorithmTags.SHA256);
             var secretKeyEncryptorBuilder = new BcPBESecretKeyEncryptorBuilder(SymmetricKeyAlgorithmTags.AES_256);
-            var keyRingGenerator = new PGPKeyRingGenerator(PGPPublicKey.RSA_SIGN, signingKeyPair, userID,
+            var keyRingGenerator = new PGPKeyRingGenerator(PGPPublicKey.RSA_GENERAL, signingKeyPair, userID,
                     digestCalculator, signatureSubpacketVector, null, contentSignerBuilder,
                     secretKeyEncryptorBuilder.build(passphrase.toCharArray()));
             keyRingGenerator.addSubKey(encryptionKeyPair, encryptionSubpacketGenerator.generate(), null);
@@ -267,16 +276,14 @@ public class BouncyCastleSigner extends AbstractGpgSigner {
         }
 
         var publicKeyOut = new ByteArrayOutputStream();
-        try (var targetStream = new ArmoredOutputStream(publicKeyOut)) {
-            targetStream.setHeader("Version", null);
+        try (var targetStream = ArmoredOutputStream.builder().setVersion(null).build(publicKeyOut)) {
             publicKeyRings.stream().map(it -> toHex(it.getPublicKey().getFingerprint()))
                     .forEach(it -> targetStream.addHeader("Key", it));
             new PGPPublicKeyRingCollection(publicKeyRings).encode(targetStream);
         }
 
         var secretKeyOut = new ByteArrayOutputStream();
-        try (var targetStream = new ArmoredOutputStream(secretKeyOut)) {
-            targetStream.setHeader("Version", null);
+        try (var targetStream = ArmoredOutputStream.builder().setVersion(null).build(secretKeyOut)) {
             new PGPSecretKeyRingCollection(secretKeyRings).encode(targetStream);
         }
 
@@ -350,5 +357,19 @@ public class BouncyCastleSigner extends AbstractGpgSigner {
             var target = Files.createTempFile("pgp", ".info");
             signer.generateSignature(target.toFile());
         }
+    }
+
+    @Override
+    public String signerName() {
+        return NAME;
+    }
+
+    @Override
+    public String getKeyInfo() {
+        Iterator<String> userIds = secretKey.getPublicKey().getUserIDs();
+        if (userIds.hasNext()) {
+            return userIds.next();
+        }
+        return Hex.toHexString(secretKey.getPublicKey().getFingerprint());
     }
 }

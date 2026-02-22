@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2012, 2022 Sonatype Inc. and others.
+ * Copyright (c) 2012, 2025 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -17,7 +17,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.AbstractMap.SimpleEntry;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,43 +25,53 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.Objects;
 
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.maven.model.Repository;
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
+import org.eclipse.equinox.p2.core.IProvisioningAgent;
 import org.eclipse.equinox.p2.core.ProvisionException;
 import org.eclipse.equinox.p2.metadata.IArtifactKey;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.metadata.Version;
+import org.eclipse.equinox.p2.query.CompoundQueryable;
 import org.eclipse.equinox.p2.query.IQueryResult;
 import org.eclipse.equinox.p2.query.IQueryable;
 import org.eclipse.equinox.p2.query.QueryUtil;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactRepository;
-import org.eclipse.tycho.MavenRepositoryLocation;
+import org.eclipse.equinox.p2.repository.artifact.IProcessingStepDescriptor;
+import org.eclipse.equinox.p2.repository.metadata.IMetadataRepository;
+import org.eclipse.tycho.helper.StatusTool;
 import org.eclipse.tycho.p2.metadata.IP2Artifact;
 import org.eclipse.tycho.p2.publisher.P2Artifact;
-import org.eclipse.tycho.p2maven.ListQueryable;
+import org.eclipse.tycho.p2maven.ListCompositeArtifactRepository;
 import org.eclipse.tycho.p2maven.repository.P2RepositoryManager;
-import org.eclipse.tycho.repository.util.StatusTool;
 
-@Component(role = BaselineService.class)
+@Named
+@Singleton
 public class BaselineServiceImpl implements BaselineService {
 
     private IProgressMonitor monitor = new NullProgressMonitor();
 
-    @Requirement
+    @Inject
     private P2RepositoryManager repositoryManager;
+    @Inject
+    private IProvisioningAgent agent;
 
-    @Requirement
+    @Inject
     private Logger logger;
 
     @Override
-    public Map<String, IP2Artifact> getProjectBaseline(Collection<MavenRepositoryLocation> baselineLocations,
+    public Map<String, IP2Artifact> getProjectBaseline(Collection<Repository> baselineRepositories,
             Map<String, IP2Artifact> reactor, File target) {
 
         // baseline repository may contain artifacts with the same id/version but different contents
@@ -69,38 +79,42 @@ public class BaselineServiceImpl implements BaselineService {
         // current local repository layout does not track per-repository artifacts and does not allow
         // multiple different artifacts with same id/version.
 
-        ListQueryable<IInstallableUnit> baselineUnits = new ListQueryable<>();
-        List<IArtifactRepository> baselineArtifacts = new ArrayList<>();
+        baselineRepositories = repositoryManager.normalizeRepositoryLocations(baselineRepositories);
 
-        for (MavenRepositoryLocation location : baselineLocations) {
+        List<IMetadataRepository> metadataRepositories = new ArrayList<>();
+        List<IArtifactRepository> artifactRepositories = new ArrayList<>();
+        for (Repository location : baselineRepositories) {
             try {
-                baselineUnits.add(repositoryManager.getMetadataRepositor(location));
-                baselineArtifacts.add(repositoryManager.getArtifactRepository(location));
-            } catch (ProvisionException e) {
+                metadataRepositories.add(repositoryManager.getMetadataRepository(location));
+                artifactRepositories.add(repositoryManager.getArtifactRepository(location));
+            } catch (ProvisionException | URISyntaxException e) {
                 // baseline repository may not exist yet
                 logger.warn(e.getMessage(), e);
             }
         }
+        IQueryable<IInstallableUnit> baselineUnits = metadataRepositories.size() == 1 ? metadataRepositories.getFirst()
+                : new CompoundQueryable<>(metadataRepositories);
+        IArtifactRepository baselineArtifacts = artifactRepositories.size() == 1 ? artifactRepositories.getFirst()
+                : new ListCompositeArtifactRepository(artifactRepositories, agent);
 
         Map<String, IP2Artifact> result = new LinkedHashMap<>();
 
         for (Map.Entry<String, IP2Artifact> reactorArtifact : reactor.entrySet()) {
-            IArtifactDescriptor descriptor = reactorArtifact.getValue().getArtifactDescriptor();
+            IP2Artifact value = reactorArtifact.getValue();
+            IArtifactDescriptor descriptor = value.getArtifactDescriptor();
 
-            Entry<IArtifactRepository, IArtifactDescriptor> baselineDescriptorEntry = getBaselineDescriptor(
-                    baselineArtifacts, descriptor);
-            if (baselineDescriptorEntry == null) {
+            IArtifactDescriptor baselineDescriptor = getBaselineDescriptor(baselineArtifacts, descriptor);
+            if (baselineDescriptor == null) {
                 continue;
             }
-            IArtifactDescriptor baselineDescriptor = baselineDescriptorEntry.getValue();
-            IArtifactKey baslineKey = baselineDescriptor.getArtifactKey();
+            IArtifactKey baselineKey = baselineDescriptor.getArtifactKey();
             String format = baselineDescriptor.getProperty(IArtifactDescriptor.FORMAT);
-            File baselineArtifact = new File(target, baslineKey.getClassifier() + "/" + baslineKey.getId() + "/"
-                    + baslineKey.getVersion() + (format != null ? "." + format : ""));
+            File baselineArtifact = new File(target, baselineKey.getClassifier() + "/" + baselineKey.getId() + "-"
+                    + baselineKey.getVersion() + (format != null ? "." + format : "") + getExtension(value));
 
             baselineArtifact.getParentFile().mkdirs();
             try (OutputStream os = new BufferedOutputStream(new FileOutputStream(baselineArtifact))) {
-                IStatus status = baselineDescriptorEntry.getKey().getRawArtifact(baselineDescriptor, os, monitor);
+                IStatus status = baselineArtifacts.getRawArtifact(baselineDescriptor, os, monitor);
                 if (status.matches(IStatus.ERROR | IStatus.CANCEL)) {
                     String repository = baselineDescriptor.getRepository().getLocation().toString();
                     String artifactId = baselineDescriptor.getArtifactKey().getId();
@@ -114,7 +128,7 @@ public class BaselineServiceImpl implements BaselineService {
             }
 
             List<IInstallableUnit> units = new ArrayList<>();
-            for (IInstallableUnit unit : reactorArtifact.getValue().getInstallableUnits()) {
+            for (IInstallableUnit unit : value.getInstallableUnits()) {
                 IInstallableUnit baselineUnit = getBaselineUnit(baselineUnits, unit.getId(), unit.getVersion());
                 if (baselineUnit != null) {
                     units.add(baselineUnit);
@@ -126,24 +140,24 @@ public class BaselineServiceImpl implements BaselineService {
         return !result.isEmpty() ? result : null;
     }
 
-    private Entry<IArtifactRepository, IArtifactDescriptor> getBaselineDescriptor(
-            List<IArtifactRepository> baselineArtifacts, IArtifactDescriptor descriptor) {
-
-        for (IArtifactRepository repository : baselineArtifacts) {
-            IArtifactDescriptor[] baselineDescriptors = repository.getArtifactDescriptors(descriptor.getArtifactKey());
-            for (IArtifactDescriptor baselineDescriptor : baselineDescriptors) {
-                if (eq(descriptor.getProperty(IArtifactDescriptor.FORMAT),
-                        baselineDescriptor.getProperty(IArtifactDescriptor.FORMAT))
-                        && Arrays.equals(descriptor.getProcessingSteps(), baselineDescriptor.getProcessingSteps())) {
-                    return new SimpleEntry<>(repository, baselineDescriptor);
-                }
+    private String getExtension(IP2Artifact value) {
+        File location = value.getLocation();
+        if (location != null) {
+            String extension = FilenameUtils.getExtension(location.getName());
+            if (!extension.isBlank()) {
+                return "." + extension;
             }
         }
-        return null;
+        return "";
     }
 
-    private static <T> boolean eq(T a, T b) {
-        return a != null ? a.equals(b) : b == null;
+    private IArtifactDescriptor getBaselineDescriptor(IArtifactRepository baseline, IArtifactDescriptor descriptor) {
+        String format = descriptor.getProperty(IArtifactDescriptor.FORMAT);
+        IProcessingStepDescriptor[] processingSteps = descriptor.getProcessingSteps();
+        return Arrays.stream(baseline.getArtifactDescriptors(descriptor.getArtifactKey()))
+                .filter(d -> Objects.equals(format, d.getProperty(IArtifactDescriptor.FORMAT)))
+                .filter(d -> Arrays.equals(processingSteps, d.getProcessingSteps())) //
+                .findFirst().orElse(null);
     }
 
     private IInstallableUnit getBaselineUnit(IQueryable<IInstallableUnit> units, String id, Version version) {
@@ -152,15 +166,11 @@ public class BaselineServiceImpl implements BaselineService {
         if (result.isEmpty()) {
             return null;
         }
-
         Iterator<IInstallableUnit> iterator = result.iterator();
-
         IInstallableUnit unit = iterator.next();
-
         if (iterator.hasNext()) {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("Unit not unique in the baseline: " + id + " - " + version);
         }
-
         return unit;
     }
 

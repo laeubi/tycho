@@ -14,11 +14,12 @@ package org.eclipse.tycho.versions;
 
 import java.io.IOException;
 
+import javax.inject.Inject;
+
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.eclipse.tycho.versions.engine.EclipseVersionUpdater;
@@ -35,17 +36,17 @@ public class UpdateEclipseMetadataMojo extends AbstractMojo {
     @Parameter(property = "session", readonly = true)
     private MavenSession session;
 
-    @Component
+    @Inject
     private ProjectMetadataReader pomReader;
 
-    @Component
+    @Inject
     private EclipseVersionUpdater metadataUpdater;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         synchronized (LOCK) {
             try {
-                pomReader.addBasedir(session.getCurrentProject().getBasedir());
+                pomReader.addBasedir(session.getCurrentProject().getBasedir(), true);
                 metadataUpdater.setProjects(pomReader.getProjects());
                 metadataUpdater.apply();
             } catch (IOException e) {

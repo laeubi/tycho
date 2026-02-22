@@ -12,26 +12,41 @@
  *******************************************************************************/
 package org.eclipse.tycho.buildversion;
 
+import java.time.Instant;
 import java.util.Date;
+import java.util.Optional;
 
+import javax.inject.Named;
+import javax.inject.Singleton;
+
+import org.apache.maven.archiver.MavenArchiver;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Component;
 import org.eclipse.tycho.build.BuildTimestampProvider;
 
 /**
- * Build timestamp provider that returns the same timestamp for all projects, the
- * ${maven.build.timestamp}.
+ * Build timestamp provider that returns the same timestamp for all projects. If
+ * the standard Maven property ${project.build.outputTimestamp} exists, its
+ * value is used for the timestamp. If it does not exist (or cannot be parsed),
+ * the ${maven.build.timestamp} timestamp is used instead.
  */
-@Component(role = BuildTimestampProvider.class, hint = DefaultBuildTimestampProvider.ROLE_HINT)
+@Singleton
+@Named(DefaultBuildTimestampProvider.ROLE_HINT)
 public class DefaultBuildTimestampProvider implements BuildTimestampProvider {
 
     static final String ROLE_HINT = "default";
 
     @Override
     public Date getTimestamp(MavenSession session, MavenProject project, MojoExecution execution) {
-        return session.getStartTime();
+		// Use the outputTimestamp property value if available for reproducible builds
+		final String outputTimestamp = (String) project.getProperties().get("project.build.outputTimestamp");
+		Optional<Instant> reproducibleTimestamp = MavenArchiver.parseBuildOutputTimestamp(outputTimestamp);
+		if (reproducibleTimestamp.isPresent()) {
+			return Date.from(reproducibleTimestamp.get());
+		} else {
+			return session.getStartTime();
+		}
     }
 
 	@Override

@@ -1,10 +1,22 @@
+/*******************************************************************************
+ * Copyright (c) 2022 Hannes Wellmann and others.
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *    Hannes Wellmann - initial API and implementation
+ *******************************************************************************/
 package org.eclipse.tycho.test.product;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
 
-import org.apache.maven.shared.verifier.Verifier;
+import org.apache.maven.it.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -58,15 +70,15 @@ public class ProductTypesTest extends AbstractTychoIntegrationTest {
 				.resolve(productId).toFile();
 
 		if (features.isEmpty()) {
-			assertDirectoryDoesNotExist(prodRoot, "*/*/*/features");
+			assertDirectoryDoesNotExist(prodRoot, "**/features");
 		} else {
 			for (String featureName : features) {
 				// features are unzipped -> directory
-				assertDirectoryExists(prodRoot, "*/*/*/features/" + featureName + "_*");
+				assertDirectoryExists(prodRoot, "**/features/" + featureName + "_*");
 			}
 		}
 		for (String bundleName : bundles) {
-			assertFileExists(prodRoot, "*/*/*/plugins/" + bundleName + "_*.jar");
+			assertFileExists(prodRoot, "**/plugins/" + bundleName + "_*.jar");
 		}
 	}
 }

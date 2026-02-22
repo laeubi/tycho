@@ -20,16 +20,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 
-import org.apache.maven.shared.verifier.Verifier;
+import org.apache.maven.it.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
-import org.eclipse.tycho.test.util.ResourceUtil.P2Repositories;
 import org.junit.Test;
 
 public class ProductMixedVersionsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMixedPluginVersions() throws Exception {
-		Verifier verifier = getVerifier("product.differentVersions", false);
-		verifier.addCliArgument("-Dplatform-url=" + P2Repositories.ECLIPSE_LATEST.toString());
+		Verifier verifier = getVerifier("product.differentVersions");
 		verifier.executeGoals(Arrays.asList("clean", "verify"));
 		verifier.verifyErrorFreeLog();
 		// check that simple configurator is there...

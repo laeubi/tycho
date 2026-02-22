@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.Stack;
 
@@ -27,7 +28,6 @@ import org.eclipse.tycho.ArtifactDescriptor;
 import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.DependencyArtifacts;
-import org.eclipse.tycho.PlatformPropertiesUtils;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.core.ArtifactDependencyVisitor;
@@ -38,7 +38,6 @@ import org.eclipse.tycho.model.FeatureRef;
 import org.eclipse.tycho.model.PluginRef;
 import org.eclipse.tycho.model.ProductConfiguration;
 import org.eclipse.tycho.model.ProductConfiguration.ProductType;
-import org.eclipse.tycho.model.UpdateSite;
 
 public abstract class AbstractArtifactDependencyWalker implements ArtifactDependencyWalker {
 
@@ -53,15 +52,6 @@ public abstract class AbstractArtifactDependencyWalker implements ArtifactDepend
     protected AbstractArtifactDependencyWalker(DependencyArtifacts artifacts, TargetEnvironment[] environments) {
         this.artifacts = artifacts;
         this.environments = environments;
-    }
-
-    @Override
-    public void traverseUpdateSite(UpdateSite site, ArtifactDependencyVisitor visitor) {
-        WalkbackPath visited = new WalkbackPath();
-
-        for (FeatureRef ref : site.getFeatures()) {
-            traverseFeature(ref, visitor, visited);
-        }
     }
 
     @Override
@@ -99,20 +89,15 @@ public abstract class AbstractArtifactDependencyWalker implements ArtifactDepend
     }
 
     protected ArtifactDescriptor getArtifact(File location, String id) {
-        Map<String, ArtifactDescriptor> artifacts = this.artifacts.getArtifact(location);
-        if (artifacts != null) {
-            for (ArtifactDescriptor artifact : artifacts.values()) {
-                if (id.equals(artifact.getKey().getId())) {
+        for (ArtifactDescriptor artifact : this.artifacts.getArtifacts()) {
+            if (id.equals(artifact.getKey().getId())) {
+                File other = getLocation(artifact);
+                if (Objects.equals(location, other)) {
                     return artifact;
                 }
             }
         }
         return null;
-    }
-
-    @Override
-    public void traverseProduct(ProductConfiguration product, ArtifactDependencyVisitor visitor) {
-        traverseProduct(product, visitor, new WalkbackPath());
     }
 
     protected void traverseProduct(ProductConfiguration product, ArtifactDependencyVisitor visitor,
@@ -136,36 +121,6 @@ public abstract class AbstractArtifactDependencyWalker implements ArtifactDepend
                 bundles.add(key.getId());
             }
         }
-
-        if (environments != null && product.includeLaunchers()) {
-            for (TargetEnvironment environment : environments) {
-                String os = environment.getOs();
-                String ws = environment.getWs();
-                String arch = environment.getArch();
-
-                String id;
-
-                // for Mac OS X there is no org.eclipse.equinox.launcher.carbon.macosx.x86 or org.eclipse.equinox.launcher.carbon.macosx.ppc folder,
-                // only a org.eclipse.equinox.launcher.carbon.macosx folder.
-                // see https://jira.codehaus.org/browse/MNGECLIPSE-1075
-                if (PlatformPropertiesUtils.OS_MACOSX.equals(os) && (PlatformPropertiesUtils.ARCH_X86.equals(arch)
-                        || PlatformPropertiesUtils.ARCH_PPC.equals(arch))) {
-                    id = "org.eclipse.equinox.launcher." + ws + "." + os;
-                } else {
-                    id = "org.eclipse.equinox.launcher." + ws + "." + os + "." + arch;
-                }
-
-                if (!bundles.contains(id)) {
-                    PluginRef ref = new PluginRef("plugin");
-                    ref.setId(id);
-                    ref.setOs(os);
-                    ref.setWs(ws);
-                    ref.setArch(arch);
-                    ref.setUnpack(true);
-                    traversePlugin(ref, visitor, visited);
-                }
-            }
-        }
     }
 
     protected void traverseFeature(FeatureRef ref, ArtifactDependencyVisitor visitor, WalkbackPath visited) {
@@ -179,8 +134,7 @@ public abstract class AbstractArtifactDependencyWalker implements ArtifactDepend
 
             visited.enter(artifact);
             try {
-                File location = artifact.getLocation(true);
-
+                File location = getLocation(artifact);
                 Feature feature = Feature.loadFeature(location);
                 traverseFeature(location, feature, ref, visitor, visited);
             } finally {
@@ -188,6 +142,15 @@ public abstract class AbstractArtifactDependencyWalker implements ArtifactDepend
             }
         } else {
             visitor.missingFeature(ref, visited.getWalkback());
+        }
+    }
+
+    private File getLocation(ArtifactDescriptor artifact) {
+        ReactorProject mavenProject = artifact.getMavenProject();
+        if (mavenProject != null) {
+            return mavenProject.getBasedir();
+        } else {
+            return artifact.getLocation(true);
         }
     }
 
@@ -205,7 +168,7 @@ public abstract class AbstractArtifactDependencyWalker implements ArtifactDepend
                 return;
             }
 
-            File location = artifact.getLocation(true);
+            File location = getLocation(artifact);
             ReactorProject project = artifact.getMavenProject();
             String classifier = artifact.getClassifier();
             Collection<IInstallableUnit> installableUnits = artifact.getInstallableUnits();

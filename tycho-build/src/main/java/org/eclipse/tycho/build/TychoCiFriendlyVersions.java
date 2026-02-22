@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022 Christoph Läubrich and others.
+ * Copyright (c) 2022, 2023 Christoph Läubrich and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -20,11 +20,15 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.annotation.Priority;
+//import javax.annotation.Priority;
 import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Provider;
+import javax.inject.Singleton;
 
 import org.apache.maven.execution.DefaultMavenExecutionRequest;
 import org.apache.maven.execution.DefaultMavenExecutionResult;
@@ -36,90 +40,109 @@ import org.apache.maven.model.building.ModelBuildingRequest;
 import org.apache.maven.model.interpolation.DefaultModelVersionProcessor;
 import org.apache.maven.model.interpolation.ModelVersionProcessor;
 import org.apache.maven.model.io.DefaultModelReader;
-import org.apache.maven.plugin.LegacySupport;
 import org.apache.maven.plugin.MojoExecution;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.PlexusContainer;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.xml.Xpp3DomBuilder;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import org.eclipse.sisu.Priority;
+import org.eclipse.tycho.TychoConstants;
 
-@Priority(100)
-@Component(role = ModelVersionProcessor.class)
-public class TychoCiFriendlyVersions extends DefaultModelVersionProcessor implements ModelVersionProcessor {
+@Singleton
+@Named("default")
+@Priority(10)
+public class TychoCiFriendlyVersions implements ModelVersionProcessor {
+
+	static final String PROPERTY_FORCE_QUALIFIER = "forceContextQualifier";
+
+	static final String PROPERTY_BUILDQUALIFIER_FORMAT = "tycho.buildqualifier.format";
 
 	static final String BUILD_QUALIFIER = "qualifier";
+
 	static final String MICRO_VERSION = "micro";
 	static final String MINOR_VERSION = "minor";
 	static final String MAJOR_VERSION = "major";
 	static final String RELEASE_VERSION = "releaseVersion";
-	private PlexusContainer container;
+
+	private static final Set<String> SIMPLE_PROPERTIES = Set.of(RELEASE_VERSION, MAJOR_VERSION, MINOR_VERSION,
+			MICRO_VERSION);
 	private Logger logger;
 	private Map<File, MavenProject> rawProjectCache = new ConcurrentHashMap<>();
 
 	@Inject
-	public TychoCiFriendlyVersions(PlexusContainer plexusContainer, Logger logger) {
-		this.container = plexusContainer;
+	private DefaultModelReader defaultModelReader;
+
+	@Inject
+	private DefaultModelVersionProcessor defaultModelVersionProcessor;
+
+	@Inject
+	private Map<String, BuildTimestampProvider> buildTimestampProviders;
+
+	@Inject
+	private Provider<MavenSession> mavenSessionProvider;
+
+	@Inject
+	public TychoCiFriendlyVersions(Logger logger) {
 		this.logger = logger;
 
 	}
 
 	@Override
 	public boolean isValidProperty(String property) {
-		return super.isValidProperty(property) || MAJOR_VERSION.equals(property) || MINOR_VERSION.equals(property)
-				|| MICRO_VERSION.equals(property) || BUILD_QUALIFIER.equals(property)
-				|| RELEASE_VERSION.equals(property);
+		return defaultModelVersionProcessor.isValidProperty(property) || SIMPLE_PROPERTIES.contains(property)
+				|| BUILD_QUALIFIER.equals(property);
 	}
 
 	@Override
 	public void overwriteModelProperties(Properties modelProperties, ModelBuildingRequest request) {
-		super.overwriteModelProperties(modelProperties, request);
-		if (request.getSystemProperties().containsKey(MAJOR_VERSION)) {
-			modelProperties.put(MAJOR_VERSION, request.getSystemProperties().get(MAJOR_VERSION));
-		}
-		if (request.getSystemProperties().containsKey(MINOR_VERSION)) {
-			modelProperties.put(MINOR_VERSION, request.getSystemProperties().get(MINOR_VERSION));
-		}
-		if (request.getSystemProperties().containsKey(MICRO_VERSION)) {
-			modelProperties.put(MICRO_VERSION, request.getSystemProperties().get(MICRO_VERSION));
+		defaultModelVersionProcessor.overwriteModelProperties(modelProperties, request);
+		for (String property : SIMPLE_PROPERTIES) {
+			if (request.getSystemProperties().containsKey(property)) {
+				modelProperties.put(property, request.getSystemProperties().get(property));
+			}
 		}
 		if (request.getSystemProperties().containsKey(BUILD_QUALIFIER)) {
 			modelProperties.put(BUILD_QUALIFIER, request.getSystemProperties().get(BUILD_QUALIFIER));
 		} else {
-			String formatString = request.getSystemProperties().getProperty("tycho.buildqualifier.format");
-			if (formatString != null) {
-				Date startTime = request.getBuildStartTime();
-				File pomFile = request.getPomFile();
-				if (startTime != null && pomFile != null) {
-					String provider = request.getSystemProperties().getProperty("tycho.buildqualifier.provider",
-							"default");
-					try {
-						BuildTimestampProvider timestampProvider = container.lookup(BuildTimestampProvider.class,
-								provider);
-						SimpleDateFormat format = new SimpleDateFormat(formatString);
-						format.setTimeZone(TimeZone.getTimeZone("UTC"));
-						MavenProject mavenProject = getMavenProject(pomFile);
-						timestampProvider.setQuiet(true);
+			String forceContextQualifier = request.getSystemProperties().getProperty(PROPERTY_FORCE_QUALIFIER);
+			if (forceContextQualifier != null) {
+				modelProperties.put(BUILD_QUALIFIER,
+						TychoConstants.QUALIFIER_NONE.equals(forceContextQualifier) ? "" : "." + forceContextQualifier);
+			} else {
+				String formatString = request.getSystemProperties().getProperty(PROPERTY_BUILDQUALIFIER_FORMAT);
+				if (formatString != null) {
+					Date startTime = request.getBuildStartTime();
+					File pomFile = request.getPomFile();
+					if (startTime != null && pomFile != null) {
+						String provider = request.getSystemProperties().getProperty("tycho.buildqualifier.provider",
+								"default");
 						try {
-							Date timestamp = timestampProvider.getTimestamp(getMavenSession(request), mavenProject,
-									getExecution(mavenProject));
-							String qualifier = format.format(timestamp);
-							modelProperties.put(BUILD_QUALIFIER, "." + qualifier);
-						} finally {
-							timestampProvider.setQuiet(false);
+							BuildTimestampProvider timestampProvider = buildTimestampProviders.get(provider);
+							if (timestampProvider == null) {
+								throw new MojoExecutionException("Can't find timestamp provider " + provider);
+							}
+							SimpleDateFormat format = new SimpleDateFormat(formatString);
+							format.setTimeZone(TimeZone.getTimeZone("UTC"));
+							MavenProject mavenProject = getMavenProject(pomFile);
+							timestampProvider.setQuiet(true);
+							try {
+								Date timestamp = timestampProvider.getTimestamp(getMavenSession(request), mavenProject,
+										getExecution(mavenProject));
+								String qualifier = format.format(timestamp);
+								modelProperties.put(BUILD_QUALIFIER, "." + qualifier);
+							} finally {
+								timestampProvider.setQuiet(false);
+							}
+						} catch (MojoExecutionException e) {
+							logger.warn("Cannot use '" + provider
+									+ "' as a timestamp provider for tycho-ci-friendly-versions (" + e + ")");
 						}
-					} catch (ComponentLookupException | MojoExecutionException e) {
-						logger.warn("Cannot use '" + provider
-								+ "' as a timestamp provider for tycho-ci-friendly-versions (" + e + ")");
-					}
 
+					}
 				}
 			}
 		}
-
 	}
 
 	private MojoExecution getExecution(MavenProject mavenProject) {
@@ -131,9 +154,8 @@ public class TychoCiFriendlyVersions extends DefaultModelVersionProcessor implem
 			projectPlugin.setGroupId("org.eclipse.tycho");
 			projectPlugin.setArtifactId("tycho-packaging-plugin");
 			try {
-			projectPlugin.setConfiguration(
-					Xpp3DomBuilder.build(new StringReader(
-							"<configuration><jgit.dirtyWorkingTree>ignore</jgit.dirtyWorkingTree></configuration>")));
+				projectPlugin.setConfiguration(Xpp3DomBuilder.build(new StringReader(
+						"<configuration><jgit.dirtyWorkingTree>ignore</jgit.dirtyWorkingTree></configuration>")));
 			} catch (XmlPullParserException | IOException e) {
 				projectPlugin.setConfiguration(null);
 			}
@@ -157,9 +179,8 @@ public class TychoCiFriendlyVersions extends DefaultModelVersionProcessor implem
 		MavenProject project = rawProjectCache.computeIfAbsent(pom, file -> {
 			// at this phase there are no projects, thats all we can offer for now...
 			MavenProject mavenProject = new MavenProject();
-			DefaultModelReader modelReader = new DefaultModelReader();
 			try {
-				mavenProject.setModel(modelReader.read(pom, Map.of()));
+				mavenProject.setModel(defaultModelReader.read(pom, Map.of()));
 			} catch (IOException e) {
 				// nothing to do here then...
 			}
@@ -180,23 +201,18 @@ public class TychoCiFriendlyVersions extends DefaultModelVersionProcessor implem
 
 	}
 
+	@SuppressWarnings("deprecation")
 	private MavenSession getMavenSession(ModelBuildingRequest request) {
-		try {
-			LegacySupport legacySupport = container.lookup(LegacySupport.class);
-			MavenSession session = legacySupport.getSession();
-			if (session != null) {
-				return session;
-			}
-		} catch (ComponentLookupException e) {
-			// fall through
+		MavenSession session = mavenSessionProvider.get();
+		if (session != null) {
+			return session;
 		}
 		// create a dummy session... actually time providers are not really interested
 		// in *all* but very limited details
 		DefaultMavenExecutionRequest executionRequest = new DefaultMavenExecutionRequest();
 		executionRequest.setBaseDirectory(request.getPomFile().getParentFile());
 		executionRequest.setStartTime(request.getBuildStartTime());
-		return new MavenSession(container, executionRequest, new DefaultMavenExecutionResult(),
-				Collections.emptyList());
+		return new MavenSession(null, executionRequest, new DefaultMavenExecutionResult(), Collections.emptyList());
 	}
 
 }

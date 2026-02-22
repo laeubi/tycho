@@ -42,7 +42,7 @@ public class ProxySignerWithPublicKeyAccess extends AbstractGpgSigner {
         this.delegate = delegate;
         this.setLog(delegate.getLog());
         // The pgpInfo is used only for testing purposes.
-        if ("bc".equals(signer) || pgpInfo != null || secretKeys != null) {
+        if (BouncyCastleSigner.NAME.equals(signer) || pgpInfo != null || secretKeys != null) {
             try {
                 this.signer = getSigner(pgpInfo, secretKeys);
             } catch (MojoExecutionException | MojoFailureException | IOException | PGPException e) {
@@ -179,8 +179,8 @@ public class ProxySignerWithPublicKeyAccess extends AbstractGpgSigner {
                         cmd.createArg().setValue("--secret-keyring");
                         cmd.createArg().setValue(delegate.secretKeyring);
                     } else {
-                        getLog().warn("'secretKeyring' is an obsolete option and ignored. All secret keys "
-                                + "are stored in the ‘private-keys-v1.d’ directory below the GnuPG home directory.");
+                        getLog().warn("'secretKeyring' is an obsolete option and is ignored. All secret keys "
+                                + "are stored in the 'private-keys-v1.d' directory below the GnuPG home directory");
                     }
                 }
             }
@@ -215,5 +215,15 @@ public class ProxySignerWithPublicKeyAccess extends AbstractGpgSigner {
         } catch (CommandLineException e) {
             throw new MojoExecutionException("Unable to execute gpg command", e);
         }
+    }
+
+    @Override
+    public String signerName() {
+        return signer.signerName();
+    }
+
+    @Override
+    public String getKeyInfo() {
+        return signer.getKeyInfo();
     }
 }

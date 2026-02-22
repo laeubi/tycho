@@ -13,46 +13,37 @@
 
 package org.eclipse.tycho.surefire.provider.impl;
 
-import static java.util.Collections.singletonList;
-import static org.eclipse.tycho.surefire.provider.impl.ProviderHelper.newDependency;
+import static org.eclipse.tycho.surefire.provider.impl.DefaultProviderHelper.newDependency;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Properties;
+
+import javax.inject.Named;
 
 import org.apache.maven.model.Dependency;
-import org.codehaus.plexus.component.annotations.Component;
-import org.eclipse.tycho.surefire.provider.spi.TestFrameworkProvider;
-import org.osgi.framework.Version;
+import org.apache.maven.project.MavenProject;
+import org.eclipse.tycho.ClasspathEntry;
 import org.osgi.framework.VersionRange;
 
-@Component(role = TestFrameworkProvider.class, hint = "junit5")
-public class JUnit5Provider extends AbstractJUnitProvider {
+@Named("junit5")
+public class JUnit5Provider extends AbstractJUnit5Provider {
 
-    private static final Version VERSION = Version.parseVersion("5.0.0");
+    private static final VersionRange JUNIT5_VERSION_RANGE = new VersionRange("[5,6)");
 
     @Override
-    protected Set<String> getJUnitBundleNames() {
-        return Set.of("org.junit.jupiter.api" /* legacy Orbit bundle */, "junit-jupiter-api");
+    public List<Dependency> getRequiredArtifacts() {
+        return List.of(newDependency("org.eclipse.tycho.surefire.junit5"));
     }
 
     @Override
-    public String getSurefireProviderClassName() {
-        return "org.apache.maven.surefire.junitplatform.JUnitPlatformProvider";
+    public boolean isEnabled(MavenProject project, List<ClasspathEntry> testBundleClassPath,
+            Properties surefireProperties) {
+        return isJUnit5(project, testBundleClassPath, JUNIT5_VERSION_RANGE)
+                && !JUnit4Provider.isJUnit4(project, testBundleClassPath);
     }
 
     @Override
-    public Version getVersion() {
-        return VERSION;
+    public VersionRange getVersionRange() {
+        return JUNIT5_VERSION_RANGE;
     }
-
-    @Override
-    public List<Dependency> getRequiredBundles() {
-        return singletonList(newDependency("org.eclipse.tycho", "org.eclipse.tycho.surefire.junit5"));
-    }
-
-    @Override
-    protected VersionRange getJUnitVersionRange() {
-        return new VersionRange("[5,5.4)");
-    }
-
 }

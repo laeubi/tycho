@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2015 Rapicorp, Inc. and others.
+ * Copyright (c) 2015, 2024 Rapicorp, Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -14,21 +14,26 @@ package org.eclipse.tycho.packaging;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.attribute.FileTime;
 
+import org.apache.maven.archiver.MavenArchiver;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Mojo;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Parameter;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import javax.inject.Inject;
 import org.codehaus.plexus.archiver.Archiver;
 import org.codehaus.plexus.archiver.ArchiverException;
 import org.codehaus.plexus.archiver.util.DefaultFileSet;
 import org.codehaus.plexus.archiver.zip.ZipArchiver;
 import org.eclipse.tycho.TargetPlatform;
+import org.eclipse.tycho.core.TychoProjectManager;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.model.IU;
 
 /**
@@ -50,14 +55,36 @@ public class PackageIUMojo extends AbstractTychoPackagingMojo {
     @Parameter(property = "project.basedir", required = true, readonly = true)
     private File basedir;
 
-    @Component
+    /**
+     * Timestamp for reproducible output archive entries, either formatted as ISO
+     * 8601 extended offset date-time (e.g. in UTC such as '2011-12-03T10:15:30Z' or
+     * with an offset '2019-10-05T20:37:42+06:00'), or as an int representing
+     * seconds since the epoch (like <a href=
+     * "https://reproducible-builds.org/docs/source-date-epoch/">SOURCE_DATE_EPOCH</a>).
+     */
+    @Parameter(defaultValue = "${project.build.outputTimestamp}")
+    private String outputTimestamp;
+
+    @Inject
     private IUXmlTransformer iuTransformer;
 
-    @Component(role = Archiver.class, hint = "zip")
+    	@Inject
     private ZipArchiver zipArchiver;
+
+	@Inject
+	private TychoProjectManager projectManager;
 
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
+        if (skip) {
+            getLog().info("Skip packaging");
+            return;
+        }
+
+        // configure for Reproducible Builds based on outputTimestamp value
+        MavenArchiver.parseBuildOutputTimestamp(outputTimestamp).map(FileTime::from)
+            .ifPresent(modifiedTime -> zipArchiver.configureReproducibleBuild(modifiedTime));
+
         synchronized (LOCK) {
             outputDirectory.mkdirs();
 
@@ -101,8 +128,7 @@ public class PackageIUMojo extends AbstractTychoPackagingMojo {
         iuTransformer.replaceQualifierInCapabilities(iu.getProvidedCapabilites(),
                 DefaultReactorProject.adapt(project).getBuildQualifier());
 
-        TargetPlatform targetPlatform = TychoProjectUtils
-                .getTargetPlatformIfAvailable(DefaultReactorProject.adapt(project));
+		TargetPlatform targetPlatform = projectManager.getTargetPlatform(project).orElse(null);
         if (targetPlatform == null) {
             getLog().warn(
                     "Skipping version reference expansion in p2iu project using the deprecated -Dtycho.targetPlatform configuration");

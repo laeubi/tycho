@@ -16,8 +16,13 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 
-import org.codehaus.plexus.component.annotations.Component;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.project.MavenProject;
 import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.PackagingType;
@@ -33,7 +38,8 @@ import org.eclipse.tycho.model.ProductConfiguration;
 /**
  * An eclipse repository project produces a p2 repository where a set of products are published.
  */
-@Component(role = TychoProject.class, hint = PackagingType.TYPE_ECLIPSE_REPOSITORY)
+@Named(PackagingType.TYPE_ECLIPSE_REPOSITORY)
+@Singleton
 public class EclipseRepositoryProject extends AbstractArtifactBasedProject {
 
     /**
@@ -70,10 +76,22 @@ public class EclipseRepositoryProject extends AbstractArtifactBasedProject {
         };
     }
 
+    @Override
+    public void setupProject(MavenSession session, MavenProject project) {
+        super.setupProject(session, project);
+        //This is a hack for install plugin that requires a "main" artifact and otherwise fails
+        //but a repository project may only attaches additional artifacts, e.g updatesite / products 
+        Properties properties = project.getProperties();
+        if (properties.getProperty("allowIncompleteProjects") == null) {
+            properties.setProperty("allowIncompleteProjects", "true");
+        }
+    }
+
     /**
      * Parses the category configuration files
      *
-     * @param project the project containing the category files
+     * @param project
+     *            the project containing the category files
      * @return the parsed category configurations
      */
     public List<Category> loadCategories(final ReactorProject project) {
@@ -83,7 +101,8 @@ public class EclipseRepositoryProject extends AbstractArtifactBasedProject {
     /**
      * Parses the category configuration files
      *
-     * @param categoriesDirectory the directory where the category files are stored
+     * @param categoriesDirectory
+     *            the directory where the category files are stored
      * @return the parsed category configurations
      */
     public List<Category> loadCategories(final File categoriesDirectory) {
@@ -106,7 +125,7 @@ public class EclipseRepositoryProject extends AbstractArtifactBasedProject {
      * @param project
      * @return
      */
-    protected List<ProductConfiguration> loadProducts(final ReactorProject project) {
+    public static List<ProductConfiguration> loadProducts(final ReactorProject project) {
         List<ProductConfiguration> products = new ArrayList<>();
         for (File file : getProductFiles(project)) {
             try {
@@ -130,13 +149,14 @@ public class EclipseRepositoryProject extends AbstractArtifactBasedProject {
     }
 
     /**
-     * Looks for all files at the base of the project that extension is ".product"
-     * Duplicated in the P2GeneratorImpl
+     * Looks for all files at the base of the project that extension is ".product" Duplicated in the
+     * P2GeneratorImpl
      *
-     * @param project the project containing the product files
+     * @param project
+     *            the project containing the product files
      * @return The list of product files to parse for an eclipse-repository project
      */
-    public List<File> getProductFiles(final ReactorProject project) {
+    public static List<File> getProductFiles(final ReactorProject project) {
         final File projectLocation = project.getBasedir();
         return getProductFiles(projectLocation);
     }
@@ -144,10 +164,11 @@ public class EclipseRepositoryProject extends AbstractArtifactBasedProject {
     /**
      * Looks for all files with the extension ".product" under a specific directory.
      *
-     * @param basedir the directory containing the product files
+     * @param basedir
+     *            the directory containing the product files
      * @return The list of product files to parse for an eclipse-repository project
      */
-    public List<File> getProductFiles(final File basedir) {
+    public static List<File> getProductFiles(final File basedir) {
         final List<File> files = new ArrayList<>();
 
         // noinspection ConstantConditions

@@ -13,22 +13,23 @@
 package org.eclipse.tycho.surefire;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import javax.inject.Inject;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugin.failsafe.util.FailsafeSummaryXmlUtils;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -46,19 +47,21 @@ import org.eclipse.tycho.DependencyResolutionException;
 import org.eclipse.tycho.IllegalArtifactReferenceException;
 import org.eclipse.tycho.MavenArtifactKey;
 import org.eclipse.tycho.PackagingType;
+import org.eclipse.tycho.ReproducibleUtils;
 import org.eclipse.tycho.ResolvedArtifactKey;
 import org.eclipse.tycho.TargetPlatform;
 import org.eclipse.tycho.TychoConstants;
-import org.eclipse.tycho.core.dotClasspath.JUnitClasspathContainerEntry;
 import org.eclipse.tycho.core.osgitools.BundleReader;
+import org.eclipse.tycho.core.osgitools.ClasspathReader;
 import org.eclipse.tycho.core.osgitools.MavenBundleResolver;
 import org.eclipse.tycho.core.osgitools.OsgiManifest;
 import org.eclipse.tycho.core.osgitools.OsgiManifestParserException;
 import org.eclipse.tycho.core.resolver.shared.PomDependencies;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
-import org.eclipse.tycho.core.utils.TychoVersion;
+import org.eclipse.tycho.model.classpath.JUnitBundle;
+import org.eclipse.tycho.model.classpath.JUnitClasspathContainerEntry;
 import org.eclipse.tycho.surefire.bnd.ArtifactKeyRepository;
 import org.eclipse.tycho.surefire.bnd.TargetPlatformRepository;
+import org.eclipse.tycho.version.TychoVersion;
 import org.osgi.resource.Requirement;
 import org.osgi.service.resolver.ResolutionException;
 
@@ -146,7 +149,7 @@ public class BndTestMojo extends AbstractTestMojo {
 
     /**
      * Configure the tester to use usually one of
-     * 
+     *
      * <ul>
      * <li>{@value #TESTER_DEFAULT}</li>
      * <li>{@value #TESTER_JUNIT_PLATFORM}</li>
@@ -165,7 +168,7 @@ public class BndTestMojo extends AbstractTestMojo {
 
     /**
      * Configure the run framework to use usually one of
-     * 
+     *
      * <ul>
      * <li>{@value #FW_FELIX}</li>
      * <li>{@value #FW_EQUINOX}</li>
@@ -184,28 +187,28 @@ public class BndTestMojo extends AbstractTestMojo {
      * <li>{@value #ENGINE_VINTAGE_ENGINE} - if your test only contains JUnit 3/4</li>
      * <li>{@value #ENGINES_DEFAULT} - if you want to use both engines</li>
      * </ul>
-     * 
+     *
      */
     @Parameter(defaultValue = ENGINES_DEFAULT, required = true)
     private String testEngines;
 
-    @Component
+    @Inject
     private BundleReader bundleReader;
 
-    @Component
+    @Inject
     private ProjectDependenciesResolver resolver;
 
-    @Component
+    @Inject
     @SuppressWarnings("deprecation")
     private org.apache.maven.artifact.factory.ArtifactFactory artifactFactory;
 
     @Parameter(defaultValue = "${repositorySystemSession}", readonly = true, required = true)
     private RepositorySystemSession repositorySession;
 
-    @Component
+    @Inject
     private RepositorySystem repositorySystem;
 
-    @Component
+    @Inject
     private MavenBundleResolver mavenBundleResolver;
 
     @Override
@@ -228,9 +231,7 @@ public class BndTestMojo extends AbstractTestMojo {
         properties.setProperty(Constants.RUNFW, runfw);
         properties.setProperty(Constants.RUNPROPERTIES, buildRunProperties());
         try {
-            try (FileOutputStream out = new FileOutputStream(runfile)) {
-                properties.store(out, null);
-            }
+            ReproducibleUtils.storeProperties(properties, runfile.toPath());
             String javaExecutable = getJavaExecutable();
             int returncode = container.execute(runfile, "testing", work, (file, bndrun, run) -> {
                 if (new File(javaExecutable).isFile()) {
@@ -241,7 +242,10 @@ public class BndTestMojo extends AbstractTestMojo {
                 for (RepositoryPlugin rp : workspace.getRepositories()) {
                     workspace.removeBasicPlugin(rp);
                 }
-                workspace.addBasicPlugin(new TargetPlatformRepository(getReactorProject()));
+                projectManager.getTargetPlatform(project).ifPresent(tp -> {
+                    workspace.addBasicPlugin(new TargetPlatformRepository(getReactorProject(), tp));
+                });
+
                 if (scanResult instanceof BundleScanResult bundleScanResult) {
                     workspace.addBasicPlugin(new ArtifactKeyRepository(bundleScanResult.pomBundles, "pom-dependencies",
                             project.getFile()));
@@ -249,9 +253,8 @@ public class BndTestMojo extends AbstractTestMojo {
                 workspace.addBasicPlugin(new ArtifactKeyRepository(implicitBundles, "implicit-project-dependencies",
                         project.getBasedir()));
                 workspace.refresh(); // required to clear cached plugins...
-                run.addProperties(Map.of("tycho.test", "property"));
                 try {
-                    getLog().info("Resolve test-container...");
+                    getLog().info("Resolving test-container");
                     if (printBundles) {
                         if (TESTER_JUNIT_PLATFORM.equals(tester)) {
                             for (String engine : Strings.split(testEngines)) {
@@ -303,7 +306,7 @@ public class BndTestMojo extends AbstractTestMojo {
                     run.getErrors().forEach(getLog()::error);
                     return ERROR_PREPARE_CONTAINER;
                 }
-                getLog().info("Running " + numberOfTests + " test(s)...");
+                getLog().info("Running " + numberOfTests + " test(s)");
                 int errors = tester.test();
                 //TODO currently we can't get the real run statistic see https://github.com/bndtools/bnd/issues/5513
                 FailsafeSummaryXmlUtils.writeSummary(new RunResult(numberOfTests, 0, errors, 0), summaryFile,
@@ -317,6 +320,12 @@ public class BndTestMojo extends AbstractTestMojo {
                 throw new MojoExecutionException("resolve bundles failed!");
             }
         } catch (Exception e) {
+            if (e instanceof MojoExecutionException mee) {
+                throw mee;
+            }
+            if (e instanceof MojoFailureException mfe) {
+                throw mfe;
+            }
             throw new MojoExecutionException("executing test container failed!", e);
         }
 
@@ -340,10 +349,16 @@ public class BndTestMojo extends AbstractTestMojo {
             }
         }
         if (properties != null) {
-            runProperties.putAll(properties);
+            for (Entry<String, String> entry : properties.entrySet()) {
+                runProperties.put(entry.getKey(), quotedValue(entry.getValue()));
+            }
         }
         return runProperties.entrySet().stream().map(e -> e.getKey() + "=" + e.getValue())
                 .collect(Collectors.joining(","));
+    }
+
+    private String quotedValue(String value) {
+        return "'" + value.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ') + "'";
     }
 
     private void addTestFramework(List<ResolvedArtifactKey> bundles, List<String> runrequire) {
@@ -352,9 +367,10 @@ public class BndTestMojo extends AbstractTestMojo {
             for (String engine : Strings.split(testEngines)) {
                 runrequire.add("bnd.identity; id=" + engine);
             }
-            for (MavenArtifactKey key : JUnitClasspathContainerEntry.JUNIT5_PLUGINS) {
-                mavenBundleResolver.resolveMavenBundle(project, session, key).ifPresentOrElse(bundles::add,
-                        () -> getLog().warn("Can't get junit artifact " + key + " test run might not resolve!"));
+            for (JUnitBundle key : JUnitClasspathContainerEntry.JUNIT5_PLUGINS) {
+                mavenBundleResolver.resolveMavenBundle(project, session, ClasspathReader.toMaven(key)).ifPresentOrElse(
+                        bundles::add,
+                        () -> getLog().warn("Cannot get JUnit artifact " + key + ". Test run might not resolve"));
             }
             if (printTests || trace) {
                 //TODO currently we need to add an extra listener see https://github.com/bndtools/bnd/issues/5507
@@ -366,13 +382,14 @@ public class BndTestMojo extends AbstractTestMojo {
                             bundles.add(t);
                             runrequire.add("bnd.identity; id=org.eclipse.tycho.bnd.executionlistener");
                         }, () -> {
-                            getLog().debug("Can't resolve execution listener, output will be missing!");
+                            getLog().debug("Cannot resolve execution listener, output will be missing");
                         });
             }
         } else if (TESTER_DEFAULT.equals(tester)) {
-            for (MavenArtifactKey key : JUnitClasspathContainerEntry.JUNIT4_PLUGINS) {
-                mavenBundleResolver.resolveMavenBundle(project, session, key).ifPresentOrElse(bundles::add,
-                        () -> getLog().warn("Can't get junit artifact " + key + " test run might not resolve!"));
+            for (JUnitBundle key : JUnitClasspathContainerEntry.JUNIT4_PLUGINS) {
+                mavenBundleResolver.resolveMavenBundle(project, session, ClasspathReader.toMaven(key)).ifPresentOrElse(
+                        bundles::add,
+                        () -> getLog().warn("Cannot get JUnit artifact " + key + ". Test run might not resolve"));
             }
         }
 
@@ -381,7 +398,7 @@ public class BndTestMojo extends AbstractTestMojo {
     private void addFramework(List<ResolvedArtifactKey> bundles) {
 
         getRunFramework().flatMap(key -> mavenBundleResolver.resolveMavenBundle(project, session, key)).ifPresentOrElse(
-                bundles::add, () -> getLog().warn("Can't get artifact for runfw " + runfw + " test run might fail!"));
+                bundles::add, () -> getLog().warn("Cannot get artifact for runfw " + runfw + ". Test run might fail"));
 
     }
 
@@ -452,8 +469,7 @@ public class BndTestMojo extends AbstractTestMojo {
     @Override
     protected BundleScanResult scanForTests() {
         ScanResult moduletests = super.scanForTests();
-        PomDependencies pomDependencies = TychoProjectUtils.getTargetPlatformConfiguration(getReactorProject())
-                .getPomDependencies();
+        PomDependencies pomDependencies = projectManager.getTargetPlatformConfiguration(project).getPomDependencies();
         Set<String> bundleTestCases = new HashSet<>();
         List<ResolvedArtifactKey> pomBundles = new ArrayList<>();
         if (pomDependencies != PomDependencies.ignore) {
@@ -472,24 +488,28 @@ public class BndTestMojo extends AbstractTestMojo {
                 }
             }
         }
-        TargetPlatform targetPlatform = TychoProjectUtils.getTargetPlatform(getReactorProject());
         if (bundles != null) {
-            for (String bundle : bundles) {
-                try {
-                    ArtifactKey key = targetPlatform.resolveArtifact(ArtifactType.TYPE_ECLIPSE_PLUGIN, bundle,
-                            Version.emptyVersion.toString());
-                    File file = targetPlatform.getArtifactLocation(key);
-                    if (file != null) {
-                        OsgiManifest manifest = bundleReader.loadManifest(file);
-                        String header = manifest.getValue(TychoConstants.HEADER_TESTCASES);
-                        for (String test : getDeclaredTests(header, key)) {
-                            bundleTestCases.add(test);
+            TargetPlatform targetPlatform = projectManager.getTargetPlatform(project).orElse(null);
+            if (targetPlatform == null) {
+                getLog().warn("No target platform, can't resolve additionally specified bundles!");
+            } else {
+                for (String bundle : bundles) {
+                    try {
+                        ArtifactKey key = targetPlatform.resolveArtifact(ArtifactType.TYPE_ECLIPSE_PLUGIN, bundle,
+                                Version.emptyVersion.toString());
+                        File file = targetPlatform.getArtifactLocation(key);
+                        if (file != null) {
+                            OsgiManifest manifest = bundleReader.loadManifest(file);
+                            String header = manifest.getValue(TychoConstants.HEADER_TESTCASES);
+                            for (String test : getDeclaredTests(header, key)) {
+                                bundleTestCases.add(test);
+                            }
                         }
+                    } catch (DependencyResolutionException | IllegalArtifactReferenceException
+                            | OsgiManifestParserException e) {
+                        //nothing we can use...
+                        getLog().debug("Bundle " + bundle + " was not found in target platform: " + e);
                     }
-                } catch (DependencyResolutionException | IllegalArtifactReferenceException
-                        | OsgiManifestParserException e) {
-                    //nothing we can use...
-                    getLog().debug("Bundle " + bundle + " was not found in target platform: " + e);
                 }
             }
         }

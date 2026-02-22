@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2022 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2024 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -10,7 +10,7 @@
  * Contributors:
  *    Sonatype Inc. - initial API and implementation
  *    Christoph Läubrich 	- Issue #177 - Automatically translate maven-pom information to osgi Bundle-Header
- *    						- Issue #572 - Insert dynamic dependencies into the jar included pom 
+ *    						- Issue #572 - Insert dynamic dependencies into the jar included pom
  *******************************************************************************/
 package org.eclipse.tycho.packaging;
 
@@ -20,6 +20,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -35,9 +37,10 @@ import org.apache.maven.archiver.MavenArchiver;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.model.License;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Parameter;
+import javax.inject.Inject;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.archiver.Archiver;
 import org.codehaus.plexus.archiver.ArchiverException;
@@ -70,7 +73,7 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 	/**
 	 * The Jar archiver.
 	 */
-	@Component(role = Archiver.class, hint = "jar")
+		@Inject
 	private JarArchiver jarArchiver;
 
 	/**
@@ -87,7 +90,7 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 	 * configuration is specified, the default value is <code>true</code>. If the
 	 * maven descriptor should not be added to the artifact, use the following
 	 * configuration:
-	 * 
+	 *
 	 * <pre>
 	 * &lt;plugin&gt;
 	 *   &lt;groupId&gt;org.eclipse.tycho&lt;/groupId&gt;
@@ -110,19 +113,19 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 	 * MANIFEST header. When using this parameter, property ${tycho.scmUrl} must be
 	 * set and be a valid
 	 * <a href="https://maven.apache.org/scm/scm-url-format.html">maven SCM URL</a>.
-	 * 
+	 *
 	 * Example configuration:
-	 * 
+	 *
 	 * <pre>
 	 *         &lt;sourceReferences&gt;
 	 *           &lt;generate&gt;true&lt;/generate&gt;
 	 *         &lt;/sourceReferences&gt;
 	 * </pre>
-	 * 
+	 *
 	 * Note that a {@link SourceReferencesProvider} component must be registered for
 	 * the SCM type being used. You may also override the generated value by
 	 * configuring:
-	 * 
+	 *
 	 * <pre>
 	 *         &lt;sourceReferences&gt;
 	 *           &lt;generate&gt;true&lt;/generate&gt;
@@ -144,24 +147,55 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 	@Parameter(defaultValue = "true")
 	private boolean deriveHeaderFromProject = true;
 
-	@Component
+	/**
+	 * Whether to derive OSGi-Headers from the sources, currently the following
+	 * header are supported
+	 * <ul>
+	 * <li>{@link Constants#REQUIRE_CAPABILITY} is enhanced by those from code
+	 * annotations</li>
+	 * </ul>
+	 */
+	@Parameter(defaultValue = "true")
+	private boolean deriveHeaderFromSource;
+
+	/**
+	 * If {@code true}, it is checked that the explicitly declared OSGi service
+	 * component files exist.
+	 */
+	@Parameter(defaultValue = "true")
+	private boolean checkServiceComponentFilesExist = true;
+
+	/**
+	 * Timestamp for reproducible output archive entries, either formatted as ISO
+	 * 8601 extended offset date-time (e.g. in UTC such as '2011-12-03T10:15:30Z' or
+	 * with an offset '2019-10-05T20:37:42+06:00'), or as an int representing
+	 * seconds since the epoch (like <a href=
+	 * "https://reproducible-builds.org/docs/source-date-epoch/">SOURCE_DATE_EPOCH</a>).
+	 */
+	@Parameter(defaultValue = "${project.build.outputTimestamp}")
+	private String outputTimestamp;
+
+	@Inject
 	private SourceReferenceComputer soureReferenceComputer;
 
-	@Component
+	@Inject
 	TychoProjectManager projectManager;
 
-	@Component
+	@Inject
 	private BundleReader bundleReader;
 
-	@Component
+	@Inject
 	List<ManifestProcessor> manifestProcessors;
 
-	@Component
+	@Inject
 	PluginRealmHelper pluginRealmHelper;
 
 	@Override
 	public void execute() throws MojoExecutionException {
-
+		if (skip) {
+			getLog().info("skip packaging");
+			return;
+		}
 		Optional<EclipsePluginProject> pde = projectManager.getTychoProject(project)
 				.filter(BundleProject.class::isInstance)
 				.map(BundleProject.class::cast)
@@ -189,8 +223,15 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 		try {
 			File jarFile = new File(project.getBasedir(), jarName);
 			JarArchiver archiver = new JarArchiver();
+			// configure for Reproducible Builds based on outputTimestamp value
+			MavenArchiver.parseBuildOutputTimestamp(outputTimestamp).map(FileTime::from)
+					.ifPresent(modifiedTime -> archiver.configureReproducibleBuild(modifiedTime));
 			archiver.setDestFile(jarFile);
-			archiver.addDirectory(jar.getOutputDirectory());
+			File outputDirectory = jar.getOutputDirectory();
+			if (!outputDirectory.mkdirs() && !outputDirectory.exists()) {
+				throw new IOException("creating output directory " + outputDirectory.getAbsolutePath() + " failed");
+			}
+			archiver.addDirectory(outputDirectory);
 			if (customManifest != null) {
 				for (File sourceFolder : jar.getSourceFolders()) {
 					File manifestFile = new File(sourceFolder, customManifest);
@@ -211,6 +252,9 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 		try {
 			MavenArchiver archiver = new MavenArchiver();
 			archiver.setArchiver(jarArchiver);
+
+			// configure for Reproducible Builds based on outputTimestamp value
+			archiver.configureReproducibleBuild(outputTimestamp);
 
 			File pluginFile = new File(buildDirectory, finalName + ".jar");
 			if (pluginFile.exists()) {
@@ -244,12 +288,12 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 			checkBinIncludesExist(buildProperties, binIncludesIgnoredForValidation.toArray(new String[0]));
 			// 4. check DS files exits...
 			TychoProject facet = getTychoProjectFacet();
-			if (facet instanceof OsgiBundleProject bundleProject) {
+			if (checkServiceComponentFilesExist && facet instanceof OsgiBundleProject bundleProject) {
 				String components = bundleProject.getManifestValue("Service-Component", project);
 				if (components != null) {
 					if (components.contains("*")) {
 						getLog().warn(
-								"Checking Service-Component header that contains wildcards is currently not supported!");
+								"Checking Service-Component header that contains wildcards is currently not supported");
 					} else {
 						for (String component : components.split(",\\s*")) {
 							assertComponentExists(component);
@@ -302,7 +346,7 @@ public class PackagePluginMojo extends AbstractTychoPackagingMojo {
 		if (!parentFile.mkdirs() && !parentFile.exists()) {
 			throw new IOException("creating target directory " + parentFile.getAbsolutePath() + " failed");
 		}
-		try (BufferedOutputStream os = new BufferedOutputStream(new FileOutputStream(output))) {
+		try (OutputStream os = new BufferedOutputStream(new FileOutputStream(output))) {
 			mf.write(os);
 		}
 	}

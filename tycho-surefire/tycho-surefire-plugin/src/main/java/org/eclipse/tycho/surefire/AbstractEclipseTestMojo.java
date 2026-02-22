@@ -19,11 +19,11 @@
  ******************************************************************************/
 package org.eclipse.tycho.surefire;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,10 +32,14 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
+
+import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.resolver.ArtifactResolutionException;
@@ -43,9 +47,9 @@ import org.apache.maven.artifact.resolver.ArtifactResolutionRequest;
 import org.apache.maven.artifact.resolver.ArtifactResolutionResult;
 import org.apache.maven.artifact.resolver.ResolutionErrorHandler;
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.Repository;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.repository.RepositorySystem;
 import org.apache.maven.surefire.api.booter.ProviderParameterNames;
@@ -72,26 +76,25 @@ import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.BuildDirectory;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.DependencyArtifacts;
+import org.eclipse.tycho.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.OptionalResolutionAction;
 import org.eclipse.tycho.PlatformPropertiesUtils;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.ReproducibleUtils;
+import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.BundleProject;
 import org.eclipse.tycho.core.DependencyResolver;
 import org.eclipse.tycho.core.DependencyResolverConfiguration;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
 import org.eclipse.tycho.core.TychoProject;
-import org.eclipse.tycho.core.ee.shared.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
 import org.eclipse.tycho.core.osgitools.project.BuildOutputJar;
-import org.eclipse.tycho.core.resolver.DefaultDependencyResolverFactory;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
-import org.eclipse.tycho.dev.DevBundleInfo;
-import org.eclipse.tycho.dev.DevWorkspaceResolver;
 import org.eclipse.tycho.p2.tools.RepositoryReferences;
 import org.eclipse.tycho.p2maven.InstallableUnitGenerator;
 import org.eclipse.tycho.p2tools.RepositoryReferenceTool;
 import org.eclipse.tycho.surefire.provider.impl.ProviderHelper;
+import org.eclipse.tycho.surefire.provider.impl.ProviderSelection;
 import org.eclipse.tycho.surefire.provider.spi.TestFrameworkProvider;
 import org.eclipse.tycho.surefire.provisioning.ProvisionedInstallationBuilder;
 import org.eclipse.tycho.surefire.provisioning.ProvisionedInstallationBuilderFactory;
@@ -108,7 +111,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
 
     /**
      * <a href=
-     * "https://help.eclipse.org/juno/topic/org.eclipse.platform.doc.isv/reference/misc/runtime-options.html#osgiinstancearea"
+     * "https://help.eclipse.org/latest/topic/org.eclipse.platform.doc.isv/reference/misc/runtime-options.html#osgiinstancearea"
      * >OSGi data directory</a> (<code>osgi.instance.area</code>, aka the workspace) of the Equinox
      * runtime used to execute tests.
      */
@@ -150,18 +153,19 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     private String debugOptions;
 
     /**
-     * (junit47 provider with JUnit4.8+ only) Groups/categories for this test (comma-separated).
+     * (JUnit 4.8+ only) Groups/categories for this test (comma-separated).
      * Only classes/methods/etc decorated with one of the group/category specified here will be
-     * included in test run, if specified. For JUnit, this parameter forces the use of the junit47
-     * provider
+     * included in test run, if specified. This parameter requires JUnit 4.8 or higher, as the
+     * {@code @Category} annotation was introduced in JUnit 4.8.
      */
     @Parameter(property = "groups")
     private String groups;
 
     /**
-     * (junit47 provider with JUnit4.8+ only) Excluded groups/categories (comma-separated). Any
+     * (JUnit 4.8+ only) Excluded groups/categories (comma-separated). Any
      * methods/classes/etc with one of the groups/categories specified in this list will
-     * specifically not be run. For JUnit, this parameter forces the use of the junit47 provider
+     * specifically not be run. This parameter requires JUnit 4.8 or higher, as the
+     * {@code @Category} annotation was introduced in JUnit 4.8.
      */
     @Parameter(property = "excludedGroups")
     private String excludedGroups;
@@ -321,34 +325,35 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     @Parameter(property = "surefire.skipAfterFailureCount", defaultValue = "0")
     private Integer skipAfterFailureCount;
 
-    @Component
+    @Inject
     protected RepositorySystem repositorySystem;
 
-    @Component
+    @Inject
     private ResolutionErrorHandler resolutionErrorHandler;
 
-    @Component(role = TychoProject.class)
+    @Inject
     private Map<String, TychoProject> projectTypes;
 
-    @Component
+    @Inject
     private EquinoxInstallationFactory installationFactory;
 
-    @Component
+    @Inject
     private ProvisionedInstallationBuilderFactory provisionedInstallationBuilderFactory;
 
-    @Component
+    @Inject
     private EquinoxLauncher launcher;
 
-    @Component
-    protected DefaultDependencyResolverFactory dependencyResolverLocator;
+    @Inject
+    @Named("p2")
+    protected DependencyResolver dependencyResolver;
 
     /**
-     * Normally tycho will automatically determine the test framework provider based on the test
-     * project's classpath. Use this to force using a test framework provider implementation with
-     * the given role hint. Tycho comes with providers
-     * &quot;junit3&quot;,&quot;junit4&quot;,&quot;junit47&quot;,&quot;junit5&quot;. Note that when
-     * specifying a providerHint, you have to make sure the provider is actually available in the
-     * dependencies of tycho-surefire-plugin.
+     * Normally, Tycho will automatically determine the test framework provider based on the test
+     * project's classpath. This options forces the use of a test framework provider implementation
+     * with the given role hint. Tycho comes with providers such as
+     * &quot;junit3&quot;,&quot;junit4&quot;,&quot;junit47&quot;,&quot;junit5&quot;, or
+     * &quot;junit59&quot;. Note that when specifying a providerHint, you have to make sure the
+     * provider is actually available in the dependencies of tycho-surefire-plugin.
      *
      * @since 0.16.0
      */
@@ -374,7 +379,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     private boolean trimStackTrace;
 
     /**
-     * (JUnit 4.7 provider) Supports values "classes"/"methods"/"both" to run in separate threads,
+     * Supports values "classes"/"methods"/"both" to run in separate threads,
      * as controlled by threadCount.
      *
      * @since 0.16.0
@@ -383,7 +388,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     private ParallelMode parallel;
 
     /**
-     * (JUnit 4.7 provider) Indicates that threadCount is per cpu core.
+     * Indicates that threadCount is per cpu core.
      *
      * @since 0.16.0
      */
@@ -391,7 +396,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     private boolean perCoreThreadCount;
 
     /**
-     * (JUnit 4.7 provider) The attribute thread-count allows you to specify how many threads should
+     * The attribute thread-count allows you to specify how many threads should
      * be allocated for this execution. Only makes sense to use in conjunction with the parallel
      * parameter.
      *
@@ -401,7 +406,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     private int threadCount = -1;
 
     /**
-     * (JUnit 4.7 provider) Indicates that the thread pool will be unlimited. The parallel parameter
+     * Indicates that the thread pool will be unlimited. The parallel parameter
      * and the actual number of classes/methods will decide. Setting this to "true" effectively
      * disables perCoreThreadCount and threadCount.
      *
@@ -424,16 +429,20 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
      * when installing products under test (see below).
      * <ul>
      * <li>In <code>default</code> mode, all necessary files to define the test runtime like
-     * <tt>config.ini</tt> are generated by tycho. This installation mode has the advantage that the
-     * test runtime is minimal (defined by the transitive dependencies of the test bundle plus and
-     * the test harness) and existing bundle jars are referenced rather than copied for the
+     * <code>config.ini</code> are generated by tycho. This installation mode has the advantage that
+     * the test runtime is minimal (defined by the transitive dependencies of the test bundle plus
+     * and the test harness) and existing bundle jars are referenced rather than copied for the
      * installation</li>
      * <li>In <code>p2Installed</code> mode, use p2 director to install test bundle, test harness
      * bundles and respective dependencies. This installation mode can be used for integration tests
      * that require a fully p2-provisioned installation. To install a product IU, add it as extra
      * requirement to the test bundle (see example below). Note that this installation mode comes
      * with a certain performance overhead for executing the provisioning operations otherwise not
-     * required.</li>
+     * required. Also note, that in this mode, in case the primary installation target environment
+     * is macOS, {@link #work} is post-processed to ensure a proper macOS layout. That is,
+     * <code>Eclipse.app/Contents/Eclipse</code> is automatically appended (or only
+     * <code>Contents/Eclipse</code>, if <code>work</code> already ends with
+     * <code>.app</code>).</li>
      * </ul>
      *
      * Example configuration which will install product IU under test "example.product.id" using p2:
@@ -475,8 +484,8 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
      * Additional dependencies to be added to the test runtime.
      *
      * Note: This parameter has only limited support for dependencies to artifacts within the
-     * reactor. Therefore it is recommended to specify <tt>extraRequirements</tt> on the
-     * <tt>target-platform-configuration</tt> plugin instead. Example:
+     * reactor. Therefore it is recommended to specify <code>extraRequirements</code> on the
+     * <code>target-platform-configuration</code> plugin instead. Example:
      *
      * <pre>
      * &lt;plugin&gt;
@@ -497,8 +506,8 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
      * &lt;/plugin&gt;
      * </pre>
      *
-     * The dependencies specified as <tt>extraRequirements</tt> are &ndash; together with the
-     * dependencies specified in the <tt>MANIFEST.MF</tt> of the project &ndash; transitively
+     * The dependencies specified as <code>extraRequirements</code> are &ndash; together with the
+     * dependencies specified in the <code>MANIFEST.MF</code> of the project &ndash; transitively
      * resolved against the target platform. The resulting set of bundles is included in the test
      * runtime.
      */
@@ -506,8 +515,40 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     private Dependency[] dependencies;
 
     /**
+     * Additional root IUs to install, only relevant if {@link #testRuntime} is
+     * <code>p2Installed</code>.
+     *
+     * <pre>
+     * &lt;install&gt;
+     *    &lt;iu&gt;
+     *       &lt;id&gt;...&lt;/id&gt;
+     *       &lt;version&gt;...optional version...&lt;/id&gt;
+     *       &lt;feature&gt;true/false&lt;/feature&gt; &lt;!-- optional if true .feature.group is automatically added to the id  --&gt;
+     * &lt;/install&gt;
+     * </pre>
+     */
+    @Parameter
+    private List<IU> install;
+
+    /**
+     * Additional repositories used to install units from, only relevant if {@link #testRuntime} is
+     * <code>p2Installed</code>.
+     *
+     * <pre>
+    * &lt;repositories&gt;
+    *   &lt;repository&gt;
+    *       &lt;url&gt;...another repository...&lt;/url&gt;
+    *   &lt;/repository&gt;
+    * &lt;/repositories&gt;
+     * </pre>
+     *
+     */
+    @Parameter(name = "repositories")
+    private List<Repository> repositories;
+
+    /**
      * p2 <a href=
-     * "https://help.eclipse.org/kepler/index.jsp?topic=%2Forg.eclipse.platform.doc.isv%2Fguide%2Fp2_director.html"
+     * "https://help.eclipse.org/latest/index.jsp?topic=%2Forg.eclipse.platform.doc.isv%2Fguide%2Fp2_director.html"
      * >profile</a> name of the installation under test.
      *
      * Only relevant if {@link #testRuntime} is <code>p2Installed</code>. If tests are installed on
@@ -516,8 +557,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
      *
      * @since 0.19.0
      */
-    // default value should be kept the same as DirectorMojo#profile default value
-    @Parameter(defaultValue = "DefaultProfile")
+    @Parameter(defaultValue = TychoConstants.DEFAULT_PROFILE)
     private String profileName;
 
     /**
@@ -529,16 +569,34 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     @Parameter
     private int reactorConcurrencyLevel;
 
-    @Component
+    public enum ClassLoaderOrder {
+        booterFirst, testProbeFirst
+    }
+
+    /**
+     * The test runtime is configured with a composite class loader. This defines the order in which
+     * the loaders are searched, and it may need to be configured depending on the resolved
+     * classpath of the project.
+     * <p>
+     * Available values are:
+     * <ul>
+     * <li><code>booterFirst</code> - the loader of the surefire booter (including bundled test
+     * platform) is searched first</li>
+     * <li><code>testProbeFirst</code> - the loader of the test class's plugin is searched
+     * first</li>
+     * </ul>
+     * Defaults to <code>booterFirst</code>.
+     */
+    @Parameter(defaultValue = "booterFirst")
+    private ClassLoaderOrder classLoaderOrder;
+
+    @Inject
     private ProviderHelper providerHelper;
 
-    @Component
-    private DevWorkspaceResolver workspaceState;
-
-    @Component
+    @Inject
     private RepositoryReferenceTool repositoryReferenceTool;
 
-    @Component
+    @Inject
     protected InstallableUnitGenerator generator;
 
     /**
@@ -596,9 +654,10 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
             //... if not we notify the caller that nothing has to be done here.
             return null;
         }
-        TestFrameworkProvider provider = providerHelper.selectProvider(project,
-                getProjectType().getClasspath(DefaultReactorProject.adapt(project)), getMergedProviderProperties(),
-                providerHint);
+        TestFrameworkProvider provider = providerHelper
+                .selectProvider(project, getProjectType().getClasspath(DefaultReactorProject.adapt(project)),
+                        getMergedProviderProperties(), providerHint)
+                .provider();
         try {
             PropertiesWrapper wrapper = createSurefireProperties(provider, scanResult);
             storeProperties(wrapper.getProperties(), surefireProperties);
@@ -611,6 +670,17 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
             }
             RepositoryReferences sources = repositoryReferenceTool.getVisibleRepositories(project, session,
                     RepositoryReferenceTool.REPOSITORIES_INCLUDE_CURRENT_MODULE);
+            if (repositories != null) {
+                for (Repository repository : repositories) {
+                    String url = repository.getUrl();
+                    if (url == null || url.isBlank()) {
+                        throw new MojoExecutionException("Repository url can't be empty!");
+                    }
+                    URI uri = new URI(url);
+                    getLog().info("Adding repository " + uri + "...");
+                    sources.addRepository(uri);
+                }
+            }
             installationBuilder.addMetadataRepositories(sources.getMetadataRepositories());
             installationBuilder.addArtifactRepositories(sources.getArtifactRepositories());
             installationBuilder.setProfileName(profileName);
@@ -619,9 +689,19 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
             workingDir.mkdirs();
             installationBuilder.setWorkingDir(workingDir);
             installationBuilder.setDestination(work);
+            List<TargetEnvironment> list = getTestTargetEnvironments();
+            TargetEnvironment testEnvironment = list.get(0);
+            installationBuilder.setTargetEnvironment(testEnvironment);
+            getLog().info("Provisioning with environment " + testEnvironment + "...");
             return installationBuilder.install();
-        } catch (Exception ex) {
-            throw new MojoExecutionException(ex.getMessage(), ex);
+        } catch (MojoExecutionException e) {
+            throw e;
+        } catch (MojoFailureException e) {
+            throw e;
+        } catch (URISyntaxException e) {
+            throw new MojoExecutionException(e.getInput() + " is not a valid URI", e);
+        } catch (Exception e) {
+            throw new MojoExecutionException(e.getMessage(), e);
         }
     }
 
@@ -632,9 +712,17 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         // 2. test harness bundles
         iusToInstall.addAll(providerHelper.getSymbolicNames(testHarnessArtifacts));
         // 3. extra dependencies
-        LinkedHashSet<ArtifactKey> extraDependencies = new LinkedHashSet<>(TychoProjectUtils
-                .getTargetPlatformConfiguration(DefaultReactorProject.adapt(project)).getAdditionalArtifacts());
+        LinkedHashSet<ArtifactKey> extraDependencies = new LinkedHashSet<>(
+                projectManager.getTargetPlatformConfiguration(project).getAdditionalArtifacts());
         extraDependencies.addAll(osgiBundle.getExtraTestRequirements(getReactorProject()));
+        // 4. mojo specified extras
+        if (this.install != null) {
+            for (IU iu : this.install) {
+                extraDependencies.add(new DefaultArtifactKey(
+                        iu.feature ? ArtifactType.TYPE_ECLIPSE_FEATURE : ArtifactType.TYPE_ECLIPSE_PLUGIN, iu.id,
+                        Objects.requireNonNullElse(iu.version, "0.0.0")));
+            }
+        }
         for (ArtifactKey extraDependency : extraDependencies) {
             String type = extraDependency.getType();
             if (ArtifactType.TYPE_ECLIPSE_PLUGIN.equals(type) || ArtifactType.TYPE_INSTALLABLE_UNIT.equals(type)) {
@@ -657,9 +745,12 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
             //... if not we notify the caller that nothing has to be done here.
             return null;
         }
-        TestFrameworkProvider provider = providerHelper.selectProvider(project,
+        ProviderSelection selection = providerHelper.selectProvider(project,
                 getProjectType().getTestClasspath(DefaultReactorProject.adapt(project)), getMergedProviderProperties(),
                 providerHint);
+        TestFrameworkProvider provider = selection.provider();
+        getLog().info(String.format("Selected test framework %s (%s) with provider %s %s", provider.getType(),
+                provider.getVersion(), selection.hint(), provider.getVersionRange()));
         Collection<IRequirement> testRequiredPackages = new ArrayList<>();
         Set<Artifact> testFrameworkBundles = providerHelper.filterTestFrameworkBundles(provider, pluginArtifacts);
         for (Artifact artifact : testFrameworkBundles) {
@@ -715,7 +806,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
             }
         }
 
-        setupTestBundles(testFrameworkBundles, testRuntime);
+        setupTestBundles(testFrameworkBundles, testRuntime, provider);
 
         getReportsDirectory().mkdirs();
         return installationFactory.createInstallation(testRuntime, work);
@@ -735,7 +826,6 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     protected DependencyArtifacts resolveDependencies(Collection<IRequirement> additionalRequirements)
             throws MojoExecutionException {
         List<ArtifactKey> extraDependencies = getExtraDependencies();
-        DependencyResolver platformResolver = dependencyResolverLocator.lookupDependencyResolver(project);
         final DependencyResolverConfiguration resolverConfiguration = new DependencyResolverConfiguration() {
             @Override
             public OptionalResolutionAction getOptionalResolutionAction() {
@@ -753,8 +843,10 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
             }
 
         };
-        DependencyArtifacts testRuntimeArtifacts = platformResolver.resolveDependencies(session, project, null,
-                getReactorProjects(), resolverConfiguration, getTestTargetEnvironments());
+        DependencyArtifacts testRuntimeArtifacts = dependencyResolver.resolveDependencies(session, project,
+                projectManager.getTargetPlatform(project)
+                        .orElseThrow(() -> new MojoExecutionException(TychoConstants.TYCHO_NOT_CONFIGURED + project)),
+                resolverConfiguration, getTestTargetEnvironments());
         if (testRuntimeArtifacts == null) {
             throw new MojoExecutionException(
                     "Cannot determinate build target platform location -- not executing tests");
@@ -762,19 +854,12 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         return testRuntimeArtifacts;
     }
 
-    protected void setupTestBundles(Set<Artifact> testFrameworkBundles, EquinoxInstallationDescription testRuntime)
-            throws MojoExecutionException {
+    protected void setupTestBundles(Set<Artifact> testFrameworkBundles, EquinoxInstallationDescription testRuntime,
+            TestFrameworkProvider provider) throws MojoExecutionException {
         for (Artifact artifact : testFrameworkBundles) {
-            DevBundleInfo devInfo = workspaceState.getBundleInfo(session, artifact.getGroupId(),
-                    artifact.getArtifactId(), artifact.getVersion(), project.getPluginArtifactRepositories());
-            if (devInfo != null) {
-                addBundle(testRuntime, devInfo.getArtifactKey(), devInfo.getLocation());
-                testRuntime.addDevEntries(devInfo.getSymbolicName(), devInfo.getDevEntries());
-            } else {
-                File bundleLocation = artifact.getFile();
-                ArtifactKey bundleArtifactKey = getBundleArtifactKey(bundleLocation);
-                addBundle(testRuntime, bundleArtifactKey, bundleLocation);
-            }
+            File bundleLocation = artifact.getFile();
+            ArtifactKey bundleArtifactKey = getBundleArtifactKey(bundleLocation);
+            addBundle(testRuntime, bundleArtifactKey, bundleLocation);
         }
 
         testRuntime.addDevEntries(getTestBundleSymbolicName(), getBuildOutputDirectories());
@@ -799,8 +884,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
                 dependencies.add(new DefaultArtifactKey(key.getType(), key.getArtifactId(), key.getVersion()));
             }
         }
-        TargetPlatformConfiguration configuration = TychoProjectUtils
-                .getTargetPlatformConfiguration(DefaultReactorProject.adapt(project));
+        TargetPlatformConfiguration configuration = projectManager.getTargetPlatformConfiguration(project);
         dependencies.addAll(configuration.getDependencyResolverConfiguration().getAdditionalArtifacts());
         dependencies.addAll(osgiBundle.getExtraTestRequirements(getReactorProject()));
         dependencies.addAll(getTestDependencies());
@@ -810,7 +894,9 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     private List<ArtifactKey> getTestDependencies() {
         ArrayList<ArtifactKey> result = new ArrayList<>();
 
-        // see also P2ResolverImpl.addDependenciesForTests()
+        // The test harness dependencies must be satisfiable from the external target platform
+        // See also https://github.com/eclipse-tycho/tycho/issues/5349 for a special situation
+        // where the harness bundles are part of the same reactor (e.g. when building eclipse.platform.ui)
         result.add(newBundleDependency("org.eclipse.osgi"));
         result.add(newBundleDependency(DefaultEquinoxInstallationDescription.EQUINOX_LAUNCHER));
         if (useUIHarness) {
@@ -840,6 +926,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         wrapper.setProperty("rerunFailingTestsCount", String.valueOf(rerunFailingTestsCount));
         wrapper.setProperty("printBundles", String.valueOf(printBundles));
         wrapper.setProperty("printWires", String.valueOf(printWires));
+        wrapper.setProperty("classLoaderOrder", classLoaderOrder.toString());
         Properties mergedProviderProperties = getMergedProviderProperties();
         mergedProviderProperties.putAll(provider.getProviderSpecificProperties());
         Map<String, String> providerPropertiesAsMap = propertiesAsMap(mergedProviderProperties);
@@ -848,7 +935,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
             wrapper.setProperty("__provider." + entry.getKey(), entry.getValue().toString());
         }
         wrapper.setProperty("testprovider", provider.getSurefireProviderClassName());
-        getLog().debug("Using test framework provider " + provider.getClass().getName());
+        getLog().debug("Using test framework provider: " + provider.getClass().getName());
         wrapper.addList(suiteXmlFiles, BooterConstants.TEST_SUITE_XML_FILES);
         return wrapper;
     }
@@ -889,9 +976,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         Properties p = new Properties();
         p.putAll(propertiesMap);
         try {
-            try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file))) {
-                p.store(out, null);
-            }
+            ReproducibleUtils.storeProperties(p, file.toPath());
         } catch (IOException e) {
             throw new MojoExecutionException("Can't write test launcher properties file", e);
         }
@@ -906,8 +991,8 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
                 FileUtils.deleteDirectory(osgiDataDirectory);
             }
             cli = createCommandLine(testRuntime);
-            getLog().info("Executing test runtime with timeout " + forkedProcessTimeoutInSeconds
-                    + ", logs (if any) will be placed at: " + logFile.getAbsolutePath());
+            getLog().info("Executing test runtime with timeout (seconds): " + forkedProcessTimeoutInSeconds
+                    + ", logs, if any, will be placed at: " + logFile.getAbsolutePath());
             result = launcher.execute(cli, forkedProcessTimeoutInSeconds);
         } catch (Exception e) {
             throw new MojoExecutionException("Error while executing platform", e);
@@ -972,18 +1057,17 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
 
     private String decodeReturnCode(int result) {
         try {
-            Properties properties = DefaultReactorProject.adapt(project).getProperties();
-            if (PlatformPropertiesUtils.OS_LINUX.equals(PlatformPropertiesUtils.getOS(properties))) {
+            if (PlatformPropertiesUtils.OS_LINUX.equals(PlatformPropertiesUtils.getOS(System.getProperties()))) {
                 int signal = result - 128;
                 if (signal > 0 && signal < UNIX_SIGNAL_NAMES.length) {
                     return result + "(" + UNIX_SIGNAL_NAMES[signal] + " received?)";
                 }
-            } else if (PlatformPropertiesUtils.OS_WIN32.equals(PlatformPropertiesUtils.getOS(properties))) {
+            } else if (PlatformPropertiesUtils.OS_WIN32.equals(PlatformPropertiesUtils.getOS(System.getProperties()))) {
                 return result + " (HRESULT Code 0x" + Integer.toHexString(result).toUpperCase()
                         + ", check for example https://www.hresult.info/ for further details)";
             }
         } catch (RuntimeException e) {
-            getLog().debug("Decoding returncode failed", e);
+            getLog().debug("Decoding return code failed", e);
         }
         return String.valueOf(result);
     }
@@ -1002,11 +1086,10 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         }
 
         cli.addVMArguments("-Dosgi.noShutdown=false");
-
-        Properties properties = DefaultReactorProject.adapt(project).getProperties();
-        cli.addVMArguments("-Dosgi.os=" + PlatformPropertiesUtils.getOS(properties), //
-                "-Dosgi.ws=" + PlatformPropertiesUtils.getWS(properties), //
-                "-Dosgi.arch=" + PlatformPropertiesUtils.getArch(properties));
+        TargetEnvironment environment = TargetEnvironment.getRunningEnvironment();
+        cli.addVMArguments("-Dosgi.os=" + environment.getOs(), //
+                "-Dosgi.ws=" + environment.getWs(), //
+                "-Dosgi.arch=" + environment.getArch());
         addCustomProfileArg(cli);
         cli.addVMArguments(splitArgLine(argLine));
 
@@ -1026,7 +1109,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         addProgramArgs(cli, "-data", osgiDataDirectory.getAbsolutePath(), //
                 "-install", testRuntime.getLocation().getAbsolutePath(), //
                 "-configuration", testRuntime.getConfigurationLocation().getAbsolutePath(), //
-                "-application", getTestApplication(testRuntime.getInstallationDescription()), //
+                "-application", getTestApplication(), //
                 "-testproperties", surefireProperties.getAbsolutePath());
         if (application != null) {
             cli.addProgramArguments("-testApplication", application);
@@ -1058,8 +1141,8 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
     }
 
     private void addCustomProfileArg(EquinoxLaunchConfiguration cli) throws MojoExecutionException {
-        ExecutionEnvironmentConfiguration eeConfig = TychoProjectUtils
-                .getExecutionEnvironmentConfiguration(DefaultReactorProject.adapt(project));
+
+        ExecutionEnvironmentConfiguration eeConfig = projectManager.getExecutionEnvironmentConfiguration(project);
         if (eeConfig.isCustomProfile()) {
             Properties customProfileProps = eeConfig.getFullSpecification().getProfileProperties();
             File profileFile = new File(new File(project.getBuild().getDirectory()), "custom.profile");
@@ -1094,7 +1177,7 @@ public abstract class AbstractEclipseTestMojo extends AbstractTestMojo {
         }
     }
 
-    private String getTestApplication(EquinoxInstallationDescription testRuntime) {
+    private String getTestApplication() {
         if (useUIHarness) {
             return "org.eclipse.tycho.surefire.osgibooter.uitest";
         } else {

@@ -14,8 +14,6 @@
 package org.eclipse.tycho.core.maven;
 
 import java.io.File;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 
 import org.apache.maven.artifact.Artifact;
@@ -72,15 +70,6 @@ public final class MavenArtifactFacade implements IArtifactFacade {
     @Override
     public String getClassifier() {
         return mavenArtifact.getClassifier();
-    }
-
-    @Override
-    public List<String> getDependencyTrail() {
-        List<String> trail = mavenArtifact.getDependencyTrail();
-        if (trail == null || trail.isEmpty()) {
-            return Collections.singletonList(mavenArtifact.getId());
-        }
-        return trail;
     }
 
     @Override

@@ -13,14 +13,19 @@
 package org.eclipse.tycho.ds;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import javax.inject.Inject;
+
 import org.apache.commons.io.FilenameUtils;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -28,11 +33,14 @@ import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.tycho.ClasspathEntry;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.classpath.ClasspathContributor;
 import org.eclipse.tycho.core.DeclarativeServicesConfiguration;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.TychoProjectManager;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
 import org.eclipse.tycho.core.osgitools.OsgiBundleProject;
+import org.eclipse.tycho.helper.PluginRealmHelper;
+import org.osgi.framework.Version;
 
 import aQute.bnd.component.DSAnnotations;
 import aQute.bnd.osgi.Analyzer;
@@ -112,11 +120,23 @@ public class DeclarativeServicesMojo extends AbstractMojo {
 	@Parameter(property = "project", readonly = true)
 	protected MavenProject project;
 
-	@Component
-	private TychoProjectManager manager;
+	private final TychoProjectManager manager;
 
-	@Component
-	private DeclarativeServiceConfigurationReader configurationReader;
+	private final DeclarativeServiceConfigurationReader configurationReader;
+
+	private final PluginRealmHelper pluginRealmHelper;
+
+	@Parameter(property = "session", readonly = true)
+	private MavenSession session;
+
+	@Inject
+	public DeclarativeServicesMojo(TychoProjectManager manager,
+			DeclarativeServiceConfigurationReader configurationReader,
+			PluginRealmHelper pluginRealmHelper) {
+		this.manager = manager;
+		this.configurationReader = configurationReader;
+		this.pluginRealmHelper = pluginRealmHelper;
+	}
 
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException {
@@ -132,7 +152,11 @@ public class DeclarativeServicesMojo extends AbstractMojo {
 					// nothing to do
 					return;
 				}
-
+				Version dsVersion = configuration.getSpecificationVersion();
+				Log log = getLog();
+				log.info("Using Declarative Service specification version " + dsVersion
+						+ " to generate component definitions");
+				boolean isDs12 = dsVersion.getMajor() == 1 && dsVersion.getMinor() == 2;
 				String childPath = configuration.getPath();
 				File targetDirectory = new File(outputDirectory, childPath);
 				File projectBaseDir = new File(project.getBasedir(), childPath);
@@ -148,24 +172,49 @@ public class DeclarativeServicesMojo extends AbstractMojo {
 					for (ClasspathEntry entry : classpath) {
 						List<File> locations = entry.getLocations();
 						for (File file : locations) {
-							if (file.exists()) {
-								analyzer.addClasspath(file);
+							if (file.exists() && !file.equals(outputDirectory) && file.length() > 0) {
+								try {
+									analyzer.addClasspath(file);
+								} catch (IOException e) {
+									log.warn("Can't add file " + file + " as classpath entry to ds analyzer",
+											log.isDebugEnabled() ? e : null);
+								}
 							}
 						}
 					}
-					// https://bnd.bndtools.org/instructions/dsannotations-options.html
-					analyzer.setProperty(Constants.DSANNOTATIONS_OPTIONS,
-							"version;maximum=" + configuration.getSpecificationVersion().toString());
+					pluginRealmHelper.visitPluginExtensions(project, session, ClasspathContributor.class, cpc -> {
+						List<ClasspathEntry> list = cpc.getAdditionalClasspathEntries(project, Artifact.SCOPE_COMPILE);
+						if (list != null && !list.isEmpty()) {
+							for (ClasspathEntry entry : list) {
+								for (File file : entry.getLocations()) {
+									try {
+										analyzer.addClasspath(file);
+									} catch (IOException e) {
+									}
+								}
+							}
+						}
+					});
+					if (isDs12) {
+						// see https://github.com/bndtools/bnd/issues/5548
+						log.warn(
+								"Generating of XML DS 1.2 might be not fully supported and validation is disabled (see https://github.com/bndtools/bnd/issues/5548), please upgrade to at least 1.3");
+					} else {
+						// https://bnd.bndtools.org/instructions/dsannotations-options.html
+						analyzer.setProperty(Constants.DSANNOTATIONS_OPTIONS,
+								"version;maximum=" + dsVersion.toString());
+					}
 					analyzer.addBasicPlugin(new DSAnnotations());
 					analyzer.analyze();
 					for (String warning : analyzer.getWarnings()) {
-						getLog().warn(warning);
+						log.warn(warning);
 					}
 					for (String error : analyzer.getErrors()) {
-						getLog().error(error);
+						log.error(error);
 					}
 					if (!analyzer.getErrors().isEmpty()) {
-						throw new MojoFailureException("Generation of ds components failed, see log for details");
+						throw new MojoFailureException(
+								"Generation of Declarative Service components failed, see log for details");
 					}
 					String components = analyzer.getProperty(SERVICE_COMPONENT_HEADER);
 					if (components == null || components.isBlank()) {
@@ -176,12 +225,17 @@ public class DeclarativeServicesMojo extends AbstractMojo {
 							&& bundleProject.getManifestValue(SERVICE_COMPONENT_HEADER, project) == null)) {
 						reactorProject.setContextValue(CONTEXT_KEY_MANIFEST_HEADER, components);
 					}
+					int generated = 0;
+					int keep = 0;
 					for (String component : components.split(",\\s*")) {
 						String name = FilenameUtils.getName(component);
 						if (new File(projectBaseDir, name).isFile()) {
 							// this is an exiting component definition, we should not mess with that...
+							keep++;
 							continue;
 						}
+						log.info("\t" + name);
+						generated++;
 						Resource resource = analyzer.getJar().getResource(component);
 						if (resource != null) {
 							File file = new File(targetDirectory, name);
@@ -189,12 +243,17 @@ public class DeclarativeServicesMojo extends AbstractMojo {
 							resource.write(file);
 						}
 					}
+					if (keep > 0) {
+						log.info(generated + " component(s) were generated, " + keep + " existing component(s) were kept.");
+					} else {
+						log.info(generated + " component(s) were generated.");
+					}
 				}
 			} catch (Exception e) {
 				if (e instanceof MojoFailureException mfe) {
 					throw mfe;
 				}
-				throw new MojoFailureException("Generation of ds components failed: " + e.getMessage(), e);
+				throw new MojoFailureException("Generation of DS components failed: " + e.getMessage(), e);
 			}
 		}
 	}

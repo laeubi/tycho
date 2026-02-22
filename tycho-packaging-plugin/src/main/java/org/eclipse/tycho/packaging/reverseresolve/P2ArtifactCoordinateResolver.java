@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022 Christoph Läubrich and others.
+ * Copyright (c) 2023 Christoph Läubrich and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -15,11 +15,13 @@ package org.eclipse.tycho.packaging.reverseresolve;
 import java.util.Objects;
 import java.util.Optional;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.artifact.Artifact;
@@ -34,13 +36,14 @@ import org.eclipse.tycho.TychoConstants;
  * Uses data stored in the P2 metadata to map to maven artifacts
  *
  */
-@Component(role = ArtifactCoordinateResolver.class, hint = "p2")
+@Singleton
+@Named("p2")
 public class P2ArtifactCoordinateResolver implements ArtifactCoordinateResolver {
 
-	@Requirement
+	@Inject
 	private RepositorySystem repositorySystem;
 
-	@Requirement
+	@Inject
 	private Logger log;
 
 	@Override
@@ -48,9 +51,25 @@ public class P2ArtifactCoordinateResolver implements ArtifactCoordinateResolver 
 		if (dependency instanceof ArtifactDescriptor) {
 			ArtifactDescriptor descriptor = (ArtifactDescriptor) dependency;
 			return descriptor.getInstallableUnits().stream().map(iu -> {
-				String groupId = iu.getProperty(TychoConstants.PROP_GROUP_ID);
-				String artifactId = iu.getProperty(TychoConstants.PROP_ARTIFACT_ID);
-				String version = iu.getProperty(TychoConstants.PROP_VERSION);
+				// Restore the original GAV in case the dependency is a rebundled jar
+				String groupId = iu.getProperty(TychoConstants.PROP_WRAPPED_GROUP_ID);
+				String artifactId = iu.getProperty(TychoConstants.PROP_WRAPPED_ARTIFACT_ID);
+				String version = iu.getProperty(TychoConstants.PROP_WRAPPED_VERSION);
+				String classifier = iu.getProperty(TychoConstants.PROP_WRAPPED_CLASSIFIER);
+				// The classifier is optional and may be null
+				if (groupId != null && artifactId != null && version != null) {
+					Dependency result = new Dependency();
+					result.setGroupId(groupId);
+					result.setArtifactId(artifactId);
+					result.setVersion(version);
+					result.setType("jar");
+					result.setClassifier(classifier);
+					return result;
+				}
+
+				groupId = iu.getProperty(TychoConstants.PROP_GROUP_ID);
+				artifactId = iu.getProperty(TychoConstants.PROP_ARTIFACT_ID);
+				version = iu.getProperty(TychoConstants.PROP_VERSION);
 				if (groupId != null && artifactId != null && version != null) {
 					ArtifactTypeRegistry typeRegistry = session.getRepositorySession().getArtifactTypeRegistry();
 					ArtifactType type = typeRegistry

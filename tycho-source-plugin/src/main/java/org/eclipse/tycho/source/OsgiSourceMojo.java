@@ -21,10 +21,8 @@ import static org.osgi.framework.Constants.BUNDLE_VENDOR;
 import static org.osgi.framework.Constants.BUNDLE_VERSION;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -57,6 +55,8 @@ import org.eclipse.tycho.BuildProperties;
 import org.eclipse.tycho.BuildPropertiesParser;
 import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.ReproducibleUtils;
+import org.eclipse.tycho.TychoProperties;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.osgitools.BundleReader;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
@@ -109,7 +109,7 @@ public class OsgiSourceMojo extends AbstractSourceJarMojo {
      * Build qualifier. Recommended way to set this parameter is using build-qualifier goal. Only
      * used when creating a source bundle.
      */
-    @Parameter(property = "buildQualifier")
+    @Parameter(property = TychoProperties.BUILD_QUALIFIER)
     private String qualifier;
 
     /**
@@ -136,10 +136,10 @@ public class OsgiSourceMojo extends AbstractSourceJarMojo {
 
     /**
      * Additional files to be included in the source bundle jar. This can be used when
-     * <tt>src.includes</tt> in build.properties is not flexible enough , e.g. for files which would
-     * otherwise conflict with files in <tt>bin.includes</tt><br/>
+     * <code>src.includes</code> in build.properties is not flexible enough , e.g. for files which
+     * would otherwise conflict with files in <code>bin.includes</code><br/>
      * Example:<br/>
-     * 
+     *
      * <pre>
      * &lt;additionalFileSets&gt;
      *  &lt;fileSet&gt;
@@ -147,7 +147,7 @@ public class OsgiSourceMojo extends AbstractSourceJarMojo {
      *   &lt;includes&gt;
      *    &lt;include&gt;&#42;&#42;/*&lt;/include&gt;
      *   &lt;/includes&gt;
-     *  &lt;/fileSet&gt;     
+     *  &lt;/fileSet&gt;
      * &lt;/additionalFileSets&gt;
      * </pre>
      */
@@ -274,9 +274,8 @@ public class OsgiSourceMojo extends AbstractSourceJarMojo {
         sourceL10nProps.setProperty(I18N_KEY_BUNDLE_NAME, sourceBundleName);
         sourceL10nProps.setProperty(I18N_KEY_BUNDLE_VENDOR, bundleVendor);
         File l10nPropsFile = new File(l10nOutputDir, MANIFEST_BUNDLE_LOCALIZATION_FILENAME);
-        l10nPropsFile.getParentFile().mkdirs();
-        try (OutputStream out = new FileOutputStream(l10nPropsFile)) {
-            sourceL10nProps.store(out, "Source Bundle Localization");
+        try {
+            ReproducibleUtils.storeProperties(sourceL10nProps, l10nPropsFile.toPath());
         } catch (IOException e) {
             throw new MojoExecutionException("error while generating source bundle localization file", e);
         }
@@ -362,8 +361,7 @@ public class OsgiSourceMojo extends AbstractSourceJarMojo {
 
             addLocalicationHeaders(mavenArchiveConfiguration::addManifestEntry);
         } else {
-            getLog().info(
-                    "NOT adding source bundle MANIFEST.MF entries. Incomplete or no bundle information available.");
+            getLog().info("NOT adding source bundle MANIFEST.MF entries. Incomplete or absent bundle information");
         }
     }
 

@@ -1,11 +1,11 @@
-def deployBranch = 'master'
+def deployBranch = 'main'
 def agentLabel
 if(env.BRANCH_NAME == deployBranch) {
 	//branches that are deployable must run on eclipse infra
-	agentLabel = "centos-latest"
+	agentLabel = "ubuntu-latest"
 } else {
 	//others (prs for example) can run on any infra
-	agentLabel = "centos-latest || linux"
+	agentLabel = "ubuntu-latest || linux"
 }
 
 pipeline {
@@ -18,13 +18,16 @@ pipeline {
 		label agentLabel
 	}
 	tools {
-		maven 'apache-maven-3.8.6'
-		jdk 'openjdk-jdk17-latest'
+		maven 'apache-maven-3.9.9'
+		jdk 'temurin-jdk21-latest'
+	}
+	environment {
+		MAVEN_OPTS = '-Xmx2500m -XX:+PrintFlagsFinal'
 	}
 	stages {
 		stage('Build') {
 			steps {
-				sh 'mvn --batch-mode -U -V -e clean install -Pits -Dmaven.repo.local=$WORKSPACE/.m2/repository'
+				sh 'mvn --batch-mode -U -V -e clean install site site:stage -Pits -Dmaven.repo.local=$WORKSPACE/.m2/repository'
 			}
 			post {
 				always {
@@ -37,15 +40,7 @@ pipeline {
 				branch deployBranch
 			}
 			steps {
-				sh 'mvn --batch-mode -V deploy -DskipTests -DaltDeploymentRepository=repo.eclipse.org::https://repo.eclipse.org/content/repositories/tycho-snapshots/'
-			}
-		}
-		stage('Deploy sitedocs') {
-			when {
-				branch 'master'
-			}
-			steps {
-				sh 'mvn --batch-mode -V clean install site site:stage -DskipTests=true'
+				sh 'mvn --batch-mode -V -ntp deploy -DskipTests -DaltDeploymentRepository=repo.eclipse.org::https://repo.eclipse.org/content/repositories/tycho-snapshots/'
 			}
 		}
 	}

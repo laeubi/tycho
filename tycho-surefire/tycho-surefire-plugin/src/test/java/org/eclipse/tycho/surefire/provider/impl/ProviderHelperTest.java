@@ -13,7 +13,6 @@
 
 package org.eclipse.tycho.surefire.provider.impl;
 
-import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.eclipse.tycho.surefire.provider.impl.AbstractJUnitProviderTest.classPath;
 import static org.junit.Assert.assertEquals;
@@ -21,10 +20,8 @@ import static org.junit.Assert.assertThrows;
 
 import java.io.File;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.model.Dependency;
@@ -37,13 +34,9 @@ import org.eclipse.tycho.testing.TychoPlexusTestCase;
 import org.junit.Before;
 import org.junit.Test;
 import org.osgi.framework.Version;
+import org.osgi.framework.VersionRange;
 
 public class ProviderHelperTest extends TychoPlexusTestCase {
-
-    private static final String TYCHO_GROUPID = "org.eclipse.tycho";
-    private static final String JUNIT3_FRAGMENT = "org.eclipse.tycho.surefire.junit";
-    private static final String JUNIT4_FRAGMENT = "org.eclipse.tycho.surefire.junit4";
-    private static final String BOOTER_ARTIFACTID = "org.eclipse.tycho.surefire.osgibooter";
 
     private ProviderHelper providerHelper;
 
@@ -53,67 +46,34 @@ public class ProviderHelperTest extends TychoPlexusTestCase {
     }
 
     @Test
-    public void testSelectJunit3() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null, classPath("org.junit:3.8"),
-                new Properties(), null);
-        assertEquals(JUnit3Provider.class, provider.getClass());
-    }
-
-    @Test
-    public void testSelectJunit4() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null, classPath("org.junit:4.8.1"),
-                new Properties(), null);
+    public void testSelectJunit47() throws Exception {
+        Properties providerProperties = new Properties();
+        providerProperties.setProperty("parallel", "classes");
+        TestFrameworkProvider provider = providerHelper
+                .selectProvider(null, classPath("org.junit:3.8.2", "org.junit4:4.8.1"), providerProperties, null)
+                .provider();
         assertEquals(JUnit4Provider.class, provider.getClass());
     }
 
     @Test
-    public void testSelectJunit47() throws Exception {
-        Properties providerProperties = new Properties();
-        providerProperties.setProperty("parallel", "classes");
-        TestFrameworkProvider provider = providerHelper.selectProvider(null,
-                classPath("org.junit:3.8.2", "org.junit4:4.8.1"), providerProperties, null);
-        assertEquals(JUnit47Provider.class, provider.getClass());
-    }
-
-    @Test
-    public void testSelectJunit5WithJUnitFromOrbit() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null, classPath("org.junit.jupiter.api:5.0.0"),
-                new Properties(), null);
-        assertEquals(JUnit5Provider.class, provider.getClass());
-    }
-
-    @Test
     public void testSelectJunit5() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null, classPath("junit-jupiter-api:5.0.0"),
-                new Properties(), null);
+        TestFrameworkProvider provider = providerHelper
+                .selectProvider(null, classPath("junit-jupiter-api:5.0.0"), new Properties(), null).provider();
         assertEquals(JUnit5Provider.class, provider.getClass());
     }
 
     @Test
     public void testSelectJunit5WithJUnit4Present() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null,
-                classPath("org.junit:4.12", "org.junit.jupiter.api:5.0.0"), new Properties(), null);
-        assertEquals(JUnit5Provider.class, provider.getClass());
-    }
-
-    @Test
-    public void testSelectJunit4WithJunit3Present() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null,
-                classPath("org.junit:3.8.1", "org.junit:4.8.1"), new Properties(), null);
-        assertEquals(JUnit4Provider.class, provider.getClass());
-    }
-
-    @Test
-    public void testForceJunit3WithHint() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null,
-                classPath("org.junit:3.8.1", "org.junit:4.8.1"), new Properties(), "junit3");
-        assertEquals(JUnit3Provider.class, provider.getClass());
+        TestFrameworkProvider provider = providerHelper
+                .selectProvider(null, classPath("org.junit:4.12", "junit-jupiter-api:5.0.0"), new Properties(), null)
+                .provider();
+        assertEquals(JUnit5VintageInternalProvider.class, provider.getClass());
     }
 
     @Test
     public void testSelectTestNG() throws Exception {
-        TestFrameworkProvider provider = providerHelper.selectProvider(null, classPath("org.testng:6.9.12"),
-                new Properties(), null);
+        TestFrameworkProvider provider = providerHelper
+                .selectProvider(null, classPath("org.testng:6.9.12"), new Properties(), null).provider();
         assertEquals(TestNGProvider.class, provider.getClass());
     }
 
@@ -125,16 +85,8 @@ public class ProviderHelperTest extends TychoPlexusTestCase {
 
     @Test
     public void testNoProviderFound() {
-        assertThrows(MojoExecutionException.class,
-                () -> providerHelper.selectProvider(null, classPath("foo:1.0", "test:2.0"), new Properties(), null));
-    }
-
-    @Test
-    public void testParallelModeNotSupported() {
-        Properties providerProperties = new Properties();
-        providerProperties.setProperty("parallel", "methods");
-        assertThrows(MojoExecutionException.class,
-                () -> providerHelper.selectProvider(null, classPath("org.junit:4.6"), providerProperties, null));
+        assertThrows(MojoExecutionException.class, () -> providerHelper
+                .selectProvider(null, classPath("foo:1.0", "test:2.0"), new Properties(), null).provider());
     }
 
     @Test
@@ -142,7 +94,8 @@ public class ProviderHelperTest extends TychoPlexusTestCase {
         TestFrameworkProvider anotherProvider = new TestFrameworkProvider() {
 
             @Override
-            public boolean isEnabled(MavenProject project, List<ClasspathEntry> testBundleClassPath, Properties surefireProperties) {
+            public boolean isEnabled(MavenProject project, List<ClasspathEntry> testBundleClassPath,
+                    Properties surefireProperties) {
                 return true;
             }
 
@@ -162,7 +115,7 @@ public class ProviderHelperTest extends TychoPlexusTestCase {
             }
 
             @Override
-            public List<Dependency> getRequiredBundles() {
+            public List<Dependency> getRequiredArtifacts() {
                 return emptyList();
             }
 
@@ -170,52 +123,21 @@ public class ProviderHelperTest extends TychoPlexusTestCase {
             public Properties getProviderSpecificProperties() {
                 return new Properties();
             }
+
+            @Override
+            public VersionRange getVersionRange() {
+                return VersionRange.valueOf("1.0");
+            }
         };
         PlexusContainer container = getContainer();
         container.addComponent(anotherProvider, TestFrameworkProvider.class, "another_test_fwk");
         ProviderHelper providerSelector = container.lookup(ProviderHelper.class);
         try {
-            assertThrows(MojoExecutionException.class,
-                    () -> providerSelector.selectProvider(null, classPath("org.junit:4.8.1"), new Properties(), null));
+            assertThrows(MojoExecutionException.class, () -> providerSelector
+                    .selectProvider(null, classPath("org.junit:4.8.1"), new Properties(), null).provider());
         } finally {
             container.release(anotherProvider);
         }
-    }
-
-    @Test
-    public void testFilterTestFrameworkBundlesNotFound() {
-        assertThrows(MojoExecutionException.class, () -> providerHelper.filterTestFrameworkBundles(new JUnit3Provider(),
-                asList(createMockArtifact("test", "test"))));
-    }
-
-    @Test
-    public void testFilterTestFrameworkBundlesJUnit3() throws MojoExecutionException {
-        Set<org.apache.maven.artifact.Artifact> junitSurefireBundles = providerHelper.filterTestFrameworkBundles(
-                new JUnit3Provider(),
-                asList(booterArtifact(), junit3Artifact(), junit4Artifact(), createMockArtifact("foo", "bar")));
-        assertEquals(2, junitSurefireBundles.size());
-        Set<String> fileNames = new HashSet<>();
-        for (org.apache.maven.artifact.Artifact artifact : junitSurefireBundles) {
-            fileNames.add(artifact.getFile().getName());
-        }
-        HashSet<String> expectedFileNames = new HashSet<>(
-                asList(TYCHO_GROUPID + "_" + BOOTER_ARTIFACTID, TYCHO_GROUPID + "_" + JUNIT3_FRAGMENT));
-        assertEquals(expectedFileNames, fileNames);
-    }
-
-    @Test
-    public void testFilterTestFrameworkBundlesJUnit4() throws MojoExecutionException {
-        Set<org.apache.maven.artifact.Artifact> junitSurefireBundles = providerHelper.filterTestFrameworkBundles(
-                new JUnit4Provider(),
-                asList(booterArtifact(), junit3Artifact(), junit4Artifact(), createMockArtifact("foo", "bar")));
-        assertEquals(2, junitSurefireBundles.size());
-        Set<String> fileNames = new HashSet<>();
-        for (org.apache.maven.artifact.Artifact artifact : junitSurefireBundles) {
-            fileNames.add(artifact.getFile().getName());
-        }
-        HashSet<String> expectedFileNames = new HashSet<>(
-                asList(TYCHO_GROUPID + "_" + BOOTER_ARTIFACTID, TYCHO_GROUPID + "_" + JUNIT4_FRAGMENT));
-        assertEquals(expectedFileNames, fileNames);
     }
 
     @Test
@@ -224,22 +146,6 @@ public class ProviderHelperTest extends TychoPlexusTestCase {
                 createMockArtifact("foo", "bar", new File("src/test/resources/org.junit_3.8.2.v20090203-1005"))));
         assertEquals(1, symbolicNames.size());
         assertEquals("org.junit", symbolicNames.get(0));
-    }
-
-    private org.apache.maven.artifact.Artifact junit3Artifact() {
-        return createMockArtifact(TYCHO_GROUPID, JUNIT3_FRAGMENT);
-    }
-
-    private org.apache.maven.artifact.Artifact junit4Artifact() {
-        return createMockArtifact(TYCHO_GROUPID, JUNIT4_FRAGMENT);
-    }
-
-    private org.apache.maven.artifact.Artifact booterArtifact() {
-        return createMockArtifact(TYCHO_GROUPID, BOOTER_ARTIFACTID);
-    }
-
-    private org.apache.maven.artifact.Artifact createMockArtifact(String groupId, String artifactId) {
-        return createMockArtifact(groupId, artifactId, null);
     }
 
     private org.apache.maven.artifact.Artifact createMockArtifact(String groupId, String artifactId, File file) {

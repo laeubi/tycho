@@ -14,32 +14,36 @@ package org.eclipse.tycho.p2maven.transport;
 
 import java.io.File;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.LegacySupport;
-import org.apache.maven.repository.RepositorySystem;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
-import org.codehaus.plexus.personality.plexus.lifecycle.phase.Initializable;
-import org.codehaus.plexus.personality.plexus.lifecycle.phase.InitializationException;
 import org.eclipse.aether.transfer.TransferListener;
+import org.eclipse.tycho.TychoConstants;
 
-@Component(role = TransportCacheConfig.class)
-public class DefaultTransportCacheConfig implements TransportCacheConfig, Initializable {
+@Named
+@Singleton
+public class DefaultTransportCacheConfig implements TransportCacheConfig {
+
+	private static final boolean DEBUG_REQUESTS = Boolean.getBoolean("tycho.p2.transport.debug");
 
 	private boolean offline;
 	private boolean update;
 	private boolean interactive;
 
-	@Requirement
+	@Inject
 	private LegacySupport legacySupport;
 	private File cacheLocation;
 
-	@Override
-	public void initialize() throws InitializationException {
+	@PostConstruct
+	public void initialize() {
 		File repoDir;
 		MavenSession session = legacySupport.getSession();
 		if (session == null) {
-			repoDir = RepositorySystem.defaultUserLocalRepository;
+			repoDir = TychoConstants.DEFAULT_USER_LOCALREPOSITORY;
 			offline = false;
 			update = false;
 			interactive = false;
@@ -49,8 +53,12 @@ public class DefaultTransportCacheConfig implements TransportCacheConfig, Initia
 			update = session.getRequest().isUpdateSnapshots();
 			interactive = session.getRequest().isInteractiveMode() && showTransferProgress(session);
 		}
-
-		cacheLocation = new File(repoDir, ".cache/tycho");
+		String property = System.getProperty("tycho.p2.transport.cache");
+		if (property == null || property.isBlank()) {
+			cacheLocation = new File(repoDir, ".cache/tycho");
+		} else {
+			cacheLocation = new File(property);
+		}
 		cacheLocation.mkdirs();
 	}
 
@@ -80,6 +88,11 @@ public class DefaultTransportCacheConfig implements TransportCacheConfig, Initia
 	@Override
 	public File getCacheLocation() {
 		return cacheLocation;
+	}
+
+	@Override
+	public boolean isDebug() {
+		return DEBUG_REQUESTS;
 	}
 
 }

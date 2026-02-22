@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2010, 2021 SAP AG and others.
+ * Copyright (c) 2010, 2023 SAP AG and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -28,8 +28,8 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 
-import org.apache.maven.shared.verifier.VerificationException;
-import org.apache.maven.shared.verifier.Verifier;
+import org.apache.maven.it.VerificationException;
+import org.apache.maven.it.Verifier;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.ArchiveContentUtil;
@@ -43,6 +43,31 @@ import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
 import org.junit.runner.RunWith;
 
+/**
+ * Integration test for building and installing Eclipse RCP (Rich Client Platform) products with P2 enabled.
+ * <p>
+ * This test validates the complete lifecycle of creating Eclipse products with P2 provisioning support,
+ * including:
+ * <ul>
+ * <li>Building multiple product configurations with different packaging options (standard, multi-platform, with bundle pools)</li>
+ * <li>Publishing product IUs (Installable Units) to P2 repositories</li>
+ * <li>Materializing products with the tycho-p2-director-plugin</li>
+ * <li>Verifying product installations have correct configurations (config.ini, P2 profiles, simpleconfigurator)</li>
+ * <li>Testing root-level feature installation in products</li>
+ * <li>Validating product artifacts and attachments for different target environments</li>
+ * </ul>
+ * <p>
+ * The test uses JUnit's Theories framework to test multiple target environments (Windows/Linux, different architectures).
+ * It covers several product scenarios:
+ * <ul>
+ * <li><b>main.product.id</b>: Standard product with local features</li>
+ * <li><b>multi.platform.package.product.id</b>: Multi-platform product with shared bundle pool</li>
+ * <li><b>extra.product.id</b>: Product with custom root folder and P2 inf properties</li>
+ * <li><b>repoonly.product.id</b>: Product published to repository only (not materialized)</li>
+ * </ul>
+ * 
+ * @see org.eclipse.tycho.test.AbstractTychoIntegrationTest
+ */
 @RunWith(Theories.class)
 public class Tycho188P2EnabledRcpTest extends AbstractTychoIntegrationTest {
 
@@ -127,9 +152,12 @@ public class Tycho188P2EnabledRcpTest extends AbstractTychoIntegrationTest {
 		Optional<File> rootFeatureInRepo = p2Repository.findFeatureArtifact("pi.root-level-installed-feature");
 		assertTrue(rootFeatureInRepo.isPresent());
 
-		// ... although there is no dependency from the product IU.
-		assertThat(p2Repository.getUniqueIU("main.product.id").getRequiredIds(),
-				not(hasItem("pi.root-level-installed-feature.feature.group")));
+		// ... although there is no unfiltered dependency from the product IU.
+		var unfilteredRequiredIds = p2Repository.getUniqueIU("main.product.id").getUnfilteredRequiredIds();
+		assertThat(unfilteredRequiredIds, not(hasItem("pi.root-level-installed-feature.feature.group")));
+
+		// There are the expected unfiltered requirement such as this one.
+		assertThat(unfilteredRequiredIds, hasItem("pi.example.feature.feature.group"));
 	}
 
 	@Test

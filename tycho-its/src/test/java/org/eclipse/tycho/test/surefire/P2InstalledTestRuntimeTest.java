@@ -14,7 +14,7 @@ package org.eclipse.tycho.test.surefire;
 
 import java.util.List;
 
-import org.apache.maven.shared.verifier.Verifier;
+import org.apache.maven.it.Verifier;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.ResourceUtil;
@@ -24,31 +24,40 @@ public class P2InstalledTestRuntimeTest extends AbstractTychoIntegrationTest {
 
 	@Test
 	public void testProvisionAppAndRunTest() throws Exception {
-		Verifier verifier = getVerifier("surefire.p2InstalledRuntime", false);
-		verifier.addCliArgument("-Dp2.repo.url=" + ResourceUtil.P2Repositories.ECLIPSE_LATEST.toString());
-		verifier.addCliArgument("-PprovisionProduct");
+		Verifier verifier = getVerifier("surefire.p2InstalledRuntime");
+		verifier.addCliOption("-PprovisionProduct");
 		verifier.executeGoals(List.of("clean", "integration-test"));
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
 	public void testRunTestOnProvisionedApp() throws Exception {
-		Verifier verifier = getVerifier("surefire.p2InstalledRuntime", false);
-		verifier.addCliArgument("-Dp2.repo.url=" + ResourceUtil.P2Repositories.ECLIPSE_LATEST.toString());
-		verifier.addCliArgument("-PuseProvisionedProduct");
-		verifier.addCliArgument("-DproductClassifier=" + getProductClassifier());
+		Verifier verifier = getVerifier("surefire.p2InstalledRuntime");
+		verifier.addCliOption("-PuseProvisionedProduct");
+		verifier.addCliOption("-DproductClassifier=" + getProductClassifier());
 		verifier.executeGoals(List.of("clean", "integration-test"));
 		verifier.verifyErrorFreeLog();
 	}
 
 	@Test
+	public void testRunTestOnProvisionedDirector() throws Exception {
+		Verifier verifier = getVerifier("surefire.p2InstalledRuntime");
+		verifier.addCliOption("-PuseProvisionedProductDirector");
+		verifier.addCliOption("-DproductClassifier=" + getProductClassifier());
+		verifier.executeGoals(List.of("clean", "integration-test"));
+		verifier.verifyErrorFreeLog();
+		verifier.verifyTextInLog("Tests run: 1");
+	}
+
+	@Test
 	public void testDifferentHarnessVersions() throws Exception {
 		Verifier verifier = getVerifier("surefire.p2InstalledRuntime", false);
-		verifier.addCliArgument("-Dp2.repo.url=" + ResourceUtil.P2Repositories.ECLIPSE_OXYGEN.toString());
+		verifier.addCliOption("-Dtarget-platform=" + ResourceUtil.P2Repositories.ECLIPSE_OXYGEN.toString());
 		// Use different TP for test bundle and product under test
-		verifier.addCliArgument("-Dother.p2.repo.url=" + ResourceUtil.P2Repositories.ECLIPSE_LATEST.toString());
-		verifier.addCliArgument("-PuseProvisionedProduct");
-		verifier.addCliArgument("-DproductClassifier=" + getProductClassifier());
+		verifier.addCliOption(
+				"-Dother.p2.repo.url=" + ResourceUtil.P2Repositories.ECLIPSE_LATEST.toString().replace("/", "//"));
+		verifier.addCliOption("-PuseProvisionedProduct");
+		verifier.addCliOption("-DproductClassifier=" + getProductClassifier());
 		verifier.executeGoals(List.of("clean", "integration-test"));
 		verifier.verifyErrorFreeLog();
 	}

@@ -41,11 +41,14 @@ import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugin.logging.Log;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Mojo;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Parameter;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.ResolutionScope;
+import javax.inject.Inject;
 import org.apache.maven.project.MavenProject;
 import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.TychoConstants;
@@ -73,16 +76,16 @@ public class UpdateConsumerPomMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${session}", readonly = true, required = true)
 	private MavenSession session;
 
-	@Component(role = ModelWriter.class)
+		@Inject
 	protected ModelWriter modelWriter;
 
-	@Component(role = ModelReader.class)
+		@Inject
 	protected ModelReader modelReader;
 
-	@Component
+	@Inject
 	private Map<String, ArtifactCoordinateResolver> artifactCoordinateResolvers;
 
-	@Component
+	@Inject
 	ArtifactHandlerManager artifactHandlerManager;
 
 	/**
@@ -163,6 +166,12 @@ public class UpdateConsumerPomMojo extends AbstractMojo {
 	@Parameter(defaultValue = "true")
 	protected boolean relativePathFromParent = true;
 
+	/**
+	 * If enabled, removes the parent and resolves version and group id directly
+	 */
+	@Parameter(defaultValue = "true")
+	protected boolean removeParent = true;
+
 	@Parameter
 	private MavenArchiveConfiguration archive = new MavenArchiveConfiguration();
 
@@ -184,12 +193,18 @@ public class UpdateConsumerPomMojo extends AbstractMojo {
 			outputDirectory = project.getBasedir();
 		}
 		Log log = getLog();
-		log.debug("Generating pom descriptor with updated dependencies...");
+		log.debug("Generating pom descriptor with updated dependencies");
 		Model projectModel;
 		try {
-			projectModel = modelReader.read(project.getFile(), null);
+			projectModel = modelReader.read(project.getFile(), Map.of());
 		} catch (IOException e) {
 			throw new MojoExecutionException("reading the model failed!", e);
+		}
+		// just in case this is a CI-Friendly version replace it with actual value
+		projectModel.setVersion(project.getVersion());
+		if (removeParent) {
+			projectModel.setGroupId(project.getGroupId());
+			projectModel.setParent(null);
 		}
 		List<Dependency> dependencies = projectModel.getDependencies();
 		dependencies.clear();
@@ -217,6 +232,11 @@ public class UpdateConsumerPomMojo extends AbstractMojo {
 		}
 		Parent parent = projectModel.getParent();
 		if (parent != null) {
+			MavenProject parentmavenProject = project.getParent();
+			if (parentmavenProject != null) {
+				// just in case this is a CI-Friendly version replace it with actual value
+				parent.setVersion(parentmavenProject.getVersion());
+			}
 			if (relativePathFromParent) {
 				parent.setRelativePath("../pom.xml"); // will be treated as default and then removed...
 			} else {
@@ -242,7 +262,7 @@ public class UpdateConsumerPomMojo extends AbstractMojo {
 		}
 		if (p2Skipped.isEmpty()) {
 			log.info("All system scoped dependencies were mapped to maven artifacts");
-		} else {
+		} else if (mapP2Dependencies) {
 			log.warn(resolved + " system scoped dependencies were mapped to maven artifacts, " + p2Skipped.size()
 					+ " were skipped");
 			if (log.isDebugEnabled()) {
@@ -250,6 +270,8 @@ public class UpdateConsumerPomMojo extends AbstractMojo {
 					log.debug("Skipped: " + skipped);
 				}
 			}
+		} else {
+			log.info(p2Skipped.size() + " system scoped dependencies were not mapped to maven artifacts");
 		}
 		try {
 			modelWriter.write(output, null, projectModel);

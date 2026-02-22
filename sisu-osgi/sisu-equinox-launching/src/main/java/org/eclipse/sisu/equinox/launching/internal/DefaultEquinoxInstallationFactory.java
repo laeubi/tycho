@@ -12,12 +12,9 @@
  *******************************************************************************/
 package org.eclipse.sisu.equinox.launching.internal;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -31,11 +28,13 @@ import java.util.StringJoiner;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.codehaus.plexus.PlexusContainer;
 import org.codehaus.plexus.archiver.ArchiverException;
 import org.codehaus.plexus.archiver.UnArchiver;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.codehaus.plexus.logging.Logger;
 import org.codehaus.plexus.util.FileUtils;
@@ -45,17 +44,19 @@ import org.eclipse.sisu.equinox.launching.BundleStartLevel;
 import org.eclipse.sisu.equinox.launching.EquinoxInstallation;
 import org.eclipse.sisu.equinox.launching.EquinoxInstallationDescription;
 import org.eclipse.sisu.equinox.launching.EquinoxInstallationFactory;
+import org.eclipse.tycho.ReproducibleUtils;
 import org.eclipse.tycho.TychoConstants;
 import org.osgi.framework.Constants;
 
-@Component(role = EquinoxInstallationFactory.class)
+@Named
+@Singleton
 public class DefaultEquinoxInstallationFactory implements EquinoxInstallationFactory {
-    @Requirement
+    @Inject
     private PlexusContainer plexus;
 
     private final Map<String, Manifest> manifestCache = new HashMap<>();
 
-    @Requirement
+    @Inject
     private Logger log;
 
     public DefaultEquinoxInstallationFactory() {
@@ -137,7 +138,7 @@ public class DefaultEquinoxInstallationFactory implements EquinoxInstallationFac
             }
 
             if (!frameworkExtensions.isEmpty()) {
-                // see osgi.framework.extensions at https://help.eclipse.org/indigo/index.jsp?topic=%2Forg.eclipse.platform.doc.isv%2Freference%2Fmisc%2Fruntime-options.html
+                // see osgi.framework.extensions at https://help.eclipse.org/latest/index.jsp?topic=%2Forg.eclipse.platform.doc.isv%2Freference%2Fmisc%2Fruntime-options.html
                 Collection<String> bundleNames = unpackFrameworkExtensions(location, frameworkExtensions);
                 p.setProperty("osgi.framework", copySystemBundle(description, location));
                 p.setProperty("osgi.framework.extensions", StringUtils.join(bundleNames.iterator(), ","));
@@ -148,12 +149,8 @@ public class DefaultEquinoxInstallationFactory implements EquinoxInstallationFac
             }
 
             File configIni = new File(location, TychoConstants.CONFIG_INI_PATH);
+            ReproducibleUtils.storeProperties(p, configIni.toPath());
             File configurationLocation = configIni.getParentFile();
-            configurationLocation.mkdirs();
-            try (FileOutputStream fos = new FileOutputStream(configIni)) {
-                p.store(fos, null);
-            }
-
             return new DefaultEquinoxInstallation(description, location, configurationLocation);
         } catch (IOException e) {
             throw new RuntimeException("Exception creating test eclipse runtime", e);
@@ -201,18 +198,16 @@ public class DefaultEquinoxInstallationFactory implements EquinoxInstallationFac
 
     /**
      * See
-     * 
+     *
      * <pre>
-     * https://help.eclipse.org/indigo/topic/org.eclipse.platform.doc.isv/reference/misc/runtime-options.html#osgidev
+     * https://help.eclipse.org/latest/topic/org.eclipse.platform.doc.isv/reference/misc/runtime-options.html#osgidev
      * </pre>
      */
     private String createDevProperties(File location, Map<String, String> devEntries) throws IOException {
         File file = new File(location, "dev.properties");
         Properties properties = new Properties();
         properties.putAll(devEntries);
-        try (OutputStream os = new BufferedOutputStream(new FileOutputStream(file))) {
-            properties.store(os, null);
-        }
+        ReproducibleUtils.storeProperties(properties, file.toPath());
         return file.toURI().toURL().toExternalForm();
     }
 

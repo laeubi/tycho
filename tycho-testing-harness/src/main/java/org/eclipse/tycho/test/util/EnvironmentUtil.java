@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2008, 2020 Sonatype Inc. and others.
+ * Copyright (c) 2008, 2023 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -12,37 +12,29 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.util;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
 import java.util.Properties;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
+import org.eclipse.tycho.TychoConstants;
 
 /**
  * Provides system properties and certain properties from the test code build ("outer build"), like
  * the location of the local Maven repository. For this class to work, the outer build must
- * configure the <tt>maven-properties-plugin</tt> to capture the values in a file called
+ * configure the <code>maven-properties-plugin</code> to capture the values in a file called
  * baseTest.properties (see tycho-its/pom.xml for an example).
  */
 public class EnvironmentUtil {
 
-    private static final String MAVEN_HOME_INFO = "Maven home:";
-
-    public static final String ECLIPSE_LATEST = "https:////download.eclipse.org/releases/2022-12/";
+    public static final String MAVEN_HOME_INFO = "Maven home:";
 
     private static final Properties props;
 
     static {
         props = new Properties();
-        ClassLoader cl = AbstractTychoIntegrationTest.class.getClassLoader();
+        ClassLoader cl = EnvironmentUtil.class.getClassLoader();
         try (InputStream is = cl.getResourceAsStream("baseTest.properties")) {
             if (is != null) {
                 props.load(is);
@@ -52,8 +44,8 @@ public class EnvironmentUtil {
         }
     }
 
-    static synchronized String getProperty(String key) {
-        return props.getProperty(key);
+    public static synchronized String getProperty(String key) {
+        return props.getProperty(key, System.getProperty(key));
     }
 
     private static final String WINDOWS_OS = "windows";
@@ -85,7 +77,7 @@ public class EnvironmentUtil {
     }
 
     public static String getTargetPlatform() {
-        return ECLIPSE_LATEST;
+        return TychoConstants.ECLIPSE_LATEST;
     }
 
     public static String getTestSettings() {
@@ -93,50 +85,6 @@ public class EnvironmentUtil {
         if (value == null || value.contains("$"))
             return null;
         return value;
-    }
-
-    public static String getMavenHome() {
-        String systemValue = System.getProperty("tychodev-maven.home");
-        if (systemValue != null) {
-            return systemValue;
-        }
-        String property = getProperty("maven-dir");
-        if (property == null) {
-            ProcessBuilder pb = new ProcessBuilder("mvn", "-V");
-            pb.redirectErrorStream(true);
-            try {
-                Process process = pb.start();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith(MAVEN_HOME_INFO)) {
-                        property = line.substring(MAVEN_HOME_INFO.length()).trim();
-                    }
-                }
-            } catch (IOException e) {
-            }
-        }
-        return property;
-    }
-
-    public static String getTychoVersion() {
-        String property = getProperty("tycho-version");
-        if (property == null) {
-            try {
-                List<String> lines = Files.readAllLines(Path.of("pom.xml"));
-                Pattern pattern = Pattern.compile("<version>(.*)</version>");
-                for (String line : lines) {
-                    Matcher matcher = pattern.matcher(line);
-                    if (matcher.find()) {
-                        return matcher.group(1);
-                    }
-                }
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-        return property;
     }
 
     public static int getHttpServerPort() {

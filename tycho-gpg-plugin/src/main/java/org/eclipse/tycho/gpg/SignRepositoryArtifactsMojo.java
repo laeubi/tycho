@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2021 Red Hat Inc. and others.
+ * Copyright (c) 2021, 2025 Red Hat Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -11,12 +11,11 @@ package org.eclipse.tycho.gpg;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.attribute.FileTime;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
+import org.apache.maven.archiver.MavenArchiver;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Component;
@@ -41,7 +40,6 @@ import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.equinox.p2.repository.artifact.IFileArtifactRepository;
 import org.eclipse.equinox.p2.repository.artifact.spi.ArtifactDescriptor;
 import org.eclipse.osgi.signedcontent.SignedContentFactory;
-import org.eclipse.tycho.MavenRepositoryLocation;
 import org.eclipse.tycho.p2maven.repository.P2RepositoryManager;
 
 /**
@@ -140,6 +138,15 @@ public class SignRepositoryArtifactsMojo extends AbstractGpgMojoExtension {
     @Parameter
     private List<String> forceSignature;
 
+    /**
+     * Timestamp for reproducible output archive entries, either formatted as ISO 8601 extended
+     * offset date-time (e.g. in UTC such as '2011-12-03T10:15:30Z' or with an offset
+     * '2019-10-05T20:37:42+06:00'), or as an int representing seconds since the epoch (like
+     * <a href="https://reproducible-builds.org/docs/source-date-epoch/">SOURCE_DATE_EPOCH</a>).
+     */
+    @Parameter(defaultValue = "${project.build.outputTimestamp}")
+    private String outputTimestamp;
+
     @Component(role = UnArchiver.class, hint = "zip")
     private ZipUnArchiver zipUnArchiver;
 
@@ -169,14 +176,14 @@ public class SignRepositoryArtifactsMojo extends AbstractGpgMojoExtension {
     }
 
     @Override
-    public void execute() throws MojoExecutionException, MojoFailureException {
+    public void doExecute() throws MojoExecutionException, MojoFailureException {
 
         var signer = newSigner(project);
         var keys = KeyStore.create();
 
         try {
             var artifactRepository = (IFileArtifactRepository) repositoryManager
-                    .getArtifactRepository(new MavenRepositoryLocation("", repository.toURI()));
+                    .getArtifactRepository(repository.toURI(), null);
 
             var compressed = "true".equals(artifactRepository.getProperty(IRepository.PROP_COMPRESSED));
 
@@ -188,9 +195,8 @@ public class SignRepositoryArtifactsMojo extends AbstractGpgMojoExtension {
             }
 
             var artifactKeys = artifactRepository.query(ArtifactKeyQuery.ALL_KEYS, null);
-            var descriptors = StreamSupport.stream(artifactKeys.spliterator(), false)
-                    .map(artifactRepository::getArtifactDescriptors).map(Arrays::asList).flatMap(Collection::stream)
-                    .collect(Collectors.toList());
+            var descriptors = artifactKeys.stream().map(artifactRepository::getArtifactDescriptors)
+                    .flatMap(Arrays::stream).toList();
             descriptors.parallelStream()
                     .forEach(it -> handle(it, artifactRepository.getArtifactFile(it), signer, keys));
 
@@ -211,6 +217,10 @@ public class SignRepositoryArtifactsMojo extends AbstractGpgMojoExtension {
                     zipUnArchiver.extract();
                 }
             }
+
+            // configure for Reproducible Builds based on outputTimestamp value
+            MavenArchiver.parseBuildOutputTimestamp(outputTimestamp).map(FileTime::from)
+                    .ifPresent(modifiedTime -> xzArchiver.configureReproducibleBuild(modifiedTime));
 
             xzArchiver.setDestFile(artifactsXmlXz);
             xzArchiver.addFile(artifactsXml, artifactsXml.getName());
@@ -256,6 +266,13 @@ public class SignRepositoryArtifactsMojo extends AbstractGpgMojoExtension {
                     try {
                         var signedContent = signedContentFactory.getSignedContent(artifact);
                         if (signedContent.isSigned()) {
+                            for (var signerInfo : signedContent.getSignerInfos()) {
+                                // Check that the signature was produced within the validity range of the certificate.
+                                // If invalid, this throws CertificateExpiredException or CertificateNotYetValidException.
+                                // That ensures we continue the logic that follows as if the content were not signed.
+                                signedContent.checkValidity(signerInfo);
+                            }
+
                             if (skipIfJarsigned) {
                                 return;
                             }
@@ -281,7 +298,7 @@ public class SignRepositoryArtifactsMojo extends AbstractGpgMojoExtension {
             try {
                 var signatures = signer.generateSignature(artifact);
                 var signerKeys = signatures.all().stream().map(PGPSignature::getKeyID)
-                        .flatMap(id -> signer.getPublicKeys().getKeys(id).stream()).collect(Collectors.toList());
+                        .flatMap(id -> signer.getPublicKeys().getKeys(id).stream()).toList();
                 var keyStore = KeyStore.create(existingKeys);
                 keyStore.add(signerKeys);
                 allKeys.add(keyStore);

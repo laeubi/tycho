@@ -13,171 +13,338 @@
  *******************************************************************************/
 package org.eclipse.tycho.versionbump;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Collections;
-import java.util.HashMap;
+import java.time.Period;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
+import java.util.stream.Stream.Builder;
 
-import javax.xml.parsers.ParserConfigurationException;
+import javax.inject.Inject;
 
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.MojoExecution;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.eclipse.tycho.TargetEnvironment;
-import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
-import org.eclipse.tycho.core.resolver.P2ResolutionResult;
-import org.eclipse.tycho.targetplatform.TargetDefinition;
-import org.eclipse.tycho.targetplatform.TargetDefinition.IncludeMode;
-import org.eclipse.tycho.targetplatform.TargetDefinition.InstallableUnitLocation;
-import org.eclipse.tycho.targetplatform.TargetDefinition.Repository;
-import org.eclipse.tycho.targetplatform.TargetDefinition.Unit;
-import org.eclipse.tycho.targetplatform.TargetDefinitionFile;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
+import org.codehaus.mojo.versions.api.Segment;
+import org.codehaus.mojo.versions.model.RuleSet;
+import org.eclipse.tycho.core.MarkdownBuilder;
+import org.eclipse.tycho.targetplatform.TargetPlatformArtifactResolver;
+import org.eclipse.tycho.targetplatform.TargetResolveException;
+
+import de.pdark.decentxml.Document;
+import de.pdark.decentxml.Element;
+import de.pdark.decentxml.XMLIOSource;
+import de.pdark.decentxml.XMLParser;
+import de.pdark.decentxml.XMLWriter;
 
 /**
- * Quick&dirty way to update .target file to use latest versions of IUs available from specified
- * metadata repositories.
+ * This allows to update a target file to use newer version of specified items, e.g. IUs from
+ * updatesites or maven coordinates. In the simplest form this is called like
+ *
+ * <pre>
+ * mvn -f [path to target project] tycho-version-bump:update-target
+ * </pre>
+ * <p>
+ * For updating <b>maven target locations</b> the mojo supports
+ * <a href="https://www.mojohaus.org/versions/versions-maven-plugin/version-rules.html">Version
+ * number comparison rule-sets</a> similar to the
+ * <a href="https://www.mojohaus.org/versions/versions-maven-plugin">Versions Maven Plugin</a>
+ * please check the documentation there for further information about ruleset files.
+ * </p>
+ * <p>
+ * For updating <b>installable unit locations</b> (also known as update sites) you can configure
+ * different strategies (see {@link #getUpdateSiteDiscovery()}) to discover updates.
+ * </p>
  */
 @Mojo(name = "update-target")
 public class UpdateTargetMojo extends AbstractUpdateMojo {
+    /**
+     * Specify the path to the target file to update, if not given the current project settings will
+     * be used to find a suitable file
+     */
     @Parameter(property = "target")
     private File targetFile;
 
+    /**
+     * Whether to allow the major version number to be changed.
+     */
+    @Parameter(property = "allowMajorUpdates", defaultValue = "true")
+    private boolean allowMajorUpdates;
+
+    /**
+     * Whether to allow the minor version number to be changed.
+     *
+     */
+    @Parameter(property = "allowMinorUpdates", defaultValue = "true")
+    private boolean allowMinorUpdates;
+
+    /**
+     * Whether to allow the incremental version number to be changed.
+     *
+     */
+    @Parameter(property = "allowIncrementalUpdates", defaultValue = "true")
+    private boolean allowIncrementalUpdates;
+
+    /**
+     * Whether to allow the subIncremental version number to be changed.
+     *
+     */
+    @Parameter(property = "allowSubIncrementalUpdates", defaultValue = "true")
+    private boolean allowSubIncrementalUpdates;
+
+    /**
+     * A list of update site discovery strategies, the following is currently supported:
+     * <ul>
+     * <li><code>parent</code> - search the parent path for a composite that can be used to find
+     * newer versions</li>
+     * <li><code>versionPattern[:pattern]</code> - specifies a pattern to match in the URL (defaults
+     * to <code>(\d+)\.(\d+)</code> where it increments each numeric part beginning at the last
+     * group, if no repository is found using the next group setting the previous to zero. Any non
+     * numeric pattern will be replaced by the empty string</li>
+     * <li><code>datePattern[:pattern:format[:period]]</code> - specifies a pattern and format to
+     * match in the URL (defaults to <code>(\d{4}-\d{2}):yyyy-MM</code>)</li> where the pattern
+     * defines a date that should be incremented by a given {@link Period} (defaults to
+     * <code>P3M7D</code>)</li>
+     * </ul>
+     * If used on the CLI, individual values must be separated by a comma see <a href=
+     * "https://maven.apache.org/guides/mini/guide-configuring-plugins.html#Mapping_Collections_and_Arrays">here</a>
+     */
+    @Parameter(property = "discovery")
+    private List<String> updateSiteDiscovery;
+
+    /**
+     * <p>
+     * Allows specifying a {@linkplain RuleSet} object describing rules on maven artifact versions
+     * to ignore when considering updates.
+     * </p>
+     */
+    @Parameter
+    private RuleSet mavenRuleSet;
+
+    /**
+     * <p>
+     * Allows specifying ignored maven artifact versions as an alternative to providing a
+     * {@linkplain #mavenRuleSet} parameter.
+     * </p>
+     */
+    @Parameter(property = "maven.version.ignore")
+    private Set<String> mavenIgnoredVersions;
+
+    /**
+     * URI of a ruleSet file containing the rules that control how to compare version numbers.
+     */
+    @Parameter(property = "maven.version.rules")
+    private String mavenRulesUri;
+
+    @Parameter(defaultValue = "Please review the changes and merge if appropriate, or cherry pick individual updates.", property = "tycho.updatetarget.report.preamble")
+    private String reportPreamble;
+
+    @Parameter(defaultValue = "${project.build.directory}/targetUpdates.md", property = "tycho.updatetarget.report")
+    private File reportFileName;
+
+    /**
+     * If enabled, missing or empty versions are updated to the most recent found in the repository
+     * to guarantee a stable build
+     */
+    @Parameter(defaultValue = "true", property = "tycho.updatetarget.updateEmptyVersion")
+    private boolean updateEmptyVersion;
+
+    @Component
+    private MavenSession mavenSession;
+
+    @Parameter(defaultValue = "${mojoExecution}", required = true, readonly = true)
+    private MojoExecution mojoExecution;
+
+    @Inject
+    private MavenLocationUpdater mavenLocationUpdater;
+
+    @Inject
+    private InstallableUnitLocationUpdater installableUnitLocationUpdater;
+
+    MarkdownBuilder builder;
+
     @Override
-    protected void doUpdate() throws IOException, URISyntaxException, ParserConfigurationException, SAXException {
-
-        Document target;
-        try (FileInputStream input = new FileInputStream(targetFile)) {
-            target = TargetDefinitionFile.parseDocument(input);
-            TargetDefinitionFile parsedTarget = TargetDefinitionFile.parse(target, targetFile.getAbsolutePath());
-            resolutionContext.setEnvironments(Collections
-                    .singletonList(TargetEnvironment.getRunningEnvironment(DefaultReactorProject.adapt(project))));
-            resolutionContext.addTargetDefinition(new LatestVersionTarget(parsedTarget));
-            P2ResolutionResult result = p2.getTargetPlatformAsResolutionResult(resolutionContext, executionEnvironment);
-
-            Map<String, String> ius = new HashMap<>();
-            for (P2ResolutionResult.Entry entry : result.getArtifacts()) {
-                ius.put(entry.getId(), entry.getVersion());
+    protected void doUpdate(File file) throws Exception {
+        getLog().info("Update target file " + file);
+        //we use the descent xml parser here because we need to retain the formating of the original file
+        XMLParser parser = new XMLParser();
+        Document target = parser.parse(new XMLIOSource(file));
+        boolean changed = false;
+        builder = new MarkdownBuilder(reportFileName);
+        builder.h2("The content of the target `" + file.getName() + "` was updated");
+        if (reportPreamble != null && !reportPreamble.isBlank()) {
+            builder.add(reportPreamble);
+            builder.newLine();
+        }
+        List<MavenVersionUpdate> mavenUpdates = new ArrayList<>();
+        try (FileInputStream input = new FileInputStream(file)) {
+            for (Element iuLocation : getLocations("InstallableUnit", target)) {
+                changed |= installableUnitLocationUpdater.update(iuLocation, this);
             }
-            //update <unit id="..." version="..."/>
-            NodeList units = target.getElementsByTagName("unit");
-            for (int i = 0; i < units.getLength(); i++) {
-                Element unit = (Element) units.item(i);
-                String id = unit.getAttribute("id");
-                String version = ius.get(id);
-                if (version != null) {
-                    unit.setAttribute("version", version);
-                } else {
-                    getLog().error("Resolution result does not contain root installable unit " + id);
+            for (Element mavenLocation : getLocations("Maven", target)) {
+                mavenUpdates.addAll(mavenLocationUpdater.update(mavenLocation, this));
+                changed |= mavenUpdates.size() > 0;
+            }
+        }
+        if (changed) {
+            String enc = target.getEncoding() != null ? target.getEncoding() : "UTF-8";
+            try (Writer w = new OutputStreamWriter(new BufferedOutputStream(new FileOutputStream(file)), enc);
+                    XMLWriter xw = new XMLWriter(w)) {
+                try {
+                    target.toXML(xw);
+                } finally {
+                    xw.flush();
+                }
+            }
+            if (mavenUpdates.size() > 0) {
+                builder.h3("The following maven artifacts have been updated:");
+                Set<String> updatedMsg = new HashSet<>();
+                for (MavenVersionUpdate update : mavenUpdates) {
+                    if (updatedMsg.add(update.id())) {
+                        update.describeUpdate(builder);
+                    }
+                }
+                builder.newLine();
+            }
+            builder.newLine();
+            builder.write();
+        }
+        builder = null;
+    }
+
+    static void setElementValue(String name, String value, Element root) {
+        Element child = root.getChild(name);
+        if (child != null) {
+            child.setText(value);
+        }
+    }
+
+    static String getElementValue(String name, Element root) {
+        Element child = root.getChild(name);
+        if (child != null) {
+            String text = child.getText().trim();
+            if (text.isBlank()) {
+                return null;
+            }
+            return text;
+        }
+        return null;
+    }
+
+    private List<Element> getLocations(String type, Document target) {
+        Element locations = target.getRootElement().getChild("locations");
+        if (locations != null) {
+            return locations.getChildren().stream().filter(elem -> type.equals(elem.getAttributeValue("type")))
+                    .toList();
+        }
+        return List.of();
+    }
+
+    @Override
+    protected File getFileToBeUpdated() throws MojoFailureException {
+        if (targetFile == null) {
+            try {
+                return TargetPlatformArtifactResolver.getMainTargetFile(getProject());
+            } catch (TargetResolveException e) {
+                throw new MojoFailureException(e);
+            }
+        } else {
+            return targetFile;
+        }
+    }
+
+    boolean isAllowSubIncrementalUpdates() {
+        return allowSubIncrementalUpdates;
+    }
+
+    boolean isAllowIncrementalUpdates() {
+        return allowIncrementalUpdates;
+    }
+
+    boolean isAllowMinorUpdates() {
+        return allowMinorUpdates;
+    }
+
+    boolean isAllowMajorUpdates() {
+        return allowMajorUpdates;
+    }
+
+    boolean isUpdateEmptyVersion() {
+        return updateEmptyVersion;
+    }
+
+    MavenSession getMavenSession() {
+        return mavenSession;
+    }
+
+    MojoExecution getMojoExecution() {
+        return mojoExecution;
+    }
+
+    List<String> getUpdateSiteDiscovery() {
+        if (updateSiteDiscovery == null) {
+            return List.of();
+        }
+        return updateSiteDiscovery.stream().map(String::trim).toList();
+    }
+
+    Set<String> getMavenIgnoredVersions() {
+        return mavenIgnoredVersions;
+    }
+
+    RuleSet getMavenRuleSet() {
+        return mavenRuleSet;
+    }
+
+    String getMavenRulesUri() {
+        if (mavenRulesUri != null && !mavenRulesUri.isBlank()) {
+            try {
+                URI u = new URI(mavenRulesUri);
+                if (u.isAbsolute()) {
+                    return mavenRulesUri;
+                }
+            } catch (URISyntaxException e) {
+            }
+            File fullPath = new File(mavenRulesUri);
+            if (fullPath.isFile()) {
+                return fullPath.toURI().toString();
+            } else {
+                File file = new File(getProject().getBasedir(), mavenRulesUri);
+                if (file.exists()) {
+                    return file.toURI().toString();
                 }
             }
         }
-        try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
-            TargetDefinitionFile.writeDocument(target, outputStream);
-        }
+        return mavenRulesUri;
     }
 
-    @Override
-    protected File getFileToBeUpdated() {
-        return targetFile;
-    }
-
-    private static final class LatestVersionTarget implements TargetDefinition {
-
-        private TargetDefinitionFile delegate;
-
-        public LatestVersionTarget(TargetDefinitionFile delegate) {
-            this.delegate = delegate;
+    Stream<Segment> getSegments() {
+        Builder<Segment> builder = Stream.builder();
+        if (isAllowMajorUpdates()) {
+            builder.accept(Segment.MAJOR);
         }
-
-        @Override
-        public List<? extends Location> getLocations() {
-            return delegate.getLocations().stream().map(location -> {
-                if (location instanceof InstallableUnitLocation iuLocation) {
-                    return new LatestVersionLocation(iuLocation);
-                } else {
-                    return location;
-                }
-            }).toList();
+        if (isAllowMinorUpdates()) {
+            builder.accept(Segment.MINOR);
         }
-
-        @Override
-        public boolean hasIncludedBundles() {
-            return delegate.hasIncludedBundles();
+        if (isAllowIncrementalUpdates()) {
+            builder.accept(Segment.INCREMENTAL);
         }
-
-        @Override
-        public String getOrigin() {
-            return delegate.getOrigin();
+        if (isAllowSubIncrementalUpdates()) {
+            builder.accept(Segment.SUBINCREMENTAL);
         }
-
-        @Override
-        public String getTargetEE() {
-            return delegate.getTargetEE();
-        }
-
-    }
-
-    private static final class LatestVersionLocation implements InstallableUnitLocation {
-
-        private InstallableUnitLocation delegate;
-
-        public LatestVersionLocation(InstallableUnitLocation delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public List<? extends Repository> getRepositories() {
-            return delegate.getRepositories();
-        }
-
-        @Override
-        public List<? extends TargetDefinition.Unit> getUnits() {
-            return delegate.getUnits().stream().map(LatestVersionUnit::new).toList();
-        }
-
-        @Override
-        public IncludeMode getIncludeMode() {
-            return delegate.getIncludeMode();
-        }
-
-        @Override
-        public boolean includeAllEnvironments() {
-            return delegate.includeAllEnvironments();
-        }
-
-        @Override
-        public boolean includeSource() {
-            return delegate.includeSource();
-        }
-
-    }
-
-    private static final class LatestVersionUnit implements TargetDefinition.Unit {
-
-        private Unit delegate;
-
-        public LatestVersionUnit(TargetDefinition.Unit delegate) {
-            this.delegate = delegate;
-        }
-
-        @Override
-        public String getId() {
-            return delegate.getId();
-        }
-
-        @Override
-        public String getVersion() {
-            return "0.0.0";
-        }
-
+        return builder.build();
     }
 
 }

@@ -30,14 +30,17 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+import java.util.stream.Stream;
+
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.PlexusContainer;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.core.runtime.CoreException;
 import org.eclipse.core.runtime.IStatus;
@@ -52,12 +55,12 @@ import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.publisher.IPublisherAction;
 import org.eclipse.equinox.p2.publisher.IPublisherInfo;
 import org.eclipse.equinox.p2.publisher.PublisherInfo;
-import org.eclipse.equinox.p2.publisher.eclipse.BundlesAction;
 import org.eclipse.equinox.p2.publisher.eclipse.Feature;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactRepositoryManager;
 import org.eclipse.osgi.framework.util.CaseInsensitiveDictionaryMap;
 import org.eclipse.osgi.service.resolver.BundleDescription;
 import org.eclipse.tycho.PackagingType;
+import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.helper.PluginRealmHelper;
 import org.eclipse.tycho.p2maven.actions.AuthoredIUAction;
 import org.eclipse.tycho.p2maven.actions.CategoryDependenciesAction;
@@ -65,6 +68,7 @@ import org.eclipse.tycho.p2maven.actions.FeatureDependenciesAction;
 import org.eclipse.tycho.p2maven.actions.ProductDependenciesAction;
 import org.eclipse.tycho.p2maven.actions.ProductFile2;
 import org.eclipse.tycho.p2maven.io.MetadataIO;
+import org.eclipse.tycho.p2maven.tmp.BundlesAction;
 import org.eclipse.tycho.resolver.InstallableUnitProvider;
 import org.osgi.framework.Constants;
 import org.xml.sax.SAXException;
@@ -73,33 +77,36 @@ import org.xml.sax.SAXException;
  * Component used to generate {@link IInstallableUnit}s from other artifacts
  *
  */
-@Component(role = InstallableUnitGenerator.class)
+@Named
+@Singleton
 public class InstallableUnitGenerator {
 
 	private static final boolean DUMP_DATA = Boolean.getBoolean("tycho.p2.dump")
 			|| Boolean.getBoolean("tycho.p2.dump.units");
 
-	@Requirement
+	@Inject
 	private Logger log;
 
 	private static final String KEY_UNITS = "InstallableUnitGenerator.units";
 
-	@Requirement
+	private static final String KEY_ARTIFACT_FILE = "InstallableUnitGenerator.artifactFile";
+
+	@Inject
 	private IProvisioningAgent provisioningAgent;
 
-	@Requirement(role = InstallableUnitProvider.class)
+	@Inject
 	private Map<String, InstallableUnitProvider> additionalUnitProviders;
 
-	@Requirement
+	@Inject
 	private PluginRealmHelper pluginRealmHelper;
 
-	@Requirement
+	@Inject
 	private InstallableUnitPublisher publisher;
 
-	@Requirement
+	@Inject
 	private PlexusContainer plexus;
 
-	@Requirement
+	@Inject
 	ArtifactHandlerManager artifactHandlerManager;
 
 	private Map<Artifact, ArtifactUnits> artifactUnitMap = new ConcurrentHashMap<>();
@@ -163,31 +170,40 @@ public class InstallableUnitGenerator {
 		Objects.requireNonNull(session);
 		log.debug("Computing installable units for " + project + ", force update = " + forceUpdate);
 		synchronized (project) {
-			if (!forceUpdate) {
-				Object contextValue = project.getContextValue(KEY_UNITS);
-				if (contextValue instanceof Collection<?>) {
-					Collection<IInstallableUnit> collection = (Collection<IInstallableUnit>) contextValue;
-					if (isCompatible(collection)) {
-						log.debug("Using cached value for " + project);
-						return collection;
-					} else {
-						log.debug("Cannot use cached value for " + project
-								+ " because of incompatible classloaders, update is forced");
-					}
-				}
-			}
 			File basedir = project.getBasedir();
 			if (basedir == null || !basedir.isDirectory()) {
 				log.warn("No valid basedir for " + project + " found");
 				return Collections.emptyList();
 			}
+			File projectArtifact = getProjectArtifact(project);
+			if (!forceUpdate) {
+				// first check if the packed state might has changed...
+				if (Objects.equals(project.getContextValue(KEY_ARTIFACT_FILE), projectArtifact)) {
+					Object contextValue = project.getContextValue(KEY_UNITS);
+					if (contextValue instanceof Collection<?>) {
+						// now check if we are classlaoder compatible...
+						Collection<IInstallableUnit> collection = (Collection<IInstallableUnit>) contextValue;
+						if (isCompatible(collection)) {
+							log.debug("Using cached value for " + project);
+							return collection;
+						} else {
+							log.debug("Cannot use cached value for " + project
+									+ " because of incompatible classloaders, update is forced");
+						}
+					}
+				} else {
+					log.info("Cannot use cached value for " + project
+							+ " because project artifact has changed, update is forced");
+				}
+			}
 			String packaging = project.getPackaging();
 			String version = project.getVersion();
 			String artifactId = project.getArtifactId();
-			List<IPublisherAction> actions = getPublisherActions(packaging, basedir, version, artifactId);
+			List<IPublisherAction> actions = getPublisherActions(packaging, basedir, projectArtifact, version,
+					artifactId);
 			Collection<IInstallableUnit> publishedUnits = publisher.publishMetadata(actions);
 			for (InstallableUnitProvider unitProvider : getProvider(project, session)) {
-				log.debug("Asking " + unitProvider + " for additional units for " + project + "...");
+				log.debug("Asking " + unitProvider + " for additional units for " + project);
 				Collection<IInstallableUnit> installableUnits = unitProvider.getInstallableUnits(project, session);
 				log.debug("Provider " + unitProvider + " generated " + installableUnits.size() + " (" + installableUnits
 						+ ") units for " + project);
@@ -205,24 +221,38 @@ public class InstallableUnitGenerator {
 				log.debug("Cannot generate any InstallableUnit for packaging type '" + packaging + "' for " + project);
 			}
 			project.setContextValue(KEY_UNITS, result);
+			project.setContextValue(KEY_ARTIFACT_FILE, projectArtifact);
 			return result;
 
 		}
 	}
 
-	private List<IPublisherAction> getPublisherActions(String packaging, File basedir, String version,
-			String artifactId) throws CoreException {
+	private static File getProjectArtifact(MavenProject project) {
+		Artifact artifact = project.getArtifact();
+		if (artifact != null) {
+			File file = artifact.getFile();
+			if (file != null && file.exists()) {
+				return file;
+			}
+		}
+		return null;
+	}
+
+	private List<IPublisherAction> getPublisherActions(String packaging, File basedir, File projectArtifact,
+			String version, String artifactId) throws CoreException {
 		List<IPublisherAction> actions = new ArrayList<>();
 		switch (packaging) {
 		case PackagingType.TYPE_ECLIPSE_TEST_PLUGIN:
 		case PackagingType.TYPE_ECLIPSE_PLUGIN: {
-			actions.add(new BundlesAction(new File[] { basedir }));
+			File bundleFile = Objects.requireNonNullElse(projectArtifact, basedir);
+			actions.add(new BundlesAction(new File[] { bundleFile }));
 			break;
 		}
 		case PackagingType.TYPE_ECLIPSE_FEATURE: {
 			FeatureParser parser = new FeatureParser();
-			Feature feature = parser.parse(basedir);
-			feature.setLocation(basedir.getAbsolutePath());
+			File featureFile = Objects.requireNonNullElse(projectArtifact, basedir);
+			Feature feature = parser.parse(featureFile);
+			feature.setLocation(featureFile.getAbsolutePath());
 			FeatureDependenciesAction action = new FeatureDependenciesAction(feature);
 			actions.add(action);
 			break;
@@ -260,6 +290,10 @@ public class InstallableUnitGenerator {
 		return actions;
 	}
 
+	public Collection<IInstallableUnit> getInstallableUnits(IProductDescriptor productDescriptor) throws CoreException {
+		return publisher.publishMetadata(List.of(new ProductDependenciesAction(productDescriptor)));
+	}
+
 	public Collection<IInstallableUnit> getInstallableUnits(Manifest manifest) {
 		Attributes mainAttributes = manifest.getMainAttributes();
 		CaseInsensitiveDictionaryMap<String, String> headers = new CaseInsensitiveDictionaryMap<>(
@@ -278,6 +312,28 @@ public class InstallableUnitGenerator {
 
 	public Collection<IInstallableUnit> getInstallableUnits(Artifact artifact) {
 		return artifactUnitMap.computeIfAbsent(artifact, x -> new ArtifactUnits()).getUnits(artifact);
+	}
+
+	/**
+	 * Compute the additional provided units for a ReactorProject
+	 * 
+	 * @param reactorProject
+	 * @return a collection of units for the given reactor project
+	 */
+	public Collection<IInstallableUnit> getProvidedInstallableUnits(ReactorProject reactorProject) {
+		MavenProject mavenProject = reactorProject.adapt(MavenProject.class);
+		MavenSession mavenSession = reactorProject.adapt(MavenSession.class);
+		try {
+			return getProvider(mavenProject, mavenSession).stream().flatMap(provider -> {
+				try {
+					return provider.getInstallableUnits(mavenProject, mavenSession).stream();
+				} catch (CoreException e) {
+					return Stream.empty();
+				}
+			}).toList();
+		} catch (CoreException e) {
+			return List.of();
+		}
 	}
 
 	private Collection<InstallableUnitProvider> getProvider(MavenProject project, MavenSession mavenSession)
@@ -325,11 +381,11 @@ public class InstallableUnitGenerator {
 					if (PackagingType.TYPE_ECLIPSE_PLUGIN.equals(type)
 							|| PackagingType.TYPE_ECLIPSE_TEST_PLUGIN.equals(type) || "bundle".equals(type)) {
 						List<IPublisherAction> actions = getPublisherActions(PackagingType.TYPE_ECLIPSE_PLUGIN, file,
-								artifact.getVersion(), artifact.getArtifactId());
+								file, artifact.getVersion(), artifact.getArtifactId());
 						return units = publisher.publishMetadata(actions);
 					} else if (PackagingType.TYPE_ECLIPSE_FEATURE.equals(type)) {
 						List<IPublisherAction> actions = getPublisherActions(PackagingType.TYPE_ECLIPSE_FEATURE, file,
-								artifact.getVersion(), artifact.getArtifactId());
+								file, artifact.getVersion(), artifact.getArtifactId());
 						return units = publisher.publishMetadata(actions);
 					} else {
 						boolean isBundle = false;
@@ -337,20 +393,19 @@ public class InstallableUnitGenerator {
 						try (JarFile jarFile = new JarFile(file)) {
 							Manifest manifest = jarFile.getManifest();
 							isBundle = manifest != null
-									&& manifest.getMainAttributes()
-									.getValue(Constants.BUNDLE_SYMBOLICNAME) != null;
+									&& manifest.getMainAttributes().getValue(Constants.BUNDLE_SYMBOLICNAME) != null;
 							isFeature = jarFile.getEntry("feature.xml") != null;
 						} catch (IOException e) {
 							// can't determine the type then...
 						}
 						if (isBundle) {
 							List<IPublisherAction> actions = getPublisherActions(PackagingType.TYPE_ECLIPSE_PLUGIN,
-									file, artifact.getVersion(), artifact.getArtifactId());
+									file, file, artifact.getVersion(), artifact.getArtifactId());
 							return units = publisher.publishMetadata(actions);
 						}
 						if (isFeature) {
 							List<IPublisherAction> actions = getPublisherActions(PackagingType.TYPE_ECLIPSE_FEATURE,
-									file, artifact.getVersion(), artifact.getArtifactId());
+									file, file, artifact.getVersion(), artifact.getArtifactId());
 							return units = publisher.publishMetadata(actions);
 						}
 					}

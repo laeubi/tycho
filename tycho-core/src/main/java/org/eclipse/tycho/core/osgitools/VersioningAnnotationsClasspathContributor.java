@@ -13,22 +13,22 @@
 package org.eclipse.tycho.core.osgitools;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 
 import org.apache.maven.SessionScoped;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Component;
 import org.eclipse.tycho.classpath.ClasspathContributor;
-import org.osgi.framework.Version;
+import org.osgi.framework.VersionRange;
 
-@Component(role = ClasspathContributor.class, hint = "versioning-annotations")
+@Named("versioning-annotations")
 @SessionScoped
 public class VersioningAnnotationsClasspathContributor extends AbstractSpecificationClasspathContributor {
 
     private static final String PACKAGE_NAME = "org.osgi.annotation.versioning";
     private static final String GROUP_ID = "org.osgi";
     private static final String ARTIFACT_ID = "org.osgi.annotation.versioning";
-    private static final Version VERSION = new Version(1, 0, 0);
+    private static final VersionRange VERSION = new VersionRange("[1,2)");
 
     @Inject
     protected VersioningAnnotationsClasspathContributor(MavenSession session) {
@@ -36,7 +36,7 @@ public class VersioningAnnotationsClasspathContributor extends AbstractSpecifica
     }
 
     @Override
-    protected Version getSpecificationVersion(MavenProject project) {
+    protected VersionRange getSpecificationVersion(MavenProject project) {
         return VERSION;
     }
 

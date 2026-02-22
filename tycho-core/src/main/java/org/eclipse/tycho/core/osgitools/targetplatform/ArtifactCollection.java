@@ -17,7 +17,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -40,14 +39,14 @@ import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.ReactorProject;
 import org.eclipse.tycho.core.osgitools.DefaultArtifactDescriptor;
 import org.osgi.framework.Version;
+import org.osgi.framework.VersionRange;
 
-public class ArtifactCollection {
+public abstract class ArtifactCollection implements DependencyArtifacts {
     private static final Version VERSION_0_0_0 = new Version("0.0.0");
 
     protected final Map<ArtifactKey, ArtifactDescriptor> artifacts = new LinkedHashMap<>();
 
-    protected final Map<File, Map<String, ArtifactDescriptor>> artifactsWithKnownLocation = new LinkedHashMap<>();
-
+    @Override
     public List<ArtifactDescriptor> getArtifacts(String type) {
         return getArtifacts(key -> key.getType().equals(type));
     }
@@ -56,6 +55,7 @@ public class ArtifactCollection {
         return artifacts.entrySet().stream().filter(entry -> filter.test(entry.getKey())).map(Entry::getValue).toList();
     }
 
+    @Override
     public List<ArtifactDescriptor> getArtifacts() {
         return new ArrayList<>(artifacts.values());
     }
@@ -64,9 +64,14 @@ public class ArtifactCollection {
         addArtifact(new DefaultArtifactDescriptor(key, location, null, null, installableUnits));
     }
 
-    public void addArtifactFile(ArtifactKey key, Supplier<File> location,
+    public void addArtifactFile(ArtifactKey key, String classifier, File location,
             Collection<IInstallableUnit> installableUnits) {
-        addArtifact(new DefaultArtifactDescriptor(key, whatever -> location.get(), null, null, installableUnits));
+        addArtifact(new DefaultArtifactDescriptor(key, location, null, classifier, installableUnits));
+    }
+
+    public void addArtifactFile(ArtifactKey key, String classifier, Supplier<File> location,
+            Collection<IInstallableUnit> installableUnits) {
+        addArtifact(new DefaultArtifactDescriptor(key, whatever -> location.get(), null, classifier, installableUnits));
     }
 
     public void addArtifact(ArtifactDescriptor artifact) {
@@ -86,10 +91,16 @@ public class ArtifactCollection {
         Collection<IInstallableUnit> artifactIUs = artifact.getInstallableUnits();
         if (original != null) {
             // can't use DefaultArtifactDescriptor.equals because artifact.location is not normalized
-            if (!Objects.equals(original.getClassifier(), artifact.getClassifier())
-                    || !Objects.equals(original.getMavenProject(), artifact.getMavenProject())) {
-                // TODO better error message
-                throw new IllegalStateException("Inconsistent artifact with key " + artifact.getKey());
+            String currentClassifier = unifyClassifier(original.getClassifier());
+            String updatedClassifier = unifyClassifier(artifact.getClassifier());
+            if (!Objects.equals(currentClassifier, updatedClassifier)) {
+                throw new IllegalStateException(
+                        "Inconsistent artifact with key " + artifact.getKey() + " classifier is different (current = "
+                                + currentClassifier + ", updated = " + updatedClassifier + ")");
+            }
+            if (!Objects.equals(original.getMavenProject(), artifact.getMavenProject())) {
+                throw new IllegalStateException(
+                        "Inconsistent artifact with key " + artifact.getKey() + " MavenProject is different");
             }
 
             // artifact equals to original
@@ -104,7 +115,6 @@ public class ArtifactCollection {
                         File newLocation = artifact.getLocation(false);
                         if (newLocation != null) {
                             def.resolve(newLocation);
-                            registerArtifactLocation(newLocation, original);
                         }
                     }
                 }
@@ -143,14 +153,17 @@ public class ArtifactCollection {
                         artifact.getClassifier(), units)
                 : new DefaultArtifactDescriptor(normalizedKey, thisArtifact -> {
                     File resolvedLocation = artifact.getLocation(true);
-                    registerArtifactLocation(resolvedLocation, thisArtifact);
                     return resolvedLocation;
                 }, artifact.getMavenProject(), artifact.getClassifier(), units);
 
         artifacts.put(normalizedKey, normalizedArtifact);
-        if (location != null) {
-            registerArtifactLocation(location, normalizedArtifact);
+    }
+
+    private static String unifyClassifier(String classifier) {
+        if (classifier != null && classifier.isBlank()) {
+            return null;
         }
+        return classifier;
     }
 
     private boolean unitSetCompare(Collection<IInstallableUnit> unitsA, Collection<IInstallableUnit> unitsB) {
@@ -168,23 +181,6 @@ public class ArtifactCollection {
         }
         //if more then we create sets and compare them ...
         return Set.copyOf(unitsB).equals(Set.copyOf(unitsA));
-    }
-
-    private void registerArtifactLocation(File location, ArtifactDescriptor normalizedArtifact) {
-        Map<String, ArtifactDescriptor> classified = artifactsWithKnownLocation.computeIfAbsent(location,
-                loc -> new LinkedHashMap<>());
-        // TODO sanity check, no duplicate artifact classifiers at the same location
-        //if (classified.containsKey(artifact.getClassifier())) {
-        //    throw new IllegalStateException("Duplicate artifact classifier at location " + location);
-        //}
-        // sanity check, all artifacts at the same location have the same reactor project
-        for (ArtifactDescriptor other : classified.values()) {
-            if (!Objects.equals(normalizedArtifact.getMavenProject(), other.getMavenProject())) {
-                throw new IllegalStateException("Inconsistent reactor project at location " + location + ". "
-                        + normalizedArtifact.getMavenProject() + " is not the same as " + other.getMavenProject());
-            }
-        }
-        classified.put(normalizedArtifact.getClassifier(), normalizedArtifact);
     }
 
     // ideally this would return a specialized type -> the type checker would then ensure that this is called wherever needed
@@ -223,6 +219,7 @@ public class ArtifactCollection {
         return artifacts.isEmpty();
     }
 
+    @Override
     public ArtifactDescriptor getArtifact(String type, String id, String version) {
         if (type == null || id == null) {
             // TODO should we throw something instead?
@@ -246,7 +243,14 @@ public class ArtifactCollection {
         if (version == null) {
             return relevantArtifacts.get(relevantArtifacts.firstKey()); // latest version
         }
-
+        if (version.startsWith("(") || version.startsWith("[")) {
+            VersionRange range = VersionRange.valueOf(version);
+            for (Entry<Version, ArtifactDescriptor> entry : relevantArtifacts.entrySet()) {
+                if (range.includes(entry.getKey())) {
+                    return entry.getValue();
+                }
+            }
+        }
         Version parsedVersion = new Version(version);
         if (VERSION_0_0_0.equals(parsedVersion)) {
             return relevantArtifacts.get(relevantArtifacts.firstKey()); // latest version
@@ -278,46 +282,12 @@ public class ArtifactCollection {
         addArtifact(artifact);
     }
 
-    public ReactorProject getMavenProject(File location) {
-        // only check artifactsWithKnownLocation as we're expected a local reactor project, location is already set
-        Map<String, ArtifactDescriptor> classified = artifactsWithKnownLocation.get(normalizeLocation(location));
-        if (classified != null) {
-            // #addArtifact enforces all artifacts at the same location have the same reactor project 
-            return classified.values().iterator().next().getMavenProject();
-        }
-        return null;
-    }
-
-    /**
-     * This triggers fetch of all dependencies.
-     * 
-     * @param location
-     * @return
-     */
-    public Map<String, ArtifactDescriptor> getArtifact(File location) {
-        artifacts.values().forEach(artifact -> artifact.getLocation(true));
-        return artifactsWithKnownLocation.get(normalizeLocation(location));
-    }
-
+    @Override
     public ArtifactDescriptor getArtifact(ArtifactKey key) {
         return artifacts.get(normalizeKey(key));
     }
 
-    public void removeAll(String type, String id) {
-        Iterator<Entry<ArtifactKey, ArtifactDescriptor>> iter = artifacts.entrySet().iterator();
-        while (iter.hasNext()) {
-            Entry<ArtifactKey, ArtifactDescriptor> entry = iter.next();
-            ArtifactKey key = entry.getKey();
-            if (key.getType().equals(type) && key.getId().equals(id)) {
-                File location = entry.getValue().getLocation(false);
-                if (location != null) {
-                    artifactsWithKnownLocation.remove(location);
-                    iter.remove();
-                }
-            }
-        }
-    }
-
+    @Override
     public void toDebugString(StringBuilder sb, String linePrefix) {
         for (ArtifactDescriptor artifact : artifacts.values()) {
             sb.append(linePrefix);

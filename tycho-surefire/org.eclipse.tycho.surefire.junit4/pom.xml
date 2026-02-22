@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- - Copyright (c) 2008, 2011 Sonatype Inc. and others.
+ - Copyright (c) 2012 SAP AG and others.
  - All rights reserved. This program and the accompanying materials
  - are made available under the terms of the Eclipse Public License v1.0
  - which accompanies this distribution, and is available at
  - https://www.eclipse.org/legal/epl-v10.html
  -
  - Contributors:
- -    Sonatype Inc. - initial API and implementation
+ -    SAP AG - initial API and implementation
  -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/maven-v4_0_0.xsd">
@@ -15,11 +15,11 @@
 	<parent>
 		<groupId>org.eclipse.tycho</groupId>
 		<artifactId>tycho-surefire</artifactId>
-		<version>4.0.0-SNAPSHOT</version>
+		<version>6.0.0-SNAPSHOT</version>
 	</parent>
 	<artifactId>org.eclipse.tycho.surefire.junit4</artifactId>
 	<packaging>jar</packaging>
-	<name>Tycho Surefire OSGi JUnit 4 Runner</name>
+	<name>Tycho Surefire OSGi JUnit 4.x Runner</name>
 	<build>
 		<plugins>
 			<plugin>
@@ -33,12 +33,22 @@
 					<artifactItems>
 						<artifactItem>
 							<groupId>org.apache.maven.surefire</groupId>
-							<artifactId>surefire-junit4</artifactId>
+							<artifactId>common-junit4</artifactId>
 							<version>${surefire-version}</version>
 						</artifactItem>
 						<artifactItem>
 							<groupId>org.apache.maven.surefire</groupId>
-							<artifactId>common-junit4</artifactId>
+							<artifactId>surefire-junit47</artifactId>
+							<version>${surefire-version}</version>
+						</artifactItem>
+						<artifactItem>
+							<groupId>org.apache.maven.surefire</groupId>
+							<artifactId>common-junit48</artifactId>
+							<version>${surefire-version}</version>
+						</artifactItem>
+						<artifactItem>
+							<groupId>org.apache.maven.surefire</groupId>
+							<artifactId>surefire-grouper</artifactId>
 							<version>${surefire-version}</version>
 						</artifactItem>
 						<artifactItem>

@@ -25,33 +25,36 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.artifact.handler.ArtifactHandler;
 import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
 import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.LegacySupport;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.repository.RepositorySystem;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
-import org.codehaus.plexus.logging.Logger;
 import org.eclipse.tycho.MavenRepositoryLocation;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.osgitools.DefaultReactorProject;
 import org.eclipse.tycho.core.shared.MavenContext;
 import org.eclipse.tycho.core.shared.MavenLogger;
-import org.eclipse.tycho.osgi.adapters.MavenLoggerAdapter;
 import org.eclipse.tycho.p2maven.repository.P2ArtifactRepositoryLayout;
 
-@Component(role = MavenContext.class)
+@Named
+@Singleton
 public class DefaultMavenContext implements MavenContext {
 
-    @Requirement
+    @Inject
     ArtifactHandlerManager artifactHandlerManager;
-    @Requirement
+    @Inject
     LegacySupport legacySupport;
-    @Requirement
-    Logger logger;
+
+    @Inject
+    @Named(FilteringMavenLogger.HINT)
+    MavenLogger mavenLogger;
 
     private Properties globalProps;
     private List<MavenRepositoryLocation> repositoryLocations;
@@ -115,14 +118,14 @@ public class DefaultMavenContext implements MavenContext {
     public File getLocalRepositoryRoot() {
         if (repoDir == null) {
             repoDir = getSession().map(s -> s.getLocalRepository().getBasedir()).map(File::new)
-                    .orElse(RepositorySystem.defaultUserLocalRepository);
+                    .orElse(TychoConstants.DEFAULT_USER_LOCALREPOSITORY);
         }
         return repoDir;
     }
 
     @Override
-    public MavenLogger getLogger() {
-        return new MavenLoggerAdapter(logger, false);
+    public synchronized MavenLogger getLogger() {
+        return mavenLogger;
     }
 
     @Override
@@ -153,15 +156,15 @@ public class DefaultMavenContext implements MavenContext {
 
     private Optional<MavenSession> getSession() {
         if (legacySupport == null) {
-            logger.warn("Legacy support not available");
+            mavenLogger.warn("Legacy support not available");
             return Optional.empty();
         }
         MavenSession session = legacySupport.getSession();
         if (session == null) {
-            if (logger.isDebugEnabled()) {
+            if (mavenLogger.isDebugEnabled()) {
                 Thread.dumpStack();
             }
-            logger.warn("Not called from a maven thread");
+            mavenLogger.warn("Not called from a maven thread");
             return Optional.empty();
         }
         return Optional.of(session);

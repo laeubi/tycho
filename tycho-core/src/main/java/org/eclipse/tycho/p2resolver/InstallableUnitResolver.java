@@ -39,9 +39,9 @@ import org.eclipse.osgi.util.NLS;
 import org.eclipse.tycho.ExecutionEnvironmentResolutionHints;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.core.resolver.shared.IncludeSourceMode;
+import org.eclipse.tycho.core.shared.DuplicateFilteringLoggingProgressMonitor;
 import org.eclipse.tycho.core.shared.MavenLogger;
 import org.eclipse.tycho.p2.resolver.ResolverException;
-import org.eclipse.tycho.repository.util.DuplicateFilteringLoggingProgressMonitor;
 import org.eclipse.tycho.targetplatform.TargetDefinition.IncludeMode;
 import org.eclipse.tycho.targetplatform.TargetDefinition.InstallableUnitLocation;
 import org.eclipse.tycho.targetplatform.TargetDefinition.Unit;
@@ -75,7 +75,8 @@ public class InstallableUnitResolver {
         this.logger = logger;
     }
 
-    public void addLocation(InstallableUnitLocation iuLocationDefinition, IQueryable<IInstallableUnit> localUnits) {
+    public Collection<IInstallableUnit> addLocation(InstallableUnitLocation iuLocationDefinition,
+            IQueryable<IInstallableUnit> localUnits) {
         //update (and validate) desired global state
         setIncludeMode(iuLocationDefinition.getIncludeMode());
         setIncludeAllEnvironments(iuLocationDefinition.includeAllEnvironments());
@@ -85,7 +86,9 @@ public class InstallableUnitResolver {
         default -> iuLocationDefinition.includeSource();
         });
         //resolve root units and add them
-        rootUnits.add(new RootUnits(getRootIUs(iuLocationDefinition.getUnits(), localUnits), localUnits));
+        Collection<IInstallableUnit> rootIUs = getRootIUs(iuLocationDefinition.getUnits(), localUnits);
+        rootUnits.add(new RootUnits(rootIUs, localUnits));
+        return rootIUs;
     }
 
     private void setIncludeMode(IncludeMode newValue) throws TargetDefinitionResolutionException {
@@ -180,7 +183,7 @@ public class InstallableUnitResolver {
             throws TargetDefinitionResolutionException {
         if (includeAllEnvironments) {
             logger.warn(
-                    "includeAllPlatforms='true' and includeMode='planner' are incompatible. ignore includeAllPlatforms flag");
+                    "includeAllPlatforms='true' and includeMode='planner' are incompatible. Ignoring 'includeAllPlatforms' flag");
         }
         ProjectorResolutionStrategy strategy = new ProjectorResolutionStrategy(logger);
         strategy.setData(data);
@@ -272,7 +275,7 @@ public class InstallableUnitResolver {
 
     private static IQueryResult<IInstallableUnit> findUnit(Unit unitReference, IQueryable<IInstallableUnit> units)
             throws TargetDefinitionSyntaxException {
-        Version version = parseVersion(unitReference);
+        VersionRange version = parseVersion(unitReference);
 
         // the createIUQuery treats 0.0.0 version as "any version", and all other versions as exact versions
         IQuery<IInstallableUnit> matchingIUQuery = QueryUtil.createIUQuery(unitReference.getId(), version);
@@ -282,12 +285,20 @@ public class InstallableUnitResolver {
         return queryResult;
     }
 
-    private static Version parseVersion(Unit unitReference) throws TargetDefinitionSyntaxException {
+    private static VersionRange parseVersion(Unit unitReference) throws TargetDefinitionSyntaxException {
+        String version = unitReference.getVersion();
         try {
-            return Version.parseVersion(unitReference.getVersion());
+            if ("0.0.0".equals(version)) {
+                return VersionRange.emptyRange;
+            } else if (version.contains(",")) { // a real version range
+                return VersionRange.create(version);
+            } else { // an explicit/exact version -> create strict version range
+                Version v = Version.parseVersion(version);
+                return new VersionRange(v, true, v, true);
+            }
         } catch (IllegalArgumentException e) {
-            throw new TargetDefinitionSyntaxException(NLS.bind("Cannot parse version \"{0}\" of unit \"{1}\"",
-                    unitReference.getVersion(), unitReference.getId()), e);
+            throw new TargetDefinitionSyntaxException(
+                    NLS.bind("Cannot parse version \"{0}\" of unit \"{1}\"", version, unitReference.getId()), e);
         }
     }
 

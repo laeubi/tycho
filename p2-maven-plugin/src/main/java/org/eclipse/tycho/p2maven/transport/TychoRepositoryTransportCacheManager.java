@@ -22,21 +22,17 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.URIUtil;
 import org.eclipse.equinox.internal.p2.repository.CacheManager;
 import org.eclipse.equinox.p2.core.ProvisionException;
+import org.eclipse.tycho.transport.TransportProtocolHandler;
 
 public class TychoRepositoryTransportCacheManager extends CacheManager {
-
-    public static final String CACHE_RELPATH = ".cache/tycho/p2-repository-metadata";
 
     private static final List<String> EXTENSIONS = List.of(".jar", ".xml");
 
     private TychoRepositoryTransport transport;
 
-	private File localRepositoryRoot;
-
-	public TychoRepositoryTransportCacheManager(TychoRepositoryTransport transport, File localRepositoryRoot) {
+	public TychoRepositoryTransportCacheManager(TychoRepositoryTransport transport) {
         super(null, transport);
         this.transport = transport;
-		this.localRepositoryRoot = localRepositoryRoot;
     }
 
     @Override
@@ -77,7 +73,9 @@ public class TychoRepositoryTransportCacheManager extends CacheManager {
 
     @Override
     protected File getCacheDirectory() {
-		return new File(localRepositoryRoot, CACHE_RELPATH);
+
+		TransportCacheConfig config = transport.getCacheConfig();
+		return new File(config.getCacheLocation(), "p2-repository-metadata");
     }
 
 }

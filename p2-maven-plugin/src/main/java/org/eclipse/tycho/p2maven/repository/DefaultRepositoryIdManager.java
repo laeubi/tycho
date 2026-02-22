@@ -19,8 +19,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.tycho.IRepositoryIdManager;
 import org.eclipse.tycho.MavenRepositoryLocation;
@@ -30,15 +32,17 @@ import org.eclipse.tycho.MavenRepositorySettings;
  * Helper class for the Remote*RepositoryManagers taking care of mapping repository URLs to the
  * settings.xml-configured mirrors and setting passwords.
  */
-@Component(role = IRepositoryIdManager.class)
+@Named
+@Singleton
 public class DefaultRepositoryIdManager implements IRepositoryIdManager {
 
-	@Requirement
+	@Inject
 	private MavenRepositorySettings settings;
-	@Requirement
+	@Inject
 	private Logger logger;
-
-    private Map<URI, String> knownMavenRepositoryIds = new ConcurrentHashMap<>();
+	// For some reason maven creates different instances of the component even if
+	// there should only be one...
+	private static final Map<URI, String> knownMavenRepositoryIds = new ConcurrentHashMap<>();
 
     @Override
     public void addMapping(String mavenRepositoryId, URI location) {
@@ -118,9 +122,10 @@ public class DefaultRepositoryIdManager implements IRepositoryIdManager {
 
     @Override
 	public Stream<MavenRepositoryLocation> getKnownMavenRepositoryLocations() {
-        return knownMavenRepositoryIds.entrySet().stream()
-                .map(e -> new MavenRepositoryLocation(e.getValue(), e.getKey()));
-    }
+		// Returns both repository and mirror locations
+		return Stream.concat(knownMavenRepositoryIds.entrySet().stream()
+				.map(e -> new MavenRepositoryLocation(e.getValue(), e.getKey())), settings.getMirrors());
+	}
 
 	@Override
 	public MavenRepositorySettings getSettings() {

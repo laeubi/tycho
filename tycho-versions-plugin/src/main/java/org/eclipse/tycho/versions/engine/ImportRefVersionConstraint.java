@@ -14,22 +14,19 @@ package org.eclipse.tycho.versions.engine;
 
 import java.util.Objects;
 
+import org.eclipse.tycho.model.Feature;
 import org.osgi.framework.Version;
 
 /**
  * Represent a version constraint using version and match attributes as defined in feature manifest
  * file (feature>requires>import)
- * {@link https://help.eclipse.org/mars/index.jsp?topic=%2Forg.eclipse.platform.doc.isv%2Freference%2Fmisc%2Ffeature_manifest.html&cp=2_1_5_20}
+ * {@link https://help.eclipse.org/latest/index.jsp?topic=%2Forg.eclipse.platform.doc.isv%2Freference%2Fmisc%2Ffeature_manifest.html&cp=2_1_5_20}
  * 
  * @author sarod
  *
  */
 public class ImportRefVersionConstraint {
 
-    public static final String MATCH_GREATER_OR_EQUAL = "greaterOrEqual";
-    public static final String MATCH_COMPATIBLE = "compatible";
-    public static final String MATCH_EQUIVALENT = "equivalent";
-    public static final String MATCH_PERFECT = "perfect";
     private final String version;
     private final String match;
 
@@ -65,10 +62,10 @@ public class ImportRefVersionConstraint {
             return isCompatible(parsedLocalVersion, parsedOtherVersion);
         } else {
             return switch (match) {
-            case MATCH_PERFECT -> isPerfectMatch(parsedLocalVersion, parsedOtherVersion);
-            case MATCH_EQUIVALENT -> isEquivalent(parsedLocalVersion, parsedOtherVersion);
-            case MATCH_COMPATIBLE -> isCompatible(parsedLocalVersion, parsedOtherVersion);
-            case MATCH_GREATER_OR_EQUAL -> isGreaterOrEqual(parsedLocalVersion, parsedOtherVersion);
+            case Feature.MATCH_PERFECT -> isPerfectMatch(parsedLocalVersion, parsedOtherVersion);
+            case Feature.MATCH_EQUIVALENT -> isEquivalent(parsedLocalVersion, parsedOtherVersion);
+            case Feature.MATCH_COMPATIBLE -> isCompatible(parsedLocalVersion, parsedOtherVersion);
+            case Feature.MATCH_GREATER_OR_EQUAL -> isGreaterOrEqual(parsedLocalVersion, parsedOtherVersion);
             default -> isCompatible(parsedLocalVersion, parsedOtherVersion);
             };
         }

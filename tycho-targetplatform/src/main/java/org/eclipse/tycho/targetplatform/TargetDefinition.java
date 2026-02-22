@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2011, 2021 SAP AG and others.
+ * Copyright (c) 2011, 2024 SAP AG and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -18,205 +18,268 @@
  *******************************************************************************/
 package org.eclipse.tycho.targetplatform;
 
-import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Stream;
 
 import org.eclipse.tycho.IArtifactFacade;
 import org.eclipse.tycho.MavenArtifactRepositoryReference;
+import org.osgi.resource.Requirement;
 import org.w3c.dom.Element;
 
 // TODO javadoc
 public interface TargetDefinition {
 
-    public List<? extends Location> getLocations();
+	public List<? extends Location> getLocations();
 
-    /**
-     * Returns <code>true</code> if the target definition specifies an explicit list of bundles to
-     * include (i.e. an <tt>&lt;includeBundles&gt;</tt> in target definition files).
-     */
-    boolean hasIncludedBundles();
+	/**
+	 * Returns <code>true</code> if the target definition specifies an explicit list
+	 * of bundles to include (i.e. an <code>&lt;includeBundles&gt;</code> in target
+	 * definition files).
+	 */
+	boolean hasIncludedBundles();
 
-    /**
-     * Returns the origin of the target definition, e.g. a file path. Used for debugging only.
-     */
-    String getOrigin();
+	/**
+	 * Returns the origin of the target definition, e.g. a file path. Used for
+	 * debugging only.
+	 */
+	String getOrigin();
 
-    /**
-     * Returns the value of the targetJRE in *.target file if it's a known EE name.
-     * <code>null</code> will be returned otherwise.
-     */
-    String getTargetEE();
+	/**
+	 * Returns the value of the targetJRE in *.target file if it's a known EE name.
+	 * <code>null</code> will be returned otherwise.
+	 */
+	String getTargetEE();
 
-    @Override
-    public boolean equals(Object obj);
+	@Override
+	public boolean equals(Object obj);
 
-    @Override
-    public int hashCode();
+	/**
+	 * 
+	 * @return a stream of implicit dependencies defined in the target to add as an
+	 *         additional dependency to every project
+	 */
+	Stream<ImplicitDependency> implicitDependencies();
 
-    public interface Location {
+	@Override
+	public int hashCode();
 
-        /**
-         * Returns a description of the underlying location implementation.
-         */
-        String getTypeDescription();
+	public interface ImplicitDependency {
 
-    }
+		String getId();
+	}
 
-    public interface InstallableUnitLocation extends Location {
+	public interface Location {
 
-        public static String TYPE = "InstallableUnit";
+		/**
+		 * Returns a description of the underlying location implementation.
+		 */
+		String getTypeDescription();
 
-        public List<? extends Repository> getRepositories();
+	}
 
-        public List<? extends Unit> getUnits();
+	public enum FollowRepositoryReferences {
+		DEFAULT,
+		ENABLED,
+		DISABLED,
+	}
 
-        public IncludeMode getIncludeMode();
+	public interface InstallableUnitLocation extends Location {
 
-        public boolean includeAllEnvironments();
+		public static String TYPE = "InstallableUnit";
+		
+		public List<? extends Repository> getRepositories();
 
-        public boolean includeSource();
+		public List<? extends Unit> getUnits();
 
-        @Override
-        public default String getTypeDescription() {
-            return InstallableUnitLocation.TYPE;
-        }
+		public IncludeMode getIncludeMode();
 
-    }
+		public boolean includeAllEnvironments();
 
-    public interface MavenGAVLocation extends Location {
+		public boolean includeSource();
+		
+		/**
+		 * Read for completeness but not used
+		 */
+		public boolean includeConfigurePhase();
+		
+		/**
+		 * When {@link FollowRepositoryReferences.Default} the global {@link IncludeSourceMode} should be used instead.
+		 * @return whether repository references should be used, never null
+		 */
+		public default FollowRepositoryReferences followRepositoryReferences() {
+			return FollowRepositoryReferences.DEFAULT;
+		}
 
-        public static final String TYPE = "Maven";
+		@Override
+		public default String getTypeDescription() {
+			return InstallableUnitLocation.TYPE;
+		}
 
-        enum MissingManifestStrategy {
-            IGNORE, ERROR, GENERATE;
-        }
+	}
 
-        enum DependencyDepth {
-            NONE, DIRECT, INFINITE;
-        }
+	public interface MavenGAVLocation extends Location {
 
-        Collection<String> getIncludeDependencyScopes();
+		public static final String TYPE = "Maven";
 
-        DependencyDepth getIncludeDependencyDepth();
+		enum MissingManifestStrategy {
+			IGNORE, ERROR, GENERATE;
+		}
 
-        MissingManifestStrategy getMissingManifestStrategy();
+		enum DependencyDepth {
+			NONE, DIRECT, INFINITE;
+		}
 
-        Collection<BNDInstructions> getInstructions();
+		Collection<String> getIncludeDependencyScopes();
 
-        Collection<MavenDependency> getRoots();
+		DependencyDepth getIncludeDependencyDepth();
 
-        Collection<MavenArtifactRepositoryReference> getRepositoryReferences();
+		MissingManifestStrategy getMissingManifestStrategy();
 
-        boolean includeSource();
+		Collection<BNDInstructions> getInstructions();
 
-        Element getFeatureTemplate();
+		Collection<MavenDependency> getRoots();
 
-        @Override
-        public default String getTypeDescription() {
-            return TYPE;
-        }
+		Collection<MavenArtifactRepositoryReference> getRepositoryReferences();
 
-    }
+		boolean includeSource();
 
-    public interface TargetReferenceLocation extends Location {
-        String getUri();
-    }
+		Element getFeatureTemplate();
 
-    /**
-     * Represents the "Directory" location that either contains bundles directly or has
-     * plugins/features/binaries folders that contains the data
-     * 
-     * @author Christoph Läubrich
-     *
-     */
-    public interface DirectoryLocation extends PathLocation {
-    }
+		String getLabel();
 
-    /**
-     * Represents the "Profile" location that contains an eclipse-sdk or exploded eclipse product
-     * 
-     * @author Christoph Läubrich
-     *
-     */
-    public interface ProfileLocation extends PathLocation {
-    }
+		@Override
+		public default String getTypeDescription() {
+			return TYPE;
+		}
 
-    /**
-     * represents the "Feature" location that contains a feature to include from a given
-     * installation
-     * 
-     * @author Christoph Läubrich
-     *
-     */
-    public interface FeaturesLocation extends PathLocation {
+	}
 
-        /**
-         * 
-         * @return the id of the feature to use
-         */
-        String getId();
+	public interface TargetReferenceLocation extends Location {
+		String getUri();
+	}
 
-        /**
-         * 
-         * @return the version of the feature to use
-         */
-        String getVersion();
-    }
+	/**
+	 * Implements the <a href=
+	 * "https://eclipse.dev/eclipse/news/4.29/pde.php#osgi-repository-target-type">PDE
+	 * repository location</a>
+	 * 
+	 */
+	public interface RepositoryLocation extends Location {
 
-    /**
-     * Base interface for all Locations that are path based, the path might contains variables that
-     * need to be resolved before used as a real directory path
-     * 
-     * @author Christoph Läubrich
-     *
-     */
-    public interface PathLocation extends Location {
-        /**
-         * 
-         * @return the plain path as supplied by the target file
-         */
-        public String getPath();
-    }
+		static final String TYPE = "Repository";
 
-    public enum IncludeMode {
-        SLICER, PLANNER
-    }
+		/**
+		 * @return the URI to load this repository from
+		 */
+		String getUri();
 
-    public interface Repository {
-        URI getLocation();
+		/**
+		 * @return the requirements that make up the content fetched from the repository
+		 */
+		Collection<Requirement> getRequirements();
 
-        String getId();
-    }
+		@Override
+		default String getTypeDescription() {
+			return TYPE;
+		}
+	}
 
-    public interface Unit {
+	/**
+	 * Represents the "Directory" location that either contains bundles directly or
+	 * has plugins/features/binaries folders that contains the data
+	 * 
+	 * @author Christoph Läubrich
+	 *
+	 */
+	public interface DirectoryLocation extends PathLocation {
+	}
 
-        public String getId();
+	/**
+	 * Represents the "Profile" location that contains an eclipse-sdk or exploded
+	 * eclipse product
+	 * 
+	 * @author Christoph Läubrich
+	 *
+	 */
+	public interface ProfileLocation extends PathLocation {
+	}
 
-        public String getVersion();
-    }
+	/**
+	 * represents the "Feature" location that contains a feature to include from a
+	 * given installation
+	 * 
+	 * @author Christoph Läubrich
+	 *
+	 */
+	public interface FeaturesLocation extends PathLocation {
 
-    public interface BNDInstructions {
+		/**
+		 * 
+		 * @return the id of the feature to use
+		 */
+		String getId();
 
-        public String getReference();
+		/**
+		 * 
+		 * @return the version of the feature to use
+		 */
+		String getVersion();
+	}
 
-        public Properties getInstructions();
-    }
+	/**
+	 * Base interface for all Locations that are path based, the path might contains
+	 * variables that need to be resolved before used as a real directory path
+	 * 
+	 * @author Christoph Läubrich
+	 *
+	 */
+	public interface PathLocation extends Location {
+		/**
+		 * 
+		 * @return the plain path as supplied by the target file
+		 */
+		public String getPath();
+	}
 
-    public interface MavenDependency {
+	public enum IncludeMode {
+		SLICER, PLANNER
+	}
 
-        String getGroupId();
+	public interface Repository {
+		String getLocation();
 
-        String getArtifactId();
+		String getId();
+	}
 
-        String getVersion();
+	public interface Unit {
 
-        String getArtifactType();
+		public String getId();
 
-        String getClassifier();
+		public String getVersion();
+	}
 
-        boolean isIgnored(IArtifactFacade artifact);
-    }
+	public interface BNDInstructions {
+
+		public String getReference();
+
+		public Properties getInstructions();
+	}
+
+	public interface MavenDependency {
+
+		String getGroupId();
+
+		String getArtifactId();
+
+		String getVersion();
+
+		String getArtifactType();
+
+		String getClassifier();
+
+		boolean isIgnored(IArtifactFacade artifact);
+	}
 
 }

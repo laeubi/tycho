@@ -19,14 +19,16 @@ import java.io.File;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Mojo;
+import javax.inject.Inject;
 import org.apache.maven.plugins.annotations.Parameter;
+import javax.inject.Inject;
 import org.eclipse.tycho.PackagingType;
 import org.eclipse.tycho.TychoProperties;
 import org.eclipse.tycho.core.ManifestHelper;
-import org.eclipse.tycho.core.shared.VersioningHelper;
+import org.eclipse.tycho.core.VersioningHelper;
 import org.osgi.framework.Constants;
 import org.sonatype.plexus.build.incremental.BuildContext;
 
@@ -43,13 +45,13 @@ public class ValidateVersionMojo extends AbstractVersionMojo {
 	 * project versions do not match. If <code>false</code> will issue a warning but
 	 * will not fail the build if Maven and OSGi project versions do not match.
 	 */
-	@Parameter(defaultValue = "true")
+	@Parameter(defaultValue = "true", property = "tycho.strictVersions")
 	private boolean strictVersions = true;
 
-	@Component
+	@Inject
 	ManifestHelper manifestHelper;
 
-	@Component
+	@Inject
 	BuildContext buildContext;
 
 	@Override

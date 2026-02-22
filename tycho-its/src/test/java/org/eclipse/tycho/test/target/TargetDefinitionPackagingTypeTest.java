@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2012, 2018 SAP AG and others.
+ * Copyright (c) 2012, 2023 SAP AG and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -16,7 +16,7 @@ package org.eclipse.tycho.test.target;
 import java.io.File;
 import java.nio.file.Files;
 
-import org.apache.maven.shared.verifier.Verifier;
+import org.apache.maven.it.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
 import org.eclipse.tycho.test.util.ResourceUtil;
 import org.eclipse.tycho.test.util.TargetDefinitionUtil;
@@ -45,7 +45,7 @@ public class TargetDefinitionPackagingTypeTest extends AbstractTychoIntegrationT
 
 	@Test
 	public void testTargetDefinitionFromWithinReactor() throws Exception {
-		verifier.addCliArgument("-PtargetAndBundle");
+		verifier.addCliOption("-PtargetAndBundle");
 		verifier.executeGoal("package");
 		verifier.verifyErrorFreeLog();
 	}
@@ -53,15 +53,15 @@ public class TargetDefinitionPackagingTypeTest extends AbstractTychoIntegrationT
 	@Test
 	public void testTargetDefinitionFromLocalRepo() throws Exception {
 		// first, install the target definition into the local repo
-		verifier.addCliArgument("-PtargetOnly");
+		verifier.addCliOption("-PtargetOnly");
 		verifier.executeGoal("install");
 		verifier.verifyErrorFreeLog();
-		verifier.verifyArtifactContent(TARGET_GROUPID, TARGET_ARTIFACTID, TARGET_VERSION, TARGET_EXTENSION,
+		verifier.assertArtifactContents(TARGET_GROUPID, TARGET_ARTIFACTID, TARGET_VERSION, TARGET_EXTENSION,
 				Files.readString(targetDefinitionFile.toPath()));
 		// then, run the build of the bundle module only which should now
 		// be able to resolve the target definition from the local repo
 		verifier = getVerifier("target.packagingType", false);
-		verifier.addCliArgument("-PbundleOnly");
+		verifier.addCliOption("-PbundleOnly");
 		verifier.executeGoal("package");
 		verifier.verifyErrorFreeLog();
 	}

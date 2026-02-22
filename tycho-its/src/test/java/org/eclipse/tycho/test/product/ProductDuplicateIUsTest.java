@@ -12,17 +12,15 @@
  *******************************************************************************/
 package org.eclipse.tycho.test.product;
 
-import org.apache.maven.shared.verifier.Verifier;
+import org.apache.maven.it.Verifier;
 import org.eclipse.tycho.test.AbstractTychoIntegrationTest;
-import org.eclipse.tycho.test.util.ResourceUtil.P2Repositories;
 import org.junit.Test;
 
 public class ProductDuplicateIUsTest extends AbstractTychoIntegrationTest {
 
 	@Test
 	public void testMultipleProductsNoDuplicateIUs() throws Exception {
-		Verifier verifier = getVerifier("product.duplicateIUs", false);
-		verifier.addCliArgument("-Dtest-data-repo=" + P2Repositories.ECLIPSE_LATEST.toString());
+		Verifier verifier = getVerifier("product.duplicateIUs");
 		verifier.executeGoal("integration-test");
 		verifier.verifyErrorFreeLog();
 	}

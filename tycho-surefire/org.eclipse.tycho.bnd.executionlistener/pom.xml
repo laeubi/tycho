@@ -3,17 +3,17 @@
 	<parent>
 		<groupId>org.eclipse.tycho</groupId>
 		<artifactId>tycho-surefire</artifactId>
-		<version>4.0.0-SNAPSHOT</version>
+		<version>6.0.0-SNAPSHOT</version>
 	</parent>
 	<artifactId>org.eclipse.tycho.bnd.executionlistener</artifactId>
 	<properties>
-		<min.jdk.version>1.8</min.jdk.version>
+		<min.jdk.version>8</min.jdk.version>
 	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>org.junit.platform</groupId>
 			<artifactId>junit-platform-launcher</artifactId>
-			<version>1.9.2</version>
+			<version>${junit5.platform.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>

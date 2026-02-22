@@ -19,8 +19,10 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.function.BiConsumer;
 
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.NullProgressMonitor;
@@ -40,14 +42,15 @@ import org.eclipse.equinox.p2.repository.metadata.IMetadataRepositoryManager;
 import org.eclipse.tycho.BuildDirectory;
 import org.eclipse.tycho.p2.tools.FacadeException;
 
-@Component(role = VerifierService.class)
+@Named
+@Singleton
 public class VerifierServiceImpl implements VerifierService {
 
     private final NullProgressMonitor monitor = new NullProgressMonitor();
-    @Requirement
+    @Inject
     IProvisioningAgent agent;
 
-    @Requirement
+    @Inject
     Logger logger;
 
     public void setLogger(Logger logger) {
@@ -81,7 +84,7 @@ public class VerifierServiceImpl implements VerifierService {
         final IQueryResult<IInstallableUnit> collector = metadata.query(QueryUtil.ALL_UNITS, monitor);
         boolean valid = true;
         Set<IInstallableUnit> set = collector.toSet();
-        logger.debug("Verify content of " + set.size() + " units...");
+        logger.debug("Verifying content of " + set.size() + " units");
         for (IInstallableUnit iu : set) {
             final Collection<IArtifactKey> artifacts = iu.getArtifacts();
             for (IArtifactKey key : artifacts) {
@@ -108,12 +111,12 @@ public class VerifierServiceImpl implements VerifierService {
         IQueryResult<IArtifactKey> allKeys = repository
                 .query(new ExpressionMatchQuery<>(IArtifactKey.class, ExpressionUtil.TRUE_EXPRESSION), null);
         Set<IArtifactKey> set = allKeys.toSet();
-        logger.debug("Verify content of " + set.size() + " artifacts...");
+        logger.debug("Verifying content of " + set.size() + " artifacts");
         for (IArtifactKey key : set) {
             IArtifactDescriptor[] descriptors = repository.getArtifactDescriptors(key);
             for (IArtifactDescriptor descriptor : descriptors) {
                 boolean verifyArtifactContent = verifyArtifactContent(repository, logger, descriptor);
-                logger.debug("Verify artifact content " + descriptor + ": " + verifyArtifactContent);
+                logger.debug("Verifying artifact content " + descriptor + ": " + verifyArtifactContent);
                 valid &= verifyArtifactContent;
             }
         }

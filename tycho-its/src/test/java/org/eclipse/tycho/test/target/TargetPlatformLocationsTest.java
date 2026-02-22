@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import org.apache.maven.shared.verifier.VerificationException;
-import org.apache.maven.shared.verifier.Verifier;
+import org.apache.maven.it.VerificationException;
+import org.apache.maven.it.Verifier;
 import org.codehaus.plexus.util.xml.Xpp3Dom;
 import org.codehaus.plexus.util.xml.Xpp3DomBuilder;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
@@ -62,7 +62,7 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testMavenArtifactHaveMavenRepoPath() throws Exception {
 		Verifier verifier = getVerifier("target.maven", false, true);
-		verifier.addCliArgument("-DoutputAbsoluteArtifactFilename=true");
+		verifier.addCliOption("-DoutputAbsoluteArtifactFilename=true");
 		verifier.executeGoal("dependency:list");
 		verifier.verifyErrorFreeLog();
 		assertFalse("Location for Maven deps should not resolve to cache",
@@ -104,7 +104,7 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 	@Test
 	public void testTargetPlatformArtifactCaching() throws Exception {
 		Verifier verifier = getVerifier("target.artifact.caching", false, true);
-		verifier.addCliArgument("-Dtycho.localArtifacts=default");
+		verifier.addCliOption("-Dtycho.localArtifacts=default");
 
 		File annotBundleManifestFile = new File(verifier.getBasedir(),
 				"target.test/plugins/osgi.annotation.bundle_0.0.1/META-INF/MANIFEST.MF");
@@ -119,13 +119,10 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 		Files.write(annotBundleManifestFile.toPath(), out, StandardOpenOption.WRITE,
 				StandardOpenOption.TRUNCATE_EXISTING);
 
-		try {
-			verifier.executeGoal("verify");
-			Assert.fail("Reference to the not exported package did not fail the build");
-		} catch (VerificationException expected) {
-			verifier.verifyTextInLog(
-					" Missing requirement: test.bundle 0.0.1.qualifier requires 'java.package; tycho.test.package 0.0.0' but it could not be found");
-		}
+		assertThrows("Reference to the not exported package did not fail the build", VerificationException.class,
+				() -> verifier.executeGoal("verify"));
+		verifier.verifyTextInLog(
+				" Missing requirement: test.bundle 0.0.1.qualifier requires 'java.package; tycho.test.package 0.0.0' but it could not be found");
 	}
 
 	@Test
@@ -165,11 +162,27 @@ public class TargetPlatformLocationsTest extends AbstractTychoIntegrationTest {
 		Verifier verifier = getVerifier("target.maven.eclipse-feature", false, true);
 		verifier.executeGoal("verify");
 		verifier.verifyErrorFreeLog();
+		File targetdir = new File(verifier.getBasedir(), "repository/target");
+		assertFileExists(targetdir, "repository/features/org.eclipse.jgit_6.1.0.202203080745-r.jar");
 	}
 
 	@Test
 	public void testMavenLocationTransitiveFeature() throws Exception {
 		Verifier verifier = getVerifier("target.maven-deps", false, true);
+		verifier.executeGoal("verify");
+		verifier.verifyErrorFreeLog();
+	}
+
+	@Test
+	public void testTargetDefinedInRepositories() throws Exception {
+		Verifier verifier = getVerifier("target.userepositories", false, true);
+		verifier.executeGoal("verify");
+		verifier.verifyErrorFreeLog();
+	}
+
+	@Test
+	public void testTargetRepositoryLocation() throws Exception {
+		Verifier verifier = getVerifier("target.repository", false, true);
 		verifier.executeGoal("verify");
 		verifier.verifyErrorFreeLog();
 	}

@@ -25,16 +25,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.commons.io.FileUtils;
-import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.PGPUtil;
 import org.bouncycastle.openpgp.bc.BcPGPPublicKeyRingCollection;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
@@ -44,22 +45,26 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.eclipse.aether.resolution.ArtifactResult;
+import org.eclipse.tycho.p2maven.transport.TransportCacheConfig;
 
-@Component(role = PGPService.class)
+@Named
+@Singleton
 public class PGPService {
 
     //See GpgSigner.SIGNATURE_EXTENSION
     private static final String SIGNATURE_EXTENSION = ".asc";
-    private static final String CACHE_RELPATH = ".cache/tycho/pgpkeys";
 
     public static final String MAVEN_CENTRAL_KEY_SERVER = "http://pgp.mit.edu/pks/lookup?op=get&search={0}";
     public static final String UBUNTU_KEY_SERVER = "https://keyserver.ubuntu.com/pks/lookup?op=get&search={0}";
 
-    @Requirement
+    @Inject
     Logger logger;
 
-    @Requirement
+    @Inject
     RepositorySystem repositorySystem;
+
+    @Inject
+    TransportCacheConfig transportCacheConfig;
 
     /**
      * Get the attached PGP signature for the given MavenProject
@@ -97,12 +102,11 @@ public class PGPService {
      * @throws IOException
      * @throws PGPException
      */
-    public PGPPublicKeyRing getPublicKey(long keyID, String keyServerUrl, MavenSession session, int keyServerRetry)
+    public PGPPublicKeyRing getPublicKey(long keyID, String keyServerUrl, int keyServerRetry)
             throws IOException, PGPException {
         String hexKey = "0x" + Long.toHexString(keyID).toUpperCase();
-        logger.info("Fetching PGP key with id " + hexKey + "...");
-        File localRepoRoot = new File(session.getLocalRepository().getBasedir());
-        File keyCacheFile = new File(new File(localRepoRoot, CACHE_RELPATH), hexKey + ".pub");
+        logger.info("Fetching PGP key with id " + hexKey);
+        File keyCacheFile = new File(new File(transportCacheConfig.getCacheLocation(), "pgpkeys"), hexKey + ".pub");
         InputStream keyStream;
         if (keyCacheFile.isFile()) {
             logger.debug("Fetching key from cache: " + keyCacheFile.getAbsolutePath());
@@ -138,12 +142,11 @@ public class PGPService {
      * @throws ArtifactResolutionException
      *             if no signature can be resolved
      */
-    public File getSignatureFile(org.apache.maven.artifact.Artifact artifact, RepositorySystemSession session,
+    public File getSignatureFile(Artifact artifact, RepositorySystemSession session,
             List<RemoteRepository> repositories) throws ArtifactResolutionException {
 
         Artifact signatureArtifact = new DefaultArtifact(artifact.getGroupId(), artifact.getArtifactId(),
-                artifact.getClassifier(), artifact.getArtifactHandler().getExtension() + SIGNATURE_EXTENSION,
-                artifact.getVersion());
+                artifact.getClassifier(), artifact.getExtension() + SIGNATURE_EXTENSION, artifact.getVersion());
         ArtifactRequest artifactRequest = new ArtifactRequest(signatureArtifact, repositories, null);
         ArtifactResult dependencyResult = repositorySystem.resolveArtifact(session, artifactRequest);
         Artifact a = dependencyResult.getArtifact();

@@ -17,9 +17,12 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Optional;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
+import org.apache.maven.project.MavenProject;
 import org.codehaus.plexus.logging.Logger;
 import org.eclipse.equinox.p2.metadata.IInstallableUnit;
 import org.eclipse.equinox.p2.publisher.IPublisherAdvice;
@@ -30,36 +33,35 @@ import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.DependencyArtifacts;
 import org.eclipse.tycho.IArtifactFacade;
 import org.eclipse.tycho.ReactorProject;
-import org.eclipse.tycho.TychoConstants;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
 import org.eclipse.tycho.core.TychoProject;
 import org.eclipse.tycho.core.TychoProjectManager;
 import org.eclipse.tycho.core.osgitools.targetplatform.ArtifactCollection;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
 import org.eclipse.tycho.p2.target.facade.PomDependencyCollector;
 import org.eclipse.tycho.p2maven.InstallableUnitGenerator;
 import org.eclipse.tycho.p2maven.InstallableUnitPublisher;
 import org.eclipse.tycho.p2maven.advices.MavenChecksumAdvice;
 import org.eclipse.tycho.p2maven.advices.MavenPropertiesAdvice;
 
-@Component(role = PomUnits.class)
+@Named
+@Singleton
 public class PomUnits {
 
     private static final String KEY = PomUnits.class.getName() + "/dependencies";
 
-    @Requirement
+    @Inject
     TychoProjectManager tychoProjectManager;
 
-    @Requirement
+    @Inject
     InstallableUnitGenerator generator;
 
-    @Requirement
+    @Inject
     InstallableUnitPublisher publisher;
 
-    @Requirement
+    @Inject
     ArtifactHandlerManager artifactHandlerManager;
 
-    @Requirement
+    @Inject
     Logger logger;
 
     public IQueryable<IInstallableUnit> createPomQueryable(ReactorProject reactorProject) {
@@ -67,8 +69,8 @@ public class PomUnits {
         if (tychoProject.isEmpty()) {
             return new CollectionResult<>(Collections.emptyList());
         }
-        TargetPlatformConfiguration configuration = (TargetPlatformConfiguration) reactorProject
-                .getContextValue(TychoConstants.CTX_TARGET_PLATFORM_CONFIGURATION);
+        TargetPlatformConfiguration configuration = tychoProjectManager
+                .getTargetPlatformConfiguration(reactorProject.adapt(MavenProject.class));
         return reactorProject.computeContextValue(KEY, () -> {
             return new PomInstallableUnitStore(tychoProject.get(), reactorProject, generator, artifactHandlerManager,
                     logger, configuration);
@@ -76,9 +78,13 @@ public class PomUnits {
     }
 
     public void addCollectedUnits(PomDependencyCollector collector, ReactorProject reactorProject) {
+        Optional<TychoProject> tychoProject = tychoProjectManager.getTychoProject(reactorProject);
+        if (tychoProject.isEmpty()) {
+            return;
+        }
         Object contextValue = reactorProject.getContextValue(KEY);
         if (contextValue instanceof PomInstallableUnitStore store) {
-            DependencyArtifacts dependencyArtifacts = TychoProjectUtils.getDependencyArtifacts(reactorProject);
+            DependencyArtifacts dependencyArtifacts = tychoProject.get().getDependencyArtifacts(reactorProject);
             store.addPomDependencyConsumer(dependency -> {
                 IArtifactFacade facade = dependency.artifactFacade();
                 Entry<ArtifactKey, IArtifactDescriptor> result = collector.addMavenArtifact(facade,
@@ -92,8 +98,8 @@ public class PomUnits {
                             new MavenChecksumAdvice(facade.getLocation()));
                     publisher.applyAdvices(dependency.installableUnit(), result.getValue(), advices);
                     if (dependencyArtifacts instanceof ArtifactCollection collection) {
-                        collection.addArtifactFile(result.getKey(), dependency.location(),
-                                dependency.installableUnit());
+                        collection.addArtifactFile(result.getKey(), dependency.artifactFacade().getClassifier(),
+                                dependency.location(), dependency.installableUnit());
                     }
                 }
             });

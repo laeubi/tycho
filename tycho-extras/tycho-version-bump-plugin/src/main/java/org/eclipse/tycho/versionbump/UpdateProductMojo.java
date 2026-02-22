@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2010, 2021 Sonatype Inc. and others.
+ * Copyright (c) 2010, 2025 Sonatype Inc. and others.
  * This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License 2.0
  * which accompanies this distribution, and is available at
@@ -18,19 +18,25 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.eclipse.tycho.ArtifactType;
 import org.eclipse.tycho.IllegalArtifactReferenceException;
 import org.eclipse.tycho.MavenRepositoryLocation;
+import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.core.ee.shared.ExecutionEnvironmentConfigurationStub;
 import org.eclipse.tycho.core.resolver.P2ResolutionResult;
+import org.eclipse.tycho.core.resolver.P2Resolver;
+import org.eclipse.tycho.core.resolver.P2ResolverFactory;
 import org.eclipse.tycho.model.PluginRef;
 import org.eclipse.tycho.model.ProductConfiguration;
+import org.eclipse.tycho.p2.target.facade.TargetPlatformConfigurationStub;
 import org.eclipse.tycho.p2maven.repository.P2ArtifactRepositoryLayout;
 
 /**
@@ -43,29 +49,53 @@ public class UpdateProductMojo extends AbstractUpdateMojo {
     @Parameter(defaultValue = "${project.artifactId}.product")
     private File productFile;
 
-    @Override
-    protected void doUpdate() throws IOException, URISyntaxException {
+    @Parameter()
+    private String executionEnvironment;
 
-        for (ArtifactRepository repository : project.getRemoteArtifactRepositories()) {
+    @Component
+    private P2ResolverFactory factory;
+
+    String getExecutionEnvironment() {
+        if (executionEnvironment == null || executionEnvironment.isBlank()) {
+            return getDefaultExecutionEnvironment();
+        }
+        return executionEnvironment;
+    }
+
+    String getDefaultExecutionEnvironment() {
+        return "JavaSE-" + Runtime.version().feature();
+    }
+
+    P2Resolver createResolver() {
+        return factory.createResolver(Collections.singletonList(TargetEnvironment.getRunningEnvironment()));
+
+    }
+
+    @Override
+    protected void doUpdate(File file) throws IOException, URISyntaxException {
+
+        TargetPlatformConfigurationStub resolutionContext = new TargetPlatformConfigurationStub();
+        for (ArtifactRepository repository : getProject().getRemoteArtifactRepositories()) {
             URI uri = new URL(repository.getUrl()).toURI();
             if (repository.getLayout() instanceof P2ArtifactRepositoryLayout) {
                 resolutionContext.addP2Repository(new MavenRepositoryLocation(repository.getId(), uri));
             }
         }
 
-        ProductConfiguration product = ProductConfiguration.read(productFile);
+        ProductConfiguration product = ProductConfiguration.read(file);
 
+        P2Resolver resolver = createResolver();
         for (PluginRef plugin : product.getPlugins()) {
             try {
-                p2.addDependency(ArtifactType.TYPE_ECLIPSE_PLUGIN, plugin.getId(), "0.0.0");
+                resolver.addDependency(ArtifactType.TYPE_ECLIPSE_PLUGIN, plugin.getId(), "0.0.0");
             } catch (IllegalArtifactReferenceException e) {
                 // shouldn't happen for the constant type and version
                 throw new RuntimeException(e);
             }
         }
 
-        P2ResolutionResult result = p2.resolveMetadata(resolutionContext,
-                new ExecutionEnvironmentConfigurationStub(executionEnvironment));
+        P2ResolutionResult result = resolver.resolveMetadata(resolutionContext,
+                new ExecutionEnvironmentConfigurationStub(getExecutionEnvironment()));
 
         Map<String, String> ius = new HashMap<>();
         for (P2ResolutionResult.Entry entry : result.getArtifacts()) {
@@ -79,7 +109,7 @@ public class UpdateProductMojo extends AbstractUpdateMojo {
             }
         }
 
-        ProductConfiguration.write(product, productFile);
+        ProductConfiguration.write(product, file);
     }
 
     @Override

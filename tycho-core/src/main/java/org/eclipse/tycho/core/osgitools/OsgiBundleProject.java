@@ -22,29 +22,25 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import javax.inject.Inject;
+import javax.inject.Named;
+import javax.inject.Singleton;
+
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.toolchain.ToolchainManager;
-import org.codehaus.plexus.component.annotations.Component;
-import org.codehaus.plexus.component.annotations.Requirement;
 import org.codehaus.plexus.logging.Logger;
-import org.eclipse.equinox.p2.metadata.IInstallableUnit;
-import org.eclipse.osgi.container.Module;
-import org.eclipse.osgi.container.ModuleContainer;
-import org.eclipse.osgi.container.ModuleRevision;
-import org.eclipse.osgi.container.namespaces.EclipsePlatformNamespace;
-import org.eclipse.osgi.internal.framework.FilterImpl;
+import org.eclipse.equinox.p2.metadata.IRequirement;
 import org.eclipse.tycho.ArtifactDescriptor;
 import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.ArtifactType;
@@ -53,46 +49,36 @@ import org.eclipse.tycho.ClasspathEntry;
 import org.eclipse.tycho.ClasspathEntry.AccessRule;
 import org.eclipse.tycho.DefaultArtifactKey;
 import org.eclipse.tycho.DependencyArtifacts;
+import org.eclipse.tycho.ExecutionEnvironmentConfiguration;
+import org.eclipse.tycho.OptionalResolutionAction;
 import org.eclipse.tycho.PackagingType;
-import org.eclipse.tycho.PlatformPropertiesUtils;
 import org.eclipse.tycho.ReactorProject;
+import org.eclipse.tycho.ResolvedArtifactKey;
 import org.eclipse.tycho.TargetEnvironment;
 import org.eclipse.tycho.TargetPlatform;
 import org.eclipse.tycho.TychoConstants;
-import org.eclipse.tycho.core.ArtifactDependencyVisitor;
 import org.eclipse.tycho.core.ArtifactDependencyWalker;
 import org.eclipse.tycho.core.BundleProject;
-import org.eclipse.tycho.core.PluginDescription;
+import org.eclipse.tycho.core.DependencyResolverConfiguration;
 import org.eclipse.tycho.core.TargetPlatformConfiguration;
 import org.eclipse.tycho.core.TychoProject;
-import org.eclipse.tycho.core.dotClasspath.ClasspathParser;
-import org.eclipse.tycho.core.dotClasspath.JUnitClasspathContainerEntry;
-import org.eclipse.tycho.core.dotClasspath.LibraryClasspathEntry;
-import org.eclipse.tycho.core.dotClasspath.ProjectClasspathEntry;
 import org.eclipse.tycho.core.ee.ExecutionEnvironmentUtils;
 import org.eclipse.tycho.core.ee.StandardExecutionEnvironment;
-import org.eclipse.tycho.core.ee.shared.ExecutionEnvironment;
-import org.eclipse.tycho.core.ee.shared.ExecutionEnvironmentConfiguration;
 import org.eclipse.tycho.core.osgitools.DefaultClasspathEntry.DefaultAccessRule;
 import org.eclipse.tycho.core.osgitools.DependencyComputer.DependencyEntry;
 import org.eclipse.tycho.core.osgitools.project.BuildOutputJar;
 import org.eclipse.tycho.core.osgitools.project.EclipsePluginProject;
 import org.eclipse.tycho.core.osgitools.project.EclipsePluginProjectImpl;
-import org.eclipse.tycho.core.resolver.P2ResolutionResult;
-import org.eclipse.tycho.core.resolver.P2ResolutionResult.Entry;
-import org.eclipse.tycho.core.resolver.P2Resolver;
+import org.eclipse.tycho.core.osgitools.targetplatform.DefaultDependencyArtifacts;
 import org.eclipse.tycho.core.resolver.P2ResolverFactory;
-import org.eclipse.tycho.core.utils.TychoProjectUtils;
-import org.eclipse.tycho.model.Feature;
-import org.eclipse.tycho.model.ProductConfiguration;
-import org.eclipse.tycho.model.UpdateSite;
-import org.osgi.framework.BundleException;
-import org.osgi.framework.Constants;
+import org.eclipse.tycho.model.classpath.JUnitBundle;
+import org.eclipse.tycho.model.classpath.JUnitClasspathContainerEntry;
+import org.eclipse.tycho.model.classpath.LibraryClasspathEntry;
+import org.eclipse.tycho.model.classpath.ProjectClasspathEntry;
 import org.osgi.framework.Filter;
-import org.osgi.framework.FrameworkUtil;
-import org.osgi.framework.InvalidSyntaxException;
 
-@Component(role = TychoProject.class, hint = PackagingType.TYPE_ECLIPSE_PLUGIN)
+@Named(PackagingType.TYPE_ECLIPSE_PLUGIN)
+@Singleton
 public class OsgiBundleProject extends AbstractTychoProject implements BundleProject {
 
     private static final String CTX_OSGI_BUNDLE_BASENAME = TychoConstants.CTX_BASENAME + "/osgiBundle";
@@ -100,66 +86,31 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
     private static final String CTX_CLASSPATH = CTX_OSGI_BUNDLE_BASENAME + "/classPath";
     static final String CTX_ECLIPSE_PLUGIN_PROJECT = CTX_OSGI_BUNDLE_BASENAME + "/eclipsePluginProject";
 
-    @Requirement
+    @Inject
     private BundleReader bundleReader;
 
-    @Requirement
-    private ClasspathParser classpathParser;
+    @Inject
+    private ClasspathReader classpathParser;
 
-    @Requirement
-    private EquinoxResolver resolver;
+    @Inject
+    @Named(EquinoxResolver.HINT)
+    private DependenciesResolver resolver;
 
-    @Requirement
-    private DependencyComputer dependencyComputer;
-
-    @Requirement
-    private Logger logger;
-
-    @Requirement
+    @Inject
     private ToolchainManager toolchainManager;
 
-    @Requirement
+    @Inject
     P2ResolverFactory resolverFactory;
 
-    @Requirement
+    @Inject
     private BuildPropertiesParser buildPropertiesParser;
+
+    @Inject
+    private MavenBundleResolver mavenBundleResolver;
 
     @Override
     public ArtifactDependencyWalker getDependencyWalker(ReactorProject project) {
-        final DependencyArtifacts artifacts = getDependencyArtifacts(project);
-
-        final List<ClasspathEntry> cp = getClasspath(project);
-
-        return new ArtifactDependencyWalker() {
-            @Override
-            public void walk(ArtifactDependencyVisitor visitor) {
-                for (ClasspathEntry entry : cp) {
-                    ArtifactDescriptor artifact = artifacts.getArtifact(entry.getArtifactKey());
-                    ArtifactKey key = artifact.getKey();
-                    File location = artifact.getLocation(true);
-                    ReactorProject project = artifact.getMavenProject();
-                    String classifier = artifact.getClassifier();
-                    Collection<IInstallableUnit> installableUnits = artifact.getInstallableUnits();
-
-                    PluginDescription plugin = new DefaultPluginDescription(key, location, project, classifier, null,
-                            installableUnits);
-
-                    visitor.visitPlugin(plugin);
-                }
-            }
-
-            @Override
-            public void traverseFeature(File location, Feature feature, ArtifactDependencyVisitor visitor) {
-            }
-
-            @Override
-            public void traverseUpdateSite(UpdateSite site, ArtifactDependencyVisitor artifactDependencyVisitor) {
-            }
-
-            @Override
-            public void traverseProduct(ProductConfiguration productConfiguration, ArtifactDependencyVisitor visitor) {
-            }
-        };
+        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -194,69 +145,72 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
     }
 
     private BundleClassPath resolveClassPath(MavenSession session, MavenProject project) {
-        logger.info("Resolving class path of " + project.getName() + "...");
+        logger.info("Resolving class path of " + project.getName());
         ReactorProject reactorProject = DefaultReactorProject.adapt(project);
-        DependencyArtifacts artifacts = getDependencyArtifacts(reactorProject);
-
-        ModuleContainer state = getResolverState(reactorProject, artifacts, session);
-
-//        if (getLogger().isDebugEnabled() && DebugUtils.isDebugEnabled(session, project)) {
-//            getLogger().debug(resolver.toDebugString(state));
-//        }
-
-        Module module = state.getModule(project.getBasedir().getAbsolutePath());
-        if (module == null) {
-            Module systemModule = state.getModule(Constants.SYSTEM_BUNDLE_LOCATION);
-            if (project.getBasedir().equals(systemModule.getCurrentRevision().getRevisionInfo())) {
-                module = systemModule;
-            }
-        }
-        ModuleRevision bundleDescription = module.getCurrentRevision();
-
-        List<ClasspathEntry> classpath = new ArrayList<>();
-
-        // dependencies
         List<AccessRule> strictBootClasspathAccessRules = new ArrayList<>();
         strictBootClasspathAccessRules.add(new DefaultAccessRule("java/**", false));
-        List<DependencyEntry> dependencies = dependencyComputer.computeDependencies(bundleDescription);
-        for (DependencyEntry entry : dependencies) {
-            if (Constants.SYSTEM_BUNDLE_ID == entry.module.getRevisions().getModule().getId()) {
-                if (entry.rules != null) {
-                    strictBootClasspathAccessRules.addAll(entry.rules);
-                }
+        DependencyArtifacts artifacts = getDependencyArtifacts(reactorProject);
+        List<ClasspathEntry> classpath = new ArrayList<>();
+        File bndFile = new File(project.getBasedir(), TychoConstants.PDE_BND);
+        List<AccessRule> bootClasspathExtraAccessRules;
+        ArtifactKey artifactKey = projectManager.getArtifactKey(project).get();
+        if (bndFile.exists()) {
+            bootClasspathExtraAccessRules = List.of();
+            classpath.add(new DefaultClasspathEntry(reactorProject, artifactKey,
+                    List.of(new File(project.getBuild().getOutputDirectory())), null));
+            List<ArtifactDescriptor> bundles = artifacts.getArtifacts(ArtifactType.TYPE_ECLIPSE_PLUGIN);
+            for (ArtifactDescriptor bundle : bundles) {
+                //TODO we might want to compute the access rules based on the manifest exported packages
+                Collection<AccessRule> rules = null;
+                classpath.add(new DefaultClasspathEntry(bundle.getMavenProject(), bundle.getKey(),
+                        List.of(bundle.fetchArtifact().join()), rules));
             }
-            File location = (File) entry.module.getRevisionInfo();
-            if (location != null && location.exists()) {
-                ArtifactDescriptor otherArtifact = getArtifact(artifacts, location, entry.module.getSymbolicName());
-                if (otherArtifact != null) {
-                    ReactorProject otherProject = otherArtifact.getMavenProject();
-                    List<File> locations;
-                    if (otherProject != null) {
-                        locations = getOtherProjectClasspath(otherArtifact, otherProject, null);
+        } else {
+            DependenciesInfo dependenciesInfo = resolver.computeDependencies(project, artifacts, session);
+            for (DependencyEntry entry : dependenciesInfo.getDependencyEntries()) {
+                if (entry.isSystemBundle()) {
+                    if (entry.getRules() != null) {
+                        strictBootClasspathAccessRules.addAll(entry.getRules());
+                    }
+                }
+                File location = entry.getLocation();
+                if (location != null && location.exists()) {
+                    ArtifactDescriptor otherArtifact = entry.getArtifactDescriptor();
+                    if (otherArtifact != null) {
+                        ReactorProject otherProject = otherArtifact.getMavenProject();
+                        List<File> locations;
+                        if (otherProject != null) {
+                            locations = getOtherProjectClasspath(otherArtifact, otherProject, null);
+                        } else {
+                            locations = getBundleClasspath(otherArtifact);
+                        }
+
+                        if (locations.isEmpty() && !entry.getRules().isEmpty()) {
+                            logger.warn("Empty classpath of required bundle " + otherArtifact);
+                        }
+
+                        classpath.add(new DefaultClasspathEntry(otherProject, otherArtifact.getKey(), locations,
+                                entry.getRules()));
                     } else {
-                        locations = getBundleClasspath(otherArtifact);
+                        logger.debug("Cannot fetch artifact info for " + entry.getSymbolicName() + " and location "
+                                + location + ", using raw jar item for classpath");
+                        classpath.add(new DefaultClasspathEntry(null,
+                                new DefaultArtifactKey(ArtifactType.TYPE_ECLIPSE_PLUGIN, entry.getSymbolicName(),
+                                        entry.getVersion().toString()),
+                                Collections.singletonList(location), entry.getRules()));
                     }
-
-                    if (locations.isEmpty() && !entry.rules.isEmpty()) {
-                        getLogger().warn("Empty classpath of required bundle " + otherArtifact);
-                    }
-
-                    classpath.add(
-                            new DefaultClasspathEntry(otherProject, otherArtifact.getKey(), locations, entry.rules));
                 }
             }
+
+            // build.properties/jars.extra.classpath
+            addExtraClasspathEntries(classpath, reactorProject, artifacts);
+
+            // project itself 
+            List<File> projectClasspath = getThisProjectClasspath(reactorProject, project);
+            classpath.add(new DefaultClasspathEntry(reactorProject, artifactKey, projectClasspath, null));
+
+            bootClasspathExtraAccessRules = dependenciesInfo.getBootClasspathExtraAccessRules();
         }
-
-        // build.properties/jars.extra.classpath
-        addExtraClasspathEntries(classpath, reactorProject, artifacts);
-
-        // project itself
-        ArtifactDescriptor artifact = getArtifact(artifacts, project.getBasedir(), bundleDescription.getSymbolicName());
-        List<File> projectClasspath = getThisProjectClasspath(artifact, reactorProject);
-        classpath.add(new DefaultClasspathEntry(reactorProject, artifact.getKey(), projectClasspath, null));
-
-        List<AccessRule> bootClasspathExtraAccessRules = dependencyComputer.computeBootClasspathExtraAccessRules(state);
-
         addPDESourceRoots(project);
         return new BundleClassPath(classpath, strictBootClasspathAccessRules, bootClasspathExtraAccessRules);
     }
@@ -267,75 +221,49 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
         Collection<ProjectClasspathEntry> entries = getEclipsePluginProject(reactorProject).getClasspathEntries();
         for (ProjectClasspathEntry cpe : entries) {
             if (cpe instanceof JUnitClasspathContainerEntry junit) {
-                logger.info("Resolve JUnit " + junit.getJUnitSegment() + " classpath container...");
-                P2Resolver resolver = resolverFactory.createResolver(
-                        Collections.singletonList(TargetEnvironment.getRunningEnvironment(reactorProject)));
-                TargetPlatform tp = TychoProjectUtils.getTargetPlatform(reactorProject);
-                Collection<P2ResolutionResult> result = resolver.resolveArtifactDependencies(tp, junit.getArtifacts())
-                        .values();
-                for (P2ResolutionResult resolutionResult : result) {
-                    for (Entry entry : resolutionResult.getArtifacts()) {
-                        logger.debug("Resolved " + entry.getId() + "::" + entry.getVersion() + "...");
-                        File location = entry.getLocation(true);
-                        list.add(new DefaultClasspathEntry(null, entry, Collections.singletonList(location),
+                logger.info("Resolving JUnit " + junit.getJUnitSegment() + " classpath container");
+
+                for (JUnitBundle junitBundle : junit.getArtifacts().toList()) {
+                    Optional<ResolvedArtifactKey> mavenBundle = mavenBundleResolver.resolveMavenBundle(
+                            reactorProject.adapt(MavenProject.class), reactorProject.adapt(MavenSession.class),
+                            ClasspathReader.toMaven(junitBundle));
+                    mavenBundle.ifPresent(key -> {
+                        list.add(new DefaultClasspathEntry(key,
                                 Collections.singletonList(new DefaultAccessRule("**/*", false))));
-                    }
+                    });
                 }
             }
         }
         return list;
     }
 
-    protected ArtifactDescriptor getArtifact(DependencyArtifacts artifacts, File location, String id) {
-        Map<String, ArtifactDescriptor> classified = artifacts.getArtifact(location);
-        if (classified != null) {
-            for (ArtifactDescriptor artifact : classified.values()) {
-                if (id.equals(artifact.getKey().getId())) {
-                    return artifact;
-                }
-            }
-        }
-        return null;
-    }
-
     private void addPDESourceRoots(MavenProject project) {
         EclipsePluginProject eclipsePluginProject = getEclipsePluginProject(DefaultReactorProject.adapt(project));
         for (BuildOutputJar outputJar : eclipsePluginProject.getOutputJars()) {
             for (File sourceFolder : outputJar.getSourceFolders()) {
-                removeDuplicateTestCompileRoot(sourceFolder, project.getTestCompileSourceRoots());
+                removeDuplicateTestCompileRoot(sourceFolder, project);
                 project.addCompileSourceRoot(sourceFolder.getAbsolutePath());
             }
         }
     }
 
-    private void removeDuplicateTestCompileRoot(File sourceFolder, List<String> testCompileSourceRoots) {
-        for (Iterator<String> iterator = testCompileSourceRoots.iterator(); iterator.hasNext();) {
-            String testCompileRoot = iterator.next();
+    private void removeDuplicateTestCompileRoot(File sourceFolder, MavenProject project) {
+        for (String testCompileRoot : project.getTestCompileSourceRoots()) {
             if (sourceFolder.equals(new File(testCompileRoot))) {
                 // avoid duplicate source folders (bug 368445)
-                iterator.remove();
-                getLogger()
-                        .debug("Removed duplicate test compile root " + testCompileRoot + " from maven project model");
+                logger
+                .debug("Removed duplicate test compile root " + testCompileRoot + " from maven project model");
+                project.removeTestCompileSourceRoot(testCompileRoot);
                 return;
             }
         }
     }
 
-    private ModuleContainer getResolverState(ReactorProject project, DependencyArtifacts artifacts,
-            MavenSession session) {
-        try {
-            ExecutionEnvironmentConfiguration eeConfiguration = TychoProjectUtils
-                    .getExecutionEnvironmentConfiguration(project);
-            ExecutionEnvironment executionEnvironment = eeConfiguration.getFullSpecification();
-            return resolver.newResolvedState(project, session,
-                    eeConfiguration.isIgnoredByResolver() ? null : executionEnvironment, artifacts);
-        } catch (BundleException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     @Override
     public EclipsePluginProject getEclipsePluginProject(ReactorProject otherProject) {
+        if (otherProject == null) {
+            return null;
+        }
         EclipsePluginProjectImpl pdeProject = (EclipsePluginProjectImpl) otherProject
                 .getContextValue(CTX_ECLIPSE_PLUGIN_PROJECT);
         if (pdeProject == null) {
@@ -377,19 +305,15 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
         return getBundleClassPath(project).getExtraBootClasspathAccessRules();
     }
 
-    public synchronized BundleClassPath getBundleClassPath(ReactorProject project) {
-        if (project.getContextValue(CTX_CLASSPATH) instanceof BundleClassPath bundleClassPath) {
-            return bundleClassPath;
-        }
-        BundleClassPath cp = resolveClassPath(getMavenSession(project), getMavenProject(project));
-        project.setContextValue(CTX_CLASSPATH, cp);
-        return cp;
+    public BundleClassPath getBundleClassPath(ReactorProject project) {
+        return project.computeContextValue(CTX_CLASSPATH,
+                () -> resolveClassPath(getMavenSession(project), getMavenProject(project)));
     }
 
     /**
      * Returns project compile classpath entries.
      */
-    private List<File> getThisProjectClasspath(ArtifactDescriptor bundle, ReactorProject project) {
+    private List<File> getThisProjectClasspath(ReactorProject project, MavenProject mavenProject) {
         LinkedHashSet<File> classpath = new LinkedHashSet<>();
 
         EclipsePluginProject pdeProject = getEclipsePluginProject(project);
@@ -403,12 +327,12 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
 
         // Bundle-ClassPath entries that do not have associated output folders
         // => assume it's checked into SCM or will be copied here later during build
-        for (String cp : parseBundleClasspath(bundle)) {
+        OsgiManifest mf = bundleReader.loadManifest(mavenProject);
+        for (String cp : mf.getBundleClasspath()) {
             if (!outputJars.containsKey(cp)) {
                 classpath.add(new File(project.getBasedir(), cp));
             }
         }
-
         return new ArrayList<>(classpath);
     }
 
@@ -467,7 +391,7 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
                     if (matchingBundle != null) {
                         classpath.add(addBundleToClasspath(matchingBundle, path));
                     } else {
-                        getLogger().warn("Missing extra classpath entry " + entry.trim());
+                        logger.warn("Missing extra classpath entry " + entry.trim());
                     }
                 } else {
                     entry = entry.trim();
@@ -477,7 +401,7 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
                         ArtifactKey projectKey = getArtifactKey(project);
                         classpath.add(new DefaultClasspathEntry(project, projectKey, locations, null));
                     } else {
-                        getLogger().warn("Missing extra classpath entry " + entry);
+                        logger.warn("Missing extra classpath entry " + entry);
                     }
                 }
             }
@@ -492,12 +416,18 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
                 }
             }
         }
+        Collection<TargetEnvironment> environments = projectManager
+                .getTargetEnvironments(project.adapt(MavenProject.class));
         //Fragments are like embedded dependencies...
         for (ArtifactDescriptor fragment : artifacts.getFragments()) {
             File location = fragment.getLocation(true);
             if (location != null) {
-                classpath.add(new DefaultClasspathEntry(null, readArtifactKey(location),
-                        Collections.singletonList(location), null));
+                OsgiManifest manifest = bundleReader.loadManifest(location);
+                Filter filter = manifest.getTargetEnvironmentFilter();
+                if (filter == null || environments.stream().anyMatch(env -> env.match(filter))) {
+                    classpath.add(new DefaultClasspathEntry(null, readArtifactKey(location),
+                            Collections.singletonList(location), null));
+                }
             }
         }
     }
@@ -551,7 +481,8 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
     }
 
     private String[] parseBundleClasspath(ArtifactDescriptor bundle) {
-        OsgiManifest mf = bundleReader.loadManifest(bundle.getLocation(true));
+        File location = bundle.getLocation(true);
+        OsgiManifest mf = bundleReader.loadManifest(location);
         return mf.getBundleClasspath();
     }
 
@@ -561,53 +492,12 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
 
     @Override
     public TargetEnvironment getImplicitTargetEnvironment(MavenProject project) {
-        String filterStr = getManifestValue(EclipsePlatformNamespace.ECLIPSE_PLATFORM_FILTER_HEADER, project);
-
-        if (filterStr != null) {
-            try {
-                FilterImpl filter = FilterImpl.newInstance(filterStr);
-
-                String ws = sn(filter.getPrimaryKeyValue(PlatformPropertiesUtils.OSGI_WS));
-                String os = sn(filter.getPrimaryKeyValue(PlatformPropertiesUtils.OSGI_OS));
-                String arch = sn(filter.getPrimaryKeyValue(PlatformPropertiesUtils.OSGI_ARCH));
-
-                // validate if os/ws/arch are not null and actually match the filter
-                if (ws != null && os != null && arch != null) {
-                    Map<String, String> properties = new HashMap<>();
-                    properties.put(PlatformPropertiesUtils.OSGI_WS, ws);
-                    properties.put(PlatformPropertiesUtils.OSGI_OS, os);
-                    properties.put(PlatformPropertiesUtils.OSGI_ARCH, arch);
-
-                    if (filter.matches(properties)) {
-                        return new TargetEnvironment(os, ws, arch);
-                    }
-                }
-            } catch (InvalidSyntaxException e) {
-                // at least we tried...
-            }
-        }
-
-        return null;
+        return getManifest(DefaultReactorProject.adapt(project)).getImplicitTargetEnvironment();
     }
 
     @Override
     public Filter getTargetEnvironmentFilter(MavenProject project) {
-        String filterStr = getManifestValue(EclipsePlatformNamespace.ECLIPSE_PLATFORM_FILTER_HEADER, project);
-        if (filterStr != null) {
-            try {
-                return FrameworkUtil.createFilter(filterStr);
-            } catch (InvalidSyntaxException e) {
-                // at least we tried...
-            }
-        }
-        return super.getTargetEnvironmentFilter(project);
-    }
-
-    private static String sn(String str) {
-        if (str != null && !str.isBlank()) {
-            return str;
-        }
-        return null;
+        return getManifest(DefaultReactorProject.adapt(project)).getTargetEnvironmentFilter();
     }
 
     @Override
@@ -628,7 +518,7 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
                 applyBestOfCurrentOrConfiguredProfile(manifestBREEs[0],
                         "Bundle-RequiredExecutionEnvironment (unique entry)", mavenSession, sink);
             } else if (manifestBREEs.length > 1) {
-                TargetPlatformConfiguration tpConfiguration = TychoProjectUtils.getTargetPlatformConfiguration(project);
+                TargetPlatformConfiguration tpConfiguration = projectManager.getTargetPlatformConfiguration(project);
                 switch (tpConfiguration.getBREEHeaderSelectionPolicy()) {
                 case first:
                     applyBestOfCurrentOrConfiguredProfile(manifestBREEs[0],
@@ -651,18 +541,22 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
             MavenSession mavenSession, ExecutionEnvironmentConfiguration sink) {
         StandardExecutionEnvironment configuredProfile = ExecutionEnvironmentUtils
                 .getExecutionEnvironment(configuredProfileName, toolchainManager, mavenSession, logger);
-        if (configuredProfile != null) {
-            // non standard profile, stick to it
-            sink.setProfileConfiguration(configuredProfileName, reason);
+        if (configuredProfile == null) {
+            //should never be the case as Tycho delegates to other profiles, but if we need to stick to the defaults...
+            return;
         }
-        StandardExecutionEnvironment currentProfile = ExecutionEnvironmentUtils.getExecutionEnvironment(
-                "JavaSE-" + Runtime.version().feature(), toolchainManager, mavenSession, logger);
-        if (currentProfile.compareTo(configuredProfile) > 0) {
-            sink.setProfileConfiguration(currentProfile.getProfileName(),
-                    "Currently running profile, newer than configured profile (" + configuredProfileName + ") from ["
-                            + reason + "]");
-        } else {
+        if (sink.isResolveWithEEConstraints()) {
             sink.setProfileConfiguration(configuredProfileName, reason);
+        } else {
+            StandardExecutionEnvironment currentProfile = ExecutionEnvironmentUtils.getExecutionEnvironment(
+                    "JavaSE-" + Runtime.version().feature(), toolchainManager, mavenSession, logger);
+            if (currentProfile != null && currentProfile.compareTo(configuredProfile) > 0) {
+                sink.setProfileConfiguration(currentProfile.getProfileName(),
+                        "Currently running profile, newer than configured profile (" + configuredProfileName
+                                + ") from [" + reason + "]");
+            } else {
+                sink.setProfileConfiguration(configuredProfileName, reason);
+            }
         }
     }
 
@@ -692,8 +586,41 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
         }
     }
 
-    public DependencyArtifacts getTestDependencyArtifacts(ReactorProject project) {
-        return TychoProjectUtils.getTestDependencyArtifacts(project);
+    @Override
+    public DependencyArtifacts getTestDependencyArtifacts(ReactorProject reactorProject) {
+        return reactorProject.computeContextValue(TychoConstants.CTX_TEST_DEPENDENCY_ARTIFACTS, () -> {
+            List<ArtifactKey> testDependencies = getExtraTestRequirements(reactorProject);
+            if (testDependencies.isEmpty()) {
+                return new DefaultDependencyArtifacts();
+            }
+            logger.info("Resolving test dependencies of " + reactorProject);
+            MavenSession mavenSession = getMavenSession(reactorProject);
+            MavenProject mavenProject = getMavenProject(reactorProject);
+            TargetPlatformConfiguration configuration = projectManager.getTargetPlatformConfiguration(mavenProject);
+            DependencyResolverConfiguration resolverConfiguration = configuration.getDependencyResolverConfiguration();
+            DependencyResolverConfiguration testResolverConfiguration = new DependencyResolverConfiguration() {
+                @Override
+                public OptionalResolutionAction getOptionalResolutionAction() {
+                    return resolverConfiguration.getOptionalResolutionAction();
+                }
+
+                @Override
+                public List<ArtifactKey> getAdditionalArtifacts() {
+                    ArrayList<ArtifactKey> res = new ArrayList<>(resolverConfiguration.getAdditionalArtifacts());
+                    res.addAll(testDependencies);
+                    return res;
+                }
+
+                @Override
+                public Collection<IRequirement> getAdditionalRequirements() {
+                    return resolverConfiguration.getAdditionalRequirements();
+                }
+            };
+            TargetPlatform preliminaryTargetPlatform = dependencyResolver.getPreliminaryTargetPlatform(mavenSession,
+                    mavenProject);
+            return dependencyResolver.resolveDependencies(mavenSession, mavenProject, preliminaryTargetPlatform,
+                    testResolverConfiguration, configuration.getEnvironments());
+        });
     }
 
     @Override
@@ -702,7 +629,7 @@ public class OsgiBundleProject extends AbstractTychoProject implements BundlePro
         Collection<ProjectClasspathEntry> entries = getEclipsePluginProject(project).getClasspathEntries();
         for (ProjectClasspathEntry cpe : entries) {
             if (cpe instanceof JUnitClasspathContainerEntry junitEntry) {
-                list.addAll(junitEntry.getArtifacts());
+                list.addAll(ClasspathReader.asMaven(junitEntry.getArtifacts().toList()));
             }
         }
         return list;

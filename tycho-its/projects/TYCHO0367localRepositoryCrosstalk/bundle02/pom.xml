@@ -20,9 +20,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
         <groupId>org.eclipse.tycho</groupId>
         <artifactId>target-platform-configuration</artifactId>
         <version>${tycho-version}</version>
-        <configuration>
-          <resolver>p2</resolver>
-        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -31,7 +28,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xs
     <repository>
       <id>galileo</id>
       <layout>p2</layout>
-      <url>${p2.repo}</url>
+      <url>${target-platform}</url>
     </repository>
   </repositories>
 

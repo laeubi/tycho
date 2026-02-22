@@ -37,10 +37,10 @@ import org.eclipse.equinox.p2.repository.artifact.IArtifactDescriptor;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactRepository;
 import org.eclipse.equinox.p2.repository.artifact.IArtifactRepositoryManager;
 import org.eclipse.equinox.p2.repository.artifact.spi.ArtifactDescriptor;
+import org.eclipse.tycho.IArtifactSink;
+import org.eclipse.tycho.WriteSessionContext;
 import org.eclipse.tycho.core.test.utils.ResourceUtil;
-import org.eclipse.tycho.p2.artifact.provider.streaming.IArtifactSink;
 import org.eclipse.tycho.p2.repository.module.ModuleArtifactRepository;
-import org.eclipse.tycho.repository.publishing.WriteSessionContext;
 import org.eclipse.tycho.testing.TychoPlexusTestCase;
 import org.junit.BeforeClass;
 import org.junit.Rule;
@@ -236,8 +236,7 @@ public class ModuleArtifactRepositoryTest extends TychoPlexusTestCase {
 
     private static void generateBinaryTestFile(File file, int size) throws IOException {
         file.getParentFile().mkdirs();
-        try (FileOutputStream fos = new FileOutputStream(file)) {
-            OutputStream os = new BufferedOutputStream(fos);
+        try (OutputStream os = new BufferedOutputStream(new FileOutputStream(file))) {
             for (int i = 0; i < size; ++i) {
                 os.write(0);
             }

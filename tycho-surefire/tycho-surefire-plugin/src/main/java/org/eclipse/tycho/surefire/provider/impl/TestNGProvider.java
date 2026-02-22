@@ -12,25 +12,27 @@
  ******************************************************************************/
 package org.eclipse.tycho.surefire.provider.impl;
 
-import static java.util.Collections.singletonList;
-import static org.eclipse.tycho.surefire.provider.impl.ProviderHelper.newDependency;
+import static org.eclipse.tycho.surefire.provider.impl.DefaultProviderHelper.newDependency;
 
 import java.util.List;
 import java.util.Properties;
 
+import javax.inject.Named;
+
 import org.apache.maven.model.Dependency;
 import org.apache.maven.project.MavenProject;
-import org.codehaus.plexus.component.annotations.Component;
 import org.eclipse.tycho.ArtifactKey;
 import org.eclipse.tycho.ClasspathEntry;
 import org.eclipse.tycho.surefire.provider.spi.TestFrameworkProvider;
 import org.osgi.framework.Version;
+import org.osgi.framework.VersionRange;
 
-@Component(role = TestFrameworkProvider.class, hint = "testng")
+@Named("testng")
 public class TestNGProvider implements TestFrameworkProvider {
 
     private static final String TESTNG_BSN = "org.testng";
     private static final Version VERSION = Version.parseVersion("6.9.10");
+    private static final VersionRange VERSION_RANGE = new VersionRange("[6,7)");
 
     @Override
     public String getType() {
@@ -48,7 +50,8 @@ public class TestNGProvider implements TestFrameworkProvider {
     }
 
     @Override
-    public boolean isEnabled(MavenProject project, List<ClasspathEntry> testBundleClassPath, Properties surefireProperties) {
+    public boolean isEnabled(MavenProject project, List<ClasspathEntry> testBundleClassPath,
+            Properties surefireProperties) {
         for (ClasspathEntry classpathEntry : testBundleClassPath) {
             ArtifactKey artifactKey = classpathEntry.getArtifactKey();
             if (TESTNG_BSN.equals(artifactKey.getId())) {
@@ -59,8 +62,9 @@ public class TestNGProvider implements TestFrameworkProvider {
     }
 
     @Override
-    public List<Dependency> getRequiredBundles() {
-        return singletonList(newDependency("org.eclipse.tycho", "org.eclipse.tycho.surefire.testng"));
+    public List<Dependency> getRequiredArtifacts() {
+        return List.of(newDependency("org.eclipse.tycho.surefire.testng"),
+                newDependency("org.eclipse.tycho.surefire.testng.fixup"));
     }
 
     @Override
@@ -68,6 +72,11 @@ public class TestNGProvider implements TestFrameworkProvider {
         Properties properties = new Properties();
         properties.setProperty("testng.configurator", "org.apache.maven.surefire.testng.conf.TestNG60Configurator");
         return properties;
+    }
+
+    @Override
+    public VersionRange getVersionRange() {
+        return VERSION_RANGE;
     }
 
 }
