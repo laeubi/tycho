@@ -173,11 +173,16 @@ public class ProxySupportTest extends AbstractTychoIntegrationTest {
 		List<String> cliOptions = verifier.getCliOptions();
 		for (Iterator<String> iterator = cliOptions.iterator(); iterator.hasNext();) {
 			String arg = iterator.next();
-			if (arg.startsWith("-s ")) {
+			if (arg.equals("-s")) {
 				iterator.remove();
+				if (iterator.hasNext()) {
+					iterator.next();
+					iterator.remove();
+				}
 			}
 		}
-		cliOptions.add("-s " + settings.getCanonicalPath());
+		cliOptions.add("-s");
+		cliOptions.add(settings.getCanonicalPath());
 	}
 
 	private void configureProxyInSettingsXml(boolean isProxyActive, String user, String password) throws Exception {

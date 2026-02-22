@@ -58,7 +58,7 @@ public class TargetDefinitionPackagingTypeTest extends AbstractTychoIntegrationT
 		verifier.addCliArgument("install");
 		verifier.execute();
 		verifier.verifyErrorFreeLog();
-		verifier.assertArtifactContents(TARGET_GROUPID, TARGET_ARTIFACTID, TARGET_VERSION, TARGET_EXTENSION,
+		verifier.verifyArtifactContent(TARGET_GROUPID, TARGET_ARTIFACTID, TARGET_VERSION, TARGET_EXTENSION,
 				Files.readString(targetDefinitionFile.toPath()));
 		// then, run the build of the bundle module only which should now
 		// be able to resolve the target definition from the local repo
