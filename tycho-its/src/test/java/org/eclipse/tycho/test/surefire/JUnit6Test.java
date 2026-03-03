@@ -31,8 +31,7 @@ public class JUnit6Test extends AbstractTychoIntegrationTest {
 	 */
 	@Test
 	public void testJUnit6ProviderHint() throws Exception {
-		final Verifier verifier = getVerifier("/tycho-surefire-plugin/junit6/basic", false);
-		verifier.addCliArgument("-Dtarget-platform=https:///download.eclipse.org/releases/2025-12");
+		final Verifier verifier = getVerifier("/tycho-surefire-plugin/junit6/basic");
 		verifier.executeGoal("verify");
 		verifier.verifyErrorFreeLog();
 		final String projectBasedir = verifier.getBasedir();
