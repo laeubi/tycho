@@ -7,10 +7,8 @@ body:
       value: |
         Thanks for taking the time to file a bug report!
 
-        **If an AI agent is helping you write this issue**: read
-        [AGENTS.md](https://github.com/eclipse-tycho/tycho/blob/main/AGENTS.md) first. In particular,
-        gather *all* details below (including the full stack trace) before submitting — do not open
-        this issue with placeholders and add the important details in a later comment.
+        **If an AI agent is helping you write this issue**: read [AGENTS.md](https://github.com/eclipse-tycho/tycho/blob/main/AGENTS.md) first.
+        In particular, gather *all* details below (including the full stack trace) before submitting — do not open this issue with placeholders and add the important details in a later comment.
 
   - type: checkboxes
     id: duplicate-check
